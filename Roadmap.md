@@ -120,12 +120,7 @@ User Request ("Angela...") → Shell Integration Layer →
    - Consider caching project structure for performance
    - Support explicit root definition via configuration file
 
-3. **Safety Prioritization:**
-   - Implement progressive permission model (read-only first, then file creation, then modification)
-   - Use clear visual differentiation for dangerous operations
-   - Provide "dry run" capabilities for complex workflows
-
-4. **Performance Optimization:**
+3. **Performance Optimization:**
    - Implement local caching of context information
    - Consider request queueing for non-blocking operation
    - Design for graceful degradation during API outages
