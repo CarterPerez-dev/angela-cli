@@ -1,88 +1,139 @@
 # Angela-CLI
 --
-Core Concept:
+## Core Concept: Brief Description
+Okay, let's dive deeper into the concept of an AI-powered command-line assistant integrated into your terminal shell.
 
-IntelliShell aims to revolutionize the command-line experience by embedding a powerful AI agent directly within the user's standard terminal environment (like Bash, Zsh, etc.). Instead of requiring users to memorize complex commands, flags, and syntax, IntelliShell allows them to express their intent in natural language. The AI agent interprets these requests and translates them into the appropriate shell commands, file manipulations, or code generation tasks, executing them safely upon user confirmation. It acts as an intelligent copilot for terminal operations, enhancing productivity, reducing errors, and lowering the barrier to entry for complex tasks.
+**Project Title:** **Angela-CLI** 
 
-Detailed Functionality & Capabilities:
+**Core Concept:**
 
-Natural Language Command Interpretation:
+Angela-CLI aims to revolutionize the command-line experience by embedding a powerful AI agent directly within the user's standard terminal environment (like Bash, Zsh, etc.). Instead of requiring users to memorize complex commands, flags, and syntax, allows them to express their intent in natural language. The AI agent interprets these requests and translates them into the appropriate shell commands, file manipulations, or code generation tasks, executing them safely upon user confirmation. It acts as an intelligent copilot for terminal operations, enhancing productivity, reducing errors, and lowering the barrier to entry for complex tasks.
 
-Users type prompts like: "Find all Python files modified in the last 2 days", "Show me the disk usage for the /var/log directory", "What's my current IP address?".
+**Detailed Functionality & Capabilities:**
 
-The AI parses the intent, identifies key entities (file types, timeframes, directories, requested information), and formulates the corresponding shell command(s) (e.g., find . -name '*.py' -mtime -2, du -sh /var/log, ip addr show).
+1.  **Natural Language Command Interpretation:**
+    *   Users type prompts like: `"Find all Python files modified in the last 2 days"`, `"Show me the disk usage for the /var/log directory"`, `"What's my current IP address?"`.
+    *   The AI parses the intent, identifies key entities (file types, timeframes, directories, requested information), and formulates the corresponding shell command(s) (e.g., `find . -name '*.py' -mtime -2`, `du -sh /var/log`, `ip addr show`).
 
-Code Generation & Snippets:
+2.  **Code Generation & Snippets:**
+    *   Users can request code: `"Write a bash script to backup all .conf files in /etc to a tar.gz archive in my home directory"`, `"Generate a simple Python Flask 'hello world' app"`, `"Give me the Rust code to read a file line by line"`.
+    *   The AI generates the code, potentially asking clarifying questions if the request is ambiguous. It can output the code directly, save it to a specified file, or even make it executable.
 
-Users can request code: "Write a bash script to backup all .conf files in /etc to a tar.gz archive in my home directory", "Generate a simple Python Flask 'hello world' app", "Give me the Rust code to read a file line by line".
+3.  **File & Directory Manipulation:**
+    *   Goes beyond simple commands: `"Create a project structure for a React app with 'src', 'public', and 'components' subfolders inside 'src'"`, `"Rename all files starting with 'IMG_' to 'photo_' followed by a sequential number"`, `"Find all lines containing 'ERROR' in 'app.log' and save them to 'errors.log'"`.
+    *   The AI plans and executes the necessary `mkdir`, `mv`, `cp`, `sed`, `awk`, `grep` commands or file system operations.
 
-The AI generates the code, potentially asking clarifying questions if the request is ambiguous. It can output the code directly, save it to a specified file, or even make it executable.
+4.  **File Editing & Content Modification:**
+    *   Allows complex, context-aware edits: `"Open 'config.yaml' and change the 'database_url' setting to 'postgresql://user:pass@host:port/db'"`, `"In 'main.py', refactor the function 'calculate_sum' to also return the average"`, `"Add comments explaining the purpose of each function in 'utils.js'"`.
+    *   The AI needs to understand file content, locate specific sections, and apply the requested changes accurately. This is significantly more complex than simple command execution.
 
-File & Directory Manipulation:
+5.  **Interactive Assistance & Clarification:**
+    *   If a request is unclear or potentially dangerous, the AI should ask for clarification: `"Which directory should I search in?"`, `"This command might delete files. Are you sure you want to proceed? [y/N]"`.
+    *   It can offer suggestions or alternative approaches.
 
-Goes beyond simple commands: "Create a project structure for a React app with 'src', 'public', and 'components' subfolders inside 'src'", "Rename all files starting with 'IMG_' to 'photo_' followed by a sequential number", "Find all lines containing 'ERROR' in 'app.log' and save them to 'errors.log'".
-
-The AI plans and executes the necessary mkdir, mv, cp, sed, awk, grep commands or file system operations.
-
-File Editing & Content Modification:
-
-Allows complex, context-aware edits: "Open 'config.yaml' and change the 'database_url' setting to 'postgresql://user:pass@host:port/db'", "In 'main.py', refactor the function 'calculate_sum' to also return the average", "Add comments explaining the purpose of each function in 'utils.js'".
-
-The AI needs to understand file content, locate specific sections, and apply the requested changes accurately. This is significantly more complex than simple command execution.
-
-Interactive Assistance & Clarification:
-
-If a request is unclear or potentially dangerous, the AI should ask for clarification: "Which directory should I search in?", "This command might delete files. Are you sure you want to proceed? [y/N]".
-
-It can offer suggestions or alternative approaches.
-
-Context Awareness:
-
-The AI should be aware of the current working directory.
-
-Ideally, it might retain some context from recent commands or interactions within the session for more coherent assistance.
-
-Safety and Confirmation:
-
-Crucially: Before executing any command that modifies the file system, runs scripts, or could have side effects, the AI must show the user the exact command(s) or actions it intends to perform and require explicit confirmation (e.g., pressing 'y'). This prevents accidental damage.
-
-How it Might Work (Conceptual Architecture):
-
-Input Hook: The shell is modified (or a wrapper is used) to detect when user input might be a natural language prompt (e.g., prefixed with "ai:", or just based on heuristics).
-
-AI Processing: The prompt is sent to an AI model (likely a Large Language Model like GPT-4, Claude, or a specialized fine-tuned model). The model needs access to context like the current directory.
-
-Intent & Action Planning: The AI analyzes the prompt, determines the user's goal, and plans the sequence of actions (shell commands, file I/O, code generation).
-
-Plan Presentation & Confirmation: The planned actions are presented clearly to the user.
-
-Execution: Upon confirmation, the agent executes the commands in the user's shell environment or performs the file operations directly.
-
-Output & Feedback: The results (command output, success/error messages) are displayed back to the user in the terminal.
-
-Benefits:
-
-Increased Productivity: Faster execution of complex or unfamiliar tasks.
-
-Reduced Cognitive Load: No need to memorize obscure command syntax.
-
-Lower Barrier to Entry: Makes powerful shell capabilities accessible to less experienced users.
-
-Learning Tool: Users can see the actual commands generated by the AI, helping them learn.
-
-Automation of Tedious Tasks: Simplifies repetitive file management or setup processes.
-
-Challenges:
+6.  **Context Awareness:**
+    *   The AI should be aware of the current working directory.
+    *   Ideally, it might retain some context from recent commands or interactions within the session for more coherent assistance.
 
 
-Accuracy: Ensuring the AI correctly interprets intent and generates the correct, non-destructive commands/code.
+**How it Might Work (Conceptual Architecture):**
 
-Context Management: Effectively tracking the relevant state (directory, environment variables, previous actions).
+1.  **Input Hook:** The shell is modified (or a wrapper is used) to detect when user input might be a natural language prompt (e.g., prefixed with "ai:", or just based on heuristics).
+2.  **AI Processing:** The prompt is sent to an AI model (likely a Large Language Model like GPT-4, Claude, or a specialized fine-tuned model). The model needs access to context like the current directory.
+3.  **Intent & Action Planning:** The AI analyzes the prompt, determines the user's goal, and plans the sequence of actions (shell commands, file I/O, code generation).
+4.  **Plan Presentation & Confirmation:** The planned actions are presented clearly to the user.
+5.  **Execution:** Upon confirmation, the agent executes the commands in the user's shell environment or performs the file operations directly.
+6.  **Output & Feedback:** The results (command output, success/error messages) are displayed back to the user in the terminal.
 
-Ambiguity Resolution: Handling unclear or underspecified user requests gracefully.
+**Benefits:**
 
-Performance: Latency of AI model responses impacting the interactive feel.
+*   **Increased Productivity:** Faster execution of complex or unfamiliar tasks.
+*   **Reduced Cognitive Load:** No need to memorize obscure command syntax.
+*   **Lower Barrier to Entry:** Makes powerful shell capabilities accessible to less experienced users.
+*   **Learning Tool:** Users can see the actual commands generated by the AI, helping them learn.
+*   **Automation of Tedious Tasks:** Simplifies repetitive file management or setup processes.
 
-Integration Complexity: Modifying or wrapping shells reliably can be tricky.
+**Challenges:**
+*   **Accuracy:** Ensuring the AI correctly interprets intent and generates the correct, non-destructive commands/code.
+*   **Context Management:** Effectively tracking the relevant state (directory, environment variables, previous actions).
+*   **Ambiguity Resolution:** Handling unclear or underspecified user requests gracefully.
+*   **Performance:** Latency of AI model responses impacting the interactive feel.
+*   **Integration Complexity:** Modifying or wrapping shells reliably can be tricky.
 
 This in-depth description outlines a powerful tool that blends natural language processing with core system operations, potentially transforming how users interact with their command-line environment.
+---------
+
+## Tech stack:
+Python, Ubuntu Linux
+--
+## WHAT I WANT TO ACHEIVE
+
+1.  **I want an AI partner so deeply woven into my shell that its presence feels almost ambient, yet instantly responsive.** It's more than just a keyword trigger; I want the boundary between my standard shell commands and my instructions to "Angela" to blur. When I type `Angela refactor the main loop in processor.py for clarity`, I want the shell's response mechanism itself to feel like it *understands* this isn't a literal command named "Angela" but an invocation of this embedded intelligence. The transition should be frictionless, immediate, and devoid of the clunkiness of launching a separate process or waiting for a distinct interface. It should feel less like I'm *running a tool* and more like the shell itself has gained a natural language understanding layer.
+
+2.  **I want Angela's contextual awareness to be profound and dynamic.** Defining a project root is just the start. I want her to potentially infer the *type* of project (Is this a Node.js app? A Python library? A Hugo static site?) and leverage that knowledge. If I say `Angela add a dependency for 'requests'`, she should know to use `pip install requests` and update `requirements.txt` in a Python project, or `npm install requests` and update `package.json` in a Node project. Her "mental map" shouldn't just be static file paths; ideally, it incorporates an understanding of common project layouts, configuration file locations, and maybe even recent files I've worked on within that project, allowing for even more concise instructions like `Angela edit the file I was just working on`.
+
+3.  **I want to express complex, multi-step intentions, not just simple tasks.** My goal isn't just mapping single sentences to single commands. I want to be able to articulate workflows: `Angela, create a new feature branch named 'user-auth', switch to it, create a 'auth.py' file in the 'services' directory with a basic Flask blueprint structure, and then stage that new file.` Angela should be able to decompose this complex request into the necessary sequence of `git checkout -b`, `cd`, `touch`, code generation, and `git add` commands, presenting the entire plan for my approval. I want her to handle conditional logic implicitly, like `Angela, find all images larger than 1MB in the assets folder and optimize them`, where she figures out the `find` command and then applies an appropriate optimization tool (like `optipng` or `jpegoptim`) to each result.
+
+4.  **I want Angela's versatility to extend across my entire development ecosystem.** She shouldn't just be limited to file operations and code generation. I want her to be my natural language interface to other CLI tools I use daily:
+    *   **Version Control:** `Angela, show me the differences in the last commit`, `Angela, revert the changes to 'config.yaml'`, `Angela, squash the last 3 commits into one`.
+    *   **Containers:** `Angela, restart the 'webserver' docker container`, `Angela, show me the logs for the database container`.
+    *   **Cloud Services:** `Angela, list my S3 buckets`, `Angela, deploy the latest changes to the staging environment` (invoking the necessary `gcloud`, `aws`, or `az` commands).
+    *   **Databases:** (With appropriate configuration/safety) `Angela, show me the schema for the 'users' table`.
+    She should become the universal translator for the myriad of CLI tools I interact with.
+
+5.  **I want the reduction in cognitive load to foster a state of creative 'flow'.** The constant mental context-switching between my high-level goal and the low-level syntax required to achieve it breaks concentration and introduces friction. By offloading the syntactical burden to Angela, I want to stay focused on the *design*, the *logic*, the *problem-solving*. The terminal should transform from a potential source of frustration ("What was that flag again?") into a smooth conduit for my intentions. This isn't just about saving time; it's about changing my *relationship* with the command line from potentially adversarial to truly collaborative and empowering. I want it to feel less like giving orders and more like having a conversation with a highly competent assistant.
+
+6.  **I want the entire experience, post-setup, to be utterly reliable and unobtrusive.** Angela should *only* act when explicitly invoked (via her name or perhaps a designated keybinding). She shouldn't interfere with standard shell operations or slow down my prompt. If she encounters an error or ambiguity, her feedback should be clear, concise, and presented directly in the terminal without breaking the flow. The initial setup – installing, authenticating, defining roots – should be a one-time, straightforward process. After that, she should just *be there*, ready and waiting, but invisible until needed.
+
+Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line interaction.** I want to build an AI entity that lives within my terminal, understands my projects and my natural language goals deeply, and translates those goals into actions across my entire digital workspace. It's about creating an environment where the power of the command line is accessible through intuitive conversation, making me fundamentally more effective, creative, and less encumbered by technical minutiae. It's about building the command-line partner I've always wished I had.
+---
+## Prompt to start
+---
+
+**Act as an expert Principal Software Architect.**
+
+**Your Task:** You are tasked with designing the initial high-level technical strategy and architecture for a new project called **Angela-CLI**.
+
+**Project Vision Summary:**
+Angela-CLI aims to be a revolutionary AI assistant deeply embedded within a user's standard Linux command-line shell (Bash/Zsh). The core goal is to transform the terminal experience by allowing users to express complex intentions and workflows in **natural language** directly at the prompt. Angela should feel like an ambient, intelligent layer over the shell, seamlessly translating user goals into appropriate actions (shell commands, file manipulations, code generation, interacting with tools like Git/Docker) while maintaining **deep project context awareness** and prioritizing **user safety through confirmation**. It should reduce cognitive load and friction, enabling users to stay in a state of flow.
+
+**Key Desired Characteristics (for the AI to consider):**
+
+1.  **Seamless Integration:** Feels like part of the shell, not a separate clunky tool. Triggering Angela should be natural and immediate.
+2.  **Natural Language Understanding:** Interprets user intent, not just keywords. Handles multi-step requests and workflows.
+3.  **Contextual Awareness:** Understands the current directory, project structure (potentially inferred or user-defined), and maybe recent activity to resolve ambiguity.
+4.  **Versatile Action Capabilities:** Translates intent into:
+    *   Shell command generation & execution.
+    *   File/directory creation, manipulation, and *content-aware editing*.
+    *   Code snippet/boilerplate generation.
+    *   Interfacing with common developer tools (Git, Docker, potentially cloud CLIs).
+6.  **Reliability & Performance:** Must be robust and not hinder the normal shell experience.
+
+**Technical Constraints:**
+
+*   **Platform:** Linux (Ubuntu focus), targeting Bash & Zsh shells.
+*   **Core AI Engine:** Google Gemini API.
+*   **Primary Implementation Language:** Python.
+
+**Your Deliverable:**
+Provide a **high-level strategic blueprint** for building the Minimum Viable Product (MVP) of Angela-CLI. Focus on the foundational structure and phased approach. Specifically, outline:
+
+1.  **Conceptual Architecture:**
+    *   Identify the major functional components required (e.g., Input Capture/Hook, Core Orchestrator, Context Manager, AI Interaction Service, Action Planner, Execution Engine, Safety/Confirmation Module).
+    *   Describe briefly how these components would likely interact. Visualize or list the primary data and control flow for a typical user request.
+
+2.  **High-Level Phased Roadmap (MVP Focus):**
+    *   Propose 3-4 distinct phases to incrementally build a functional and *safe* MVP.
+    *   For each phase, define the primary goal and the key capabilities that would be delivered. Prioritize getting a basic, safe loop working early, then layer on capabilities. (e.g., Phase 1: Basic integration & echo -> Phase 2: Read-only command generation -> Phase 3: Safety confirmation & safe execution -> Phase 4: Basic context & file ops).
+
+**Output Guidelines:**
+
+*   **Focus:** Keep the architecture and roadmap conceptual and strategic. Avoid deep dives into specific library choices or implementation algorithms at this stage.
+*   **Clarity:** Provide a clear structure that a development team could use as a starting point for detailed design.
+*   **Prioritization:** Emphasize safety and the core user experience loop in the roadmap.
+*   **Conciseness:** Be informative but avoid excessive detail. We need the big picture first.
+
+---------------
+
+
+
