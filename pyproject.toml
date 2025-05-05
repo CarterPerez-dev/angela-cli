@@ -34,6 +34,8 @@ dependencies = [
     "aiohttp>=3.8.5",
     "google-generativeai>=0.1.0",
     "loguru>=0.7.0",
+    "tomli>=2.0.1; python_version < '3.11'",
+    "tomli-w",
 ]
 
 [project.optional-dependencies]

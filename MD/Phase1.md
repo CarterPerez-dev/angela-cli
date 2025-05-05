@@ -128,5 +128,151 @@ For Phase 2, we'll focus on:
 
 This implementation provides a solid foundation that can be extended incrementally according to the roadmap. Each component is designed to be modular and testable, following best practices for Python development.
 
+------
 
+# Test 1 results
+─$ angela hello world
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:08:05.811 | DEBUG    | angela.context.manager:_detect_project_root:63 - Project detected: git at /home/yoshi/test1/angela-cli                                 
+2025-05-05 14:08:05.811 | DEBUG    | angela.context.manager:refresh_context:36 - Context refreshed: cwd=/home/yoshi/test1/angela-cli, project_root=/home/yoshi/test1/angela-cli                                                                                   
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:08:05 | INFO | Processing request: hello world
+╭───── Angela ──────╮
+│ Echo: hello world │
+╰───────────────────╯
+
+┌──(venv)─(yoshi㉿kali)-[~/test1/angela-cli]
+└─$ angela --debug find all Python files
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:08:12.055 | DEBUG    | angela.context.manager:_detect_project_root:63 - Project detected: git at /home/yoshi/test1/angela-cli                                 
+2025-05-05 14:08:12.055 | DEBUG    | angela.context.manager:refresh_context:36 - Context refreshed: cwd=/home/yoshi/test1/angela-cli, project_root=/home/yoshi/test1/angela-cli                                                                                   
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+Usage: python -m angela request [OPTIONS] REQUEST_TEXT...
+Try 'python -m angela request --help' for help.
+╭─ Error ────────────────────────────────────────────────────────────────────────────╮
+│ No such option: --debug                                                            │
+╰─────────────────────────────────────────────
+
+┌──(venv)─(yoshi㉿kali)-[~/test1/angela-cli]
+└─$ mkdir -p test_project/.git
+
+┌──(venv)─(yoshi㉿kali)-[~/test1/angela-cli]
+└─$ cd test_project
+
+┌──(venv)─(yoshi㉿kali)-[~/test1/angela-cli/test_project]
+└─$ angela --debug what project is this
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:09:25.883 | DEBUG    | angela.context.manager:_detect_project_root:63 - Project detected: git at /home/yoshi/test1/angela-cli/test_project                    
+2025-05-05 14:09:25.883 | DEBUG    | angela.context.manager:refresh_context:36 - Context refreshed: cwd=/home/yoshi/test1/angela-cli/test_project, project_root=/home/yoshi/test1/angela-cli/test_project                                                         
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+Usage: python -m angela request [OPTIONS] REQUEST_TEXT...
+Try 'python -m angela request --help' for help.
+╭─ Error ────────────────────────────────────────────────────────────────────────────╮
+│ No such option: --debug                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────╯
+
+┌──(venv)─(yoshi㉿kali)-
+
+┌──(venv)─(yoshi㉿kali)-[~/test1/angela-cli]
+└─$ angela init
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:09:52.265 | DEBUG    | angela.context.manager:_detect_project_root:63 - Project detected: git at /home/yoshi/test1/angela-cli                                 
+2025-05-05 14:09:52.266 | DEBUG    | angela.context.manager:refresh_context:36 - Context refreshed: cwd=/home/yoshi/test1/angela-cli, project_root=/home/yoshi/test1/angela-cli                                                                                   
+Loading configuration from: /home/yoshi/.config/angela/config.toml
+2025-05-05 14:09:52 | INFO | Processing request: init
+╭── Angela ──╮
+│ Echo: init │
+╰────────────╯
+
+------
+Debug flag issue: The --debug flag isn't being properly passed to the request subcommand. This is happening because the shell script is directly calling python -m angela request "$@" without handling the flags separately.
+Init command issue: The init command is being processed as a regular request instead of running the initialization function.
+
+These are pretty minor for Phase 1, but here's how we can fix them for Phase 2:
+----
+Update the angela.bash script:
+angela() {
+    # Check if no arguments or help requested
+    if [ $# -eq 0 ] || [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+        python -m angela --help
+        return
+    fi
+
+    # Handle version flag
+    if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+        python -m angela --version
+        return
+    fi
+
+    # Handle debug flag
+    if [ "$1" = "--debug" ] || [ "$1" = "-d" ]; then
+        DEBUG_FLAG="--debug"
+        shift  # Remove the debug flag from arguments
+    else
+        DEBUG_FLAG=""
+    fi
+
+    # Handle specific command (init, etc.)
+    if [ "$1" = "init" ]; then
+        python -m angela $DEBUG_FLAG init
+        return
+    fi
+
+    # Process as a request for anything else
+    python -m angela $DEBUG_FLAG request "$@"
+}
+# updated
+------------
+Phase 1 objectives, this implementation is successful! Established the foundation with:
+
+✅ Shell integration
+✅ Basic pipeline structure
+✅ Context detection
+✅ Configuration management
+✅ Echo capability
+
+Phase 2, which will focus on integrating the Gemini API and implementing the AI understanding capabilities.
+
+
+# Current Tree/Structure after Phase1
+.
+├── MD
+│   ├── Phase1.md
+│   ├── README.md
+│   ├── Roadmap.md
+│   └── Start.md
+├── Makefile
+├── angela
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── __pycache__
+│   ├── ai
+│   ├── cli.py
+│   ├── config.py
+│   ├── constants.py
+│   ├── context
+│   │   ├── __init__.py
+│   │   └── manager.py
+│   ├── execution
+│   ├── intent
+│   ├── orchestrator.py
+│   ├── safety
+│   └── utils
+│       ├── __init__.py
+│       └── logging.py
+├── pyproject.toml
+├── requirements.txt
+├── scripts
+│   ├── install.sh
+│   └── uninstall.sh
+├── setup.py
+├── shell
+│   ├── angela.bash
+│   └── angela.zsh
+└── tests
+    ├── __init__.py
+    ├── conftest.py
+    └── test_context.py
+
+13 directories, 25 files
 
