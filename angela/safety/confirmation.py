@@ -24,9 +24,9 @@ console = Console()
 # Risk level color mapping
 RISK_COLORS = {
     RISK_LEVELS["SAFE"]: "green",
-    RISK_LEVELS["LOW"]: "blue",
+    RISK_LEVELS["LOW"]: "blue", 
     RISK_LEVELS["MEDIUM"]: "yellow",
-    RISK_LEVELS["HIGH"]: "orange",
+    RISK_LEVELS["HIGH"]: "bright_red",  
     RISK_LEVELS["CRITICAL"]: "red",
 }
 

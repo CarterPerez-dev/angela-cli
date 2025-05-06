@@ -17,95 +17,6 @@ from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Commands that can be simulated with more specific previews
-PREVIEWABLE_COMMANDS = {
-    'mkdir': preview_mkdir,
-    'touch': preview_touch,
-    'rm': preview_rm,
-    'cp': preview_cp,
-    'mv': preview_mv,
-    'ls': preview_ls,
-    'cat': preview_cat,
-    'grep': preview_grep,
-    'find': preview_find,
-}
-
-async def generate_preview(command: str) -> Optional[str]:
-    """
-    Generate a preview of what a command will do.
-    
-    Args:
-        command: The shell command to preview.
-        
-    Returns:
-        A string containing the preview, or None if preview is not available.
-    """
-    try:
-        # Parse the command
-        tokens = shlex.split(command)
-        if not tokens:
-            return None
-        
-        base_cmd = tokens[0]
-        
-        # Check if we have a specific preview function for this command
-        if base_cmd in PREVIEWABLE_COMMANDS:
-            return await PREVIEWABLE_COMMANDS[base_cmd](command, tokens)
-        
-        # For other commands, try to use --dry-run or similar flags if available
-        return await generic_preview(command)
-    
-    except Exception as e:
-        logger.exception(f"Error generating preview for '{command}': {str(e)}")
-        return f"Preview generation failed: {str(e)}"
-
-
-async def generic_preview(command: str) -> Optional[str]:
-    """
-    Generate a generic preview for commands without specific implementations.
-    Attempts to use --dry-run flags when available.
-    
-    Args:
-        command: The shell command to preview.
-        
-    Returns:
-        A string containing the preview, or None if preview is not available.
-    """
-    # List of commands that support --dry-run or similar
-    dry_run_commands = {
-        'rsync': '--dry-run',
-        'apt': '--dry-run',
-        'apt-get': '--dry-run',
-        'dnf': '--dry-run',
-        'yum': '--dry-run',
-        'pacman': '--print',
-    }
-    
-    tokens = shlex.split(command)
-    base_cmd = tokens[0]
-    
-    if base_cmd in dry_run_commands:
-        # Add the dry run flag
-        dry_run_flag = dry_run_commands[base_cmd]
-        
-        # Check if the flag is already in the command
-        if dry_run_flag not in command:
-            modified_command = f"{command} {dry_run_flag}"
-        else:
-            modified_command = command
-        
-        # Execute the command with the dry run flag
-        stdout, stderr, return_code = await execution_engine.execute_command(modified_command)
-        
-        if return_code == 0:
-            return f"Dry run output:\n{stdout}"
-        else:
-            return f"Dry run failed with error:\n{stderr}"
-    
-    # For commands without dry run support, return a generic message
-    return "Preview not available for this command type. Use --dry-run to simulate."
-
-
 async def preview_mkdir(command: str, tokens: List[str]) -> str:
     """Generate a preview for mkdir command."""
     # Parse flags and paths
@@ -498,3 +409,91 @@ async def preview_find(command: str, tokens: List[str]) -> str:
         result.append(search_desc)
     
     return "\n".join(result)
+
+# Commands that can be simulated with more specific previews
+PREVIEWABLE_COMMANDS = {
+    'mkdir': preview_mkdir,
+    'touch': preview_touch,
+    'rm': preview_rm,
+    'cp': preview_cp,
+    'mv': preview_mv,
+    'ls': preview_ls,
+    'cat': preview_cat,
+    'grep': preview_grep,
+    'find': preview_find,
+}
+
+async def generate_preview(command: str) -> Optional[str]:
+    """
+    Generate a preview of what a command will do.
+    
+    Args:
+        command: The shell command to preview.
+        
+    Returns:
+        A string containing the preview, or None if preview is not available.
+    """
+    try:
+        # Parse the command
+        tokens = shlex.split(command)
+        if not tokens:
+            return None
+        
+        base_cmd = tokens[0]
+        
+        # Check if we have a specific preview function for this command
+        if base_cmd in PREVIEWABLE_COMMANDS:
+            return await PREVIEWABLE_COMMANDS[base_cmd](command, tokens)
+        
+        # For other commands, try to use --dry-run or similar flags if available
+        return await generic_preview(command)
+    
+    except Exception as e:
+        logger.exception(f"Error generating preview for '{command}': {str(e)}")
+        return f"Preview generation failed: {str(e)}"
+
+
+async def generic_preview(command: str) -> Optional[str]:
+    """
+    Generate a generic preview for commands without specific implementations.
+    Attempts to use --dry-run flags when available.
+    
+    Args:
+        command: The shell command to preview.
+        
+    Returns:
+        A string containing the preview, or None if preview is not available.
+    """
+    # List of commands that support --dry-run or similar
+    dry_run_commands = {
+        'rsync': '--dry-run',
+        'apt': '--dry-run',
+        'apt-get': '--dry-run',
+        'dnf': '--dry-run',
+        'yum': '--dry-run',
+        'pacman': '--print',
+    }
+    
+    tokens = shlex.split(command)
+    base_cmd = tokens[0]
+    
+    if base_cmd in dry_run_commands:
+        # Add the dry run flag
+        dry_run_flag = dry_run_commands[base_cmd]
+        
+        # Check if the flag is already in the command
+        if dry_run_flag not in command:
+            modified_command = f"{command} {dry_run_flag}"
+        else:
+            modified_command = command
+        
+        # Execute the command with the dry run flag
+        stdout, stderr, return_code = await execution_engine.execute_command(modified_command)
+        
+        if return_code == 0:
+            return f"Dry run output:\n{stdout}"
+        else:
+            return f"Dry run failed with error:\n{stderr}"
+    
+    # For commands without dry run support, return a generic message
+    return "Preview not available for this command type. Use --dry-run to simulate."

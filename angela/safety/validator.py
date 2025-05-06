@@ -185,6 +185,10 @@ def validate_operation(operation_type: str, params: Dict[str, Any]) -> Tuple[boo
             path = Path(params.get('path', ''))
             return check_file_permission(path, require_write=True)
         
+        elif operation_type == 'read_file':  # Add this handler
+            path = Path(params.get('path', ''))
+            return check_file_permission(path, require_write=False)
+            
         elif operation_type == 'delete_file':
             path = Path(params.get('path', ''))
             # Check if this is a system file
@@ -209,11 +213,35 @@ def validate_operation(operation_type: str, params: Dict[str, Any]) -> Tuple[boo
             
             return check_file_permission(path, require_write=True)
         
+        elif operation_type == 'copy_file':  # Add this handler
+            source = Path(params.get('source', ''))
+            destination = Path(params.get('destination', ''))
+            
+            # Check if source exists
+            if not source.exists():
+                return False, f"Source file does not exist: {source}"
+                
+            # Check destination permissions
+            return check_file_permission(destination.parent, require_write=True)
+            
+        elif operation_type == 'move_file':  # Add this handler
+            source = Path(params.get('source', ''))
+            destination = Path(params.get('destination', ''))
+            
+            # Check if source exists
+            if not source.exists():
+                return False, f"Source file does not exist: {source}"
+                
+            # Check permissions for both source and destination
+            source_ok, source_err = check_file_permission(source, require_write=True)
+            if not source_ok:
+                return False, source_err
+                
+            return check_file_permission(destination.parent, require_write=True)
+            
         elif operation_type == 'execute_command':
             command = params.get('command', '')
             return validate_command_safety(command)
-        
-        # Add more operation types as needed
         
         # Unknown operation type
         logger.warning(f"Unknown operation type: {operation_type}")

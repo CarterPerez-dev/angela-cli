@@ -214,6 +214,26 @@ SHEBANG_PATTERNS = [
     (r'^#!/usr/bin/env\s+php', 'PHP'),
 ]
 
+# Mapping of MIME type prefixes to general types
+MIME_TYPE_MAPPING = {
+    'image/': 'image',
+    'audio/': 'audio',
+    'video/': 'video',
+    'text/': 'text',
+    'application/pdf': 'document',
+    'application/msword': 'document',
+    'application/vnd.openxmlformats-officedocument': 'document',
+    'application/zip': 'archive',
+    'application/x-tar': 'archive',
+    'application/x-gzip': 'archive',
+    'application/x-bzip2': 'archive',
+    'application/x-xz': 'archive',
+    'application/x-7z-compressed': 'archive',
+    'application/x-rar-compressed': 'archive',
+}
+
+
+# In angela/context/file_detector.py - update the detect_file_type function
 
 def detect_file_type(path: Path) -> Dict[str, Any]:
     """
@@ -223,12 +243,7 @@ def detect_file_type(path: Path) -> Dict[str, Any]:
         path: The path to the file.
         
     Returns:
-        A dictionary with file type information including:
-            - type: General file type
-            - language: Programming language (if applicable)
-            - mime_type: MIME type
-            - binary: Whether the file is binary
-            - encoding: File encoding (if applicable)
+        A dictionary with file type information.
     """
     result = {
         'type': 'unknown',
@@ -268,8 +283,12 @@ def detect_file_type(path: Path) -> Dict[str, Any]:
         # Detect language based on extension
         if extension in LANGUAGE_EXTENSIONS:
             result['language'] = LANGUAGE_EXTENSIONS[extension]
-            result['type'] = 'source_code'
+            result['type'] = 'source_code'  # Set type to source_code when a language is detected
         
+        # Special case for known project files
+        if name == "requirements.txt":
+            result['type'] = "Python"  # Force correct type for requirements.txt
+            
         # For text files without a clear type, check for shebangs
         if extension in ['.txt', ''] or not result['language']:
             try:
@@ -281,7 +300,7 @@ def detect_file_type(path: Path) -> Dict[str, Any]:
                 for pattern, language in SHEBANG_PATTERNS:
                     if re.match(pattern, first_line):
                         result['language'] = language
-                        result['type'] = 'source_code'
+                        result['type'] = 'source_code'  # Set the type for scripting files with shebangs
                         break
             except UnicodeDecodeError:
                 # File is likely binary
