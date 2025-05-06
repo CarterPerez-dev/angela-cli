@@ -245,29 +245,20 @@ AI-Powered File Content Comprehension & Manipulation: Integrate AI (ai/client.py
 User-Defined Workflows via Natural Language: Allow users to teach Angela reusable multi-step workflows ("Define 'publish package' as: run tests, bump version, build, upload"). Angela (intent/planner.py, new workflows/manager.py) translates, confirms, saves, and allows invocation by the user-defined name.
 Proactive Monitoring, Suggestions & Advanced Rollback: Implement optional background monitoring (orchestrator.py, asyncio) for contextual nudges (lint errors, git status, process crashes) via shell/formatter.py. Offer proactive suggestions/autofill based on deeper context (context/*, ai/*). Enhance rollback mechanisms (safety/*, execution/*) to specifically support undoing multi-step or content-manipulation actions where feasible, maintaining safety without hindering the autonomous capabilities.
 
-### Step 7: Enhanced Project Context
+### Step 6: Enhanced Project Context
 1. Implement project type inference
 2. Add dependency detection in projects
 3. Create file reference resolution from natural language
 4. Implement recent activity tracking
 5. massivly Enhance prompt engineering with project context
 
-### Step 8: Developer Tool Integration (MAIN ASPECTY OF THIS WHOLE THING WERE IT COMES ALL TOGETHOR)
+### Step 7: Developer Tool Integration (MAIN ASPECTY OF THIS WHOLE THING WERE IT COMES ALL TOGETHOR)
 1. Add Git commands integration
 2. Implement Docker support
 3. Create code generation flow. it shoudl be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
 4. Build multi-step workflow execution
 5. Perform final testing, optimization, and documentation, containeriziation and even CI/CD if needed
 
-## Initial Implementation Focus
-
-For the immediate first steps, focus on:
-
-1. Setting up the project structure exactly as outlined above
-2. Implementing the shell integration mechanism
-3. Creating the basic configuration and orchestration pipeline
-4. Establishing a simple echo service that confirms Angela received the request
-5. Building the foundation for context tracking
 
 This will establish the core infrastructure before integrating AI capabilities, ensuring a solid foundation for the more complex features to follow, to ocomplish IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****
 
