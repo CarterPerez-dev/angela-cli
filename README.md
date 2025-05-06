@@ -4,12 +4,15 @@
 .
 ├── MD
 │   ├── Info.md
+│   ├── NextSteps.md
 │   ├── Phase1.md
 │   ├── Phase2.md
 │   ├── Phase3.md
 │   ├── Phase4.md
 │   ├── Phase5.md
-│   └── context.md
+│   ├── Phase6.md
+│   ├── context.md
+│   └── tree.md
 ├── Makefile
 ├── README.md
 ├── angela
@@ -24,10 +27,12 @@
 │   │   ├── file_integration.py
 │   │   ├── intent_analyzer.py
 │   │   ├── parser.py
-│   │   └── prompts.py
+│   │   ├── prompts.py
+│   │   └── prompts_update.py
 │   ├── cli
 │   │   ├── __init__.py
 │   │   ├── files.py
+│   │   ├── files_extensions.py
 │   │   ├── main.py
 │   │   └── workflows.py
 │   ├── cli.py
@@ -35,7 +40,10 @@
 │   ├── constants.py
 │   ├── context
 │   │   ├── __init__.py
+│   │   ├── enhancer.py
+│   │   ├── file_activity.py
 │   │   ├── file_detector.py
+│   │   ├── file_resolver.py
 │   │   ├── history.py
 │   │   ├── manager.py
 │   │   ├── preferences.py
@@ -46,8 +54,11 @@
 │   │   ├── engine.py
 │   │   ├── error_recovery.py
 │   │   ├── filesystem.py
+│   │   ├── hooks.py
 │   │   └── rollback.py
-│   ├── integrations.py
+│   ├── integrations
+│   │   ├── integrations5.py
+│   │   └── integrations6.py
 │   ├── intent
 │   │   ├── advanced_planner.py
 │   │   ├── models.py
@@ -87,8 +98,11 @@
     ├── conftest.py
     ├── test_ai_client.py
     ├── test_context.py
+    ├── test_context_enhancer.py
     ├── test_execution.py
+    ├── test_file_activity.py
     ├── test_file_detector.py
+    ├── test_file_resolver.py
     ├── test_filesystem.py
     ├── test_integration.py
     ├── test_orchestration.py
@@ -96,7 +110,8 @@
     ├── test_response_parsing.py
     └── test_safety.py
 
-15 directories, 79 files
+16 directories, 92 files
+
 ```
 **Project Title:** **Angela-CLI** 
 
