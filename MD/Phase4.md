@@ -42,3 +42,35 @@ Update the CLI interface to reflect these changes
 Enhance the prompting system to better leverage conversational context
 
 
+
+# We haev now implemented most of Phase 4
+We've designed and implemented Phase 4 Part 2, 
+
+angela/ai/intent_analyzer.py
+angela/ai/confidence.py
+angela/shell/formatter.py
+
+Updated the existing files:
+
+angela/orchestrator.py
+angela/cli/main.py
+angela/ai/prompts.py
+
+This implementation enhances Angela-CLI with more intelligent interaction and contextual execution capabilities, making it more responsive, user-friendly, and adaptive. The focus on rich feedback, error analysis, and improved NLU will make Angela feel more like a true AI assistant rather than just a command translator.
+Key Features Added:
+Enhanced NLU with Tolerance for Variations: Angela can now understand misspellings and variations in user requests.
+Interactive Clarification for Ambiguous Intents: When unsure, Angela will ask for clarification rather than executing potentially incorrect commands.
+Rich Terminal Feedback: Real-time output streaming with spinners and progress indicators.
+Intelligent Error Analysis: When commands fail, Angela analyzes the error and suggests fixes.
+Context-Aware Command Suggestions: Leverages conversation history and project context for better suggestions.
+These enhancements move Angela closer to being a true AI terminal agent, making the shell feel more intelligent and responsive.
+
+Now we must implement teh next steps which is step 5 and any aspects we missed int step 4
+### Step 5: Autonomous Task Orchestration & Proactive Assistance
+(Focus: Enable high-level goal execution, deep content understanding, learning user workflows, and proactive behaviour.)
+High-Level Goal Decomposition & Multi-Step Orchestration: Empower the AI (intent/planner.py, orchestrator.py) to break down complex user goals ("Deploy latest dev to staging") into sequences of commands/actions. Plan dependencies, visualize the execution flow (shell/formatter.py with rich), gain confirmation, and execute the orchestrated plan, monitoring progress and handling intermediate steps/errors gracefully.
+Conversational Context & Session Memory: Implement robust session memory (context/manager.py, orchestrator.py) allowing Angela to understand follow-up commands referencing entities (files, outputs, errors) from the current interaction ("Try that again with sudo", "Analyze those errors").
+AI-Powered File Content Comprehension & Manipulation: Integrate AI (ai/client.py, potentially new ai/content_analyzer.py) to understand the content of files (code functions, config values, text). Enable natural language requests for content-aware tasks like refactoring simple functions, updating configuration entries, or summarizing logs (execution/filesystem.py, safety/preview.py showing diffs). Create underlying utilities for safe content manipulation.
+User-Defined Workflows via Natural Language: Allow users to teach Angela reusable multi-step workflows ("Define 'publish package' as: run tests, bump version, build, upload"). Angela (intent/planner.py, new workflows/manager.py) translates, confirms, saves, and allows invocation by the user-defined name.
+Proactive Monitoring, Suggestions & Advanced Rollback: Implement optional background monitoring (orchestrator.py, asyncio) for contextual nudges (lint errors, git status, process crashes) via shell/formatter.py. Offer proactive suggestions/autofill based on deeper context (context/*, ai/*). Enhance rollback mechanisms (safety/*, execution/*) to specifically support undoing multi-step or content-manipulation actions where feasible, maintaining safety without hindering the autonomous capabilities.
+

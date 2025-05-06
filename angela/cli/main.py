@@ -17,6 +17,9 @@ from angela.context import context_manager
 from angela.orchestrator import orchestrator
 from angela.execution.engine import execution_engine
 from angela.utils.logging import setup_logging, get_logger
+from angela.shell.formatter import terminal_formatter, OutputType
+from angela.ai.analyzer import error_analyzer
+from angela.context.session import session_manager
 
 # Create the app
 app = typer.Typer(help="Angela: AI-powered command-line assistant")
@@ -59,32 +62,39 @@ def request(
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Preview command execution without making changes."
     ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Execute without confirmation, even for risky operations."
+    ),
 ):
     """Send a natural language request to Angela."""
     # Combine all arguments into a single request string
     full_request = " ".join(request_text)
     
     try:
+        # If forcing execution, set this in the session
+        if force:
+            session_manager.add_entity("force_execution", "preference", "true")
+        
         # Process the request - note execute=True is now the default
         # Only switch to false if suggest_only is True
         execute = not suggest_only
         
+        # Call the orchestrator to process the request
         result = asyncio.run(orchestrator.process_request(
             full_request, execute=execute, dry_run=dry_run
         ))
         
-        # Display the response
-        panel_title = "Angela"
-        
         if "suggestion" in result:
             suggestion = result["suggestion"]
             
-            # Build panel content with command suggestion
-            console.print("[bold]I suggest using this command:[/bold]")
+            # Display the suggestion with rich formatting
+            terminal_formatter.print_command(suggestion.command, title="Command")
             
-            # Add the command with syntax highlighting
-            command_syntax = Syntax(suggestion.command, "bash", theme="monokai", word_wrap=True)
-            console.print(Panel(command_syntax, title="Command", expand=False))
+            # Show confidence if available
+            if "confidence" in result:
+                confidence = result["confidence"]
+                confidence_color = "green" if confidence > 0.8 else "yellow" if confidence > 0.6 else "red"
+                console.print(f"[bold]Confidence:[/bold] [{confidence_color}]{confidence:.2f}[/{confidence_color}]")
             
             # Show explanation
             console.print("\n[bold]Explanation:[/bold]")
@@ -97,30 +107,36 @@ def request(
                 
                 if execution["success"]:
                     if execution["stdout"].strip():
-                        output_panel = Panel(
-                            execution["stdout"], 
-                            title="Output", 
-                            expand=False,
-                            border_style="green"
+                        terminal_formatter.print_output(
+                            execution["stdout"],
+                            OutputType.STDOUT,
+                            title="Output"
                         )
-                        console.print(output_panel)
                     else:
                         console.print("[green]Command executed successfully with no output.[/green]")
                 else:
                     console.print("[bold red]Command failed[/bold red]")
                     if execution["stderr"].strip():
-                        error_panel = Panel(
-                            execution["stderr"], 
-                            title="Error", 
-                            expand=False,
-                            border_style="red"
+                        terminal_formatter.print_output(
+                            execution["stderr"],
+                            OutputType.STDERR,
+                            title="Error"
                         )
-                        console.print(error_panel)
+                    
+                    # Show error analysis if available
+                    if "error_analysis" in result:
+                        terminal_formatter.print_error_analysis(result["error_analysis"])
+                        
+                    # Show fix suggestions if available
+                    if "fix_suggestions" in execution:
+                        console.print("\n[bold]Suggested fixes:[/bold]")
+                        for suggestion in execution["fix_suggestions"]:
+                            console.print(f"• {suggestion}")
             
         else:
             # Fall back to simple response if no suggestion
             panel_content = result.get("response", "I couldn't process that request.")
-            console.print(Panel(panel_content, title=panel_title, expand=False))
+            console.print(Panel(panel_content, title="Angela", expand=False))
         
         # In debug mode, show context information
         if config_manager.config.debug:

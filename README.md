@@ -114,70 +114,7 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
    - `python-dotenv`: Environment variable handling
    - Custom project detection logic
 
-## Detailed Roadmap
-
-### Phase 1: Foundation & Shell Integration 
-**Milestone 1A: Core Setup **
-- Project scaffolding and environment setup
-- Configuration management implementation
-- Basic CLI structure with argument processing
-- Shell hook mechanism (bash/zsh function)
-- Simple request echo pipeline
-
-**Milestone 1B: Context & Pipeline**
-- Working directory tracking
-- Basic project root detection (git/marker files)
-- Command history integration
-- Logging and telemetry framework
-- Test infrastructure
-
-### Phase 2: AI Integration
-**Milestone 2A: Gemini Integration)**
-- Gemini API client implementation
-- Initial prompt engineering
-- Response parsing framework
-- Basic intent classification
-- Command suggestion (non-executing)
-
-**Milestone 2B: Read-Only Operations**
-- Safe command execution engine
-- Support for info retrieval commands (find, grep, etc.)
-- Output formatting and display
-- Enhanced error handling
-- Command validation
-
-### Phase 3: File Operations
-**Milestone 3A: Safety System)**
-- Operation risk classification system
-- Confirmation interface with previews
-- Command impact analysis
-- Permission model implementation
-- Dry-run capability
-
-**Milestone 3B: Basic File Operations**
-- Directory operations (mkdir, ls enhancements)
-- File creation operations (touch, basic content)
-- Simple content viewing
-- Enhanced context with file type detection
-- Basic rollback capability
-
-### Phase 4: Enhanced Context & Developer Tool
-**Milestone 4A: Project Context**
-- Project type inference (Python, Node.js)
-- Basic dependency awareness
-- Configuration file understanding
-- Improved natural language file references
-- Recent activity tracking
-
-**Milestone 4B: Developer Workflows)**
-- Git operations integration
-- Docker basic support
-- Simple code snippet generation
-- Multi-step workflow execution
-- Performance optimization
-
-## Implementation File Structure
-
+## Brief Roadmap
 ```
 angela-cli/
 ├── README.md                   # Project documentation
@@ -262,7 +199,7 @@ angela-cli/
     └── test_safety.py
 ```
 
-## Step-by-Step Implementation Plan
+## Implementation Plan
 
 ### Step 1: Project Setup & Shell Hook
 1. Initialize project structure with core directories

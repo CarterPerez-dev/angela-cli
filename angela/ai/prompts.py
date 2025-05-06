@@ -108,9 +108,10 @@ FILE_OPERATION_EXAMPLES = [
 def build_prompt(
     request: str, 
     context: Dict[str, Any],
-    similar_command: Optional[str] = None
+    similar_command: Optional[str] = None,
+    intent_result: Optional[Dict[str, Any]] = None
 ) -> str:
-    """Build a prompt for the Gemini API with context information."""
+    """Build a prompt for the Gemini API with enhanced context information."""
     # Create a context description
     context_str = "Current context:\n"
     if context.get("cwd"):
@@ -131,20 +132,42 @@ def build_prompt(
         if file_info.get("type"):
             context_str += f"- File type: {file_info.get('type')}\n"
             
+    # Add conversation context
     if "session" in context:
         session = context["session"]
         
         # Add recent commands for continuity
         if session.get("recent_commands"):
             context_str += "Recent commands:\n"
-            for cmd in session.get("recent_commands", []):
-                context_str += f"- {cmd}\n"
+            for i, cmd in enumerate(session.get("recent_commands", []), 1):
+                context_str += f"- Command {i}: {cmd}\n"
+        
+        # Add recent results for reference
+        if session.get("recent_results"):
+            context_str += "Recent command results:\n"
+            for i, result in enumerate(session.get("recent_results", []), 1):
+                # Truncate long results
+                if len(result) > 200:
+                    result = result[:200] + "..."
+                context_str += f"- Result {i}: {result}\n"
         
         # Add entities for reference resolution
         if session.get("entities"):
             context_str += "Referenced entities:\n"
             for name, entity in session.get("entities", {}).items():
                 context_str += f"- {name}: {entity.get('type')} - {entity.get('value')}\n"
+    
+    # Add intent analysis if available
+    if intent_result:
+        context_str += "\nIntent analysis:\n"
+        context_str += f"- Intent type: {intent_result.get('intent_type', 'unknown')}\n"
+        context_str += f"- Confidence: {intent_result.get('confidence', 0.0):.2f}\n"
+        
+        # Add extracted entities
+        if intent_result.get("entities"):
+            context_str += "- Extracted entities:\n"
+            for key, value in intent_result.get("entities", {}).items():
+                context_str += f"  - {key}: {value}\n"
     
     # Add similar command suggestion if available
     if similar_command:
@@ -165,13 +188,14 @@ def build_prompt(
         examples_str += f"Context: {example['context']}\n"
         examples_str += f"Response: {example['response']}\n"
     
-    # Define the expected response format
+    # Define the expected response format - now with confidence indicator
     response_format = """
 Expected response format (valid JSON):
 {
     "intent": "the_classified_intent",
     "command": "the_suggested_command",
     "explanation": "explanation of what the command does",
+    "confidence": 0.85, /* Optional confidence score from 0.0 to 1.0 */
     "additional_info": "any additional information (optional)"
 }
 """

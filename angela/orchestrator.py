@@ -18,6 +18,9 @@ from angela.execution.adaptive_engine import adaptive_engine
 from angela.context.session import session_manager
 from angela.context.history import history_manager
 from angela.ai.analyzer import error_analyzer
+from angela.ai.intent_analyzer import intent_analyzer
+from angela.ai.confidence import confidence_scorer
+from angela.shell.formatter import terminal_formatter, OutputType
 
 logger = get_logger(__name__)
 
@@ -30,7 +33,7 @@ class Orchestrator:
     async def process_request(
         self, 
         request: str, 
-        execute: bool = True,  # Note: Now defaults to True
+        execute: bool = True,
         dry_run: bool = False
     ) -> Dict[str, Any]:
         """Process a request from the user."""
@@ -46,15 +49,48 @@ class Orchestrator:
         self._logger.debug(f"Context: {context}")
         
         try:
+            # Analyze intent with enhanced NLU
+            intent_result = await self._analyze_intent(request, context)
+            
             # Check if we've seen a similar request before
             similar_command = history_manager.search_similar_command(request)
             
             # Get command suggestion from AI
-            suggestion = await self._get_ai_suggestion(request, context, similar_command)
+            suggestion = await self._get_ai_suggestion(
+                request, 
+                context, 
+                similar_command, 
+                intent_result
+            )
+            
+            # Score confidence in the suggestion
+            confidence = confidence_scorer.score_command_confidence(
+                request=request,
+                command=suggestion.command,
+                context=context
+            )
+            
+            # If confidence is low, offer clarification
+            if confidence < 0.6 and not dry_run and not session_context.get("skip_clarification"):
+                # Interactive clarification
+                from prompt_toolkit.shortcuts import yes_no_dialog
+                should_proceed = yes_no_dialog(
+                    title="Low Confidence Suggestion",
+                    text=f"I'm not very confident this is what you meant:\n\n{suggestion.command}\n\nWould you like to proceed with this command?",
+                ).run()
+                
+                if not should_proceed:
+                    return {
+                        "request": request,
+                        "response": "Command cancelled due to low confidence.",
+                        "context": context,
+                    }
             
             result = {
                 "request": request,
                 "suggestion": suggestion,
+                "confidence": confidence,
+                "intent": intent_result.intent_type if hasattr(intent_result, 'intent_type') else "unknown",
                 "context": context,
             }
             
@@ -62,7 +98,7 @@ class Orchestrator:
             if execute or dry_run:
                 self._logger.info(f"{'Dry run' if dry_run else 'Executing'} suggested command: {suggestion.command}")
                 
-                # Execute using the adaptive engine
+                # Execute using the adaptive engine with rich feedback
                 execution_result = await adaptive_engine.execute_command(
                     command=suggestion.command,
                     natural_request=request,
@@ -71,6 +107,17 @@ class Orchestrator:
                 )
                 
                 result["execution"] = execution_result
+                
+                # If execution failed, analyze errors and provide suggestions
+                if not execution_result.get("success") and execution_result.get("stderr"):
+                    error_analysis = error_analyzer.analyze_error(
+                        suggestion.command, 
+                        execution_result["stderr"]
+                    )
+                    result["error_analysis"] = error_analysis
+                    
+                    # Display error analysis with rich formatting
+                    terminal_formatter.print_error_analysis(error_analysis)
             
             return result
             
@@ -83,6 +130,31 @@ class Orchestrator:
                 "error": str(e),
                 "context": context,
             }
+
+    async def _analyze_intent(
+        self, 
+        request: str, 
+        context: Dict[str, Any]
+    ) -> IntentAnalysisResult:
+        """
+        Analyze the intent of a request using the enhanced NLU system.
+        
+        Args:
+            request: The user request
+            context: The context dictionary
+            
+        Returns:
+            Intent analysis result
+        """
+        # Analyze intent
+        result = intent_analyzer.analyze_intent(request)
+        
+        # If disambiguation is needed and confidence is low, get interactive clarification
+        if result.disambiguation_needed and result.confidence < 0.7:
+            result = await intent_analyzer.get_interactive_disambiguation(result)
+        
+        return result
+
     
     async def _get_ai_suggestion(
         self, 
