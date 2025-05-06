@@ -86,6 +86,79 @@ def list_workflows(
         sys.exit(1)
 
 
+# angela/cli/workflows.py
+# Add new commands to the existing workflows app
+
+@app.command("export")
+def export_workflow(
+    name: str = typer.Argument(
+        ..., help="Name of the workflow to export"
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output path for the exported workflow"
+    ),
+):
+    """Export a workflow to a shareable package."""
+    try:
+        # Get the workflow sharing manager
+        from angela.workflows.sharing import workflow_sharing_manager
+        
+        # Export the workflow
+        result = asyncio.run(workflow_sharing_manager.export_workflow(
+            workflow_name=name,
+            output_path=output
+        ))
+        
+        if result["success"]:
+            console.print(f"[bold green]Workflow '{name}' exported successfully![/bold green]")
+            console.print(f"Output path: {result['output_path']}")
+        else:
+            console.print(f"[bold red]Error:[/bold red] {result.get('error', 'Unknown error')}")
+            sys.exit(1)
+        
+    except Exception as e:
+        logger.exception(f"Error exporting workflow: {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        sys.exit(1)
+
+
+@app.command("import")
+def import_workflow(
+    path: Path = typer.Argument(
+        ..., help="Path to the workflow package to import"
+    ),
+    rename: Optional[str] = typer.Option(
+        None, "--rename", "-r", help="New name for the imported workflow"
+    ),
+    replace: bool = typer.Option(
+        False, "--replace", help="Replace existing workflow with same name"
+    ),
+):
+    """Import a workflow from a package."""
+    try:
+        # Get the workflow sharing manager
+        from angela.workflows.sharing import workflow_sharing_manager
+        
+        # Import the workflow
+        result = asyncio.run(workflow_sharing_manager.import_workflow(
+            workflow_path=path,
+            rename=rename,
+            replace_existing=replace
+        ))
+        
+        if result["success"]:
+            console.print(f"[bold green]Workflow imported successfully as '{result['workflow']}'![/bold green]")
+        else:
+            console.print(f"[bold red]Error:[/bold red] {result.get('error', 'Unknown error')}")
+            sys.exit(1)
+        
+    except Exception as e:
+        logger.exception(f"Error importing workflow: {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        sys.exit(1)
+
+
+
 @app.command("create")
 def create_workflow(
     name: str = typer.Argument(..., help="Name for the workflow"),

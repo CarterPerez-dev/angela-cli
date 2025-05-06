@@ -27,6 +27,8 @@ from angela.intent.planner import task_planner
 from angela.workflows.manager import workflow_manager
 from angela.utils.logging import get_logger
 from angela.shell.formatter import terminal_formatter, OutputType
+from angela.intent.advanced_planner import advanced_task_planner
+from angela.execution.error_recovery import ErrorRecoveryManager
 
 logger = get_logger(__name__)
 
@@ -47,6 +49,7 @@ class Orchestrator:
         """Initialize the orchestrator."""
         self._logger = logger
         self._background_tasks = set()
+        self._error_recovery_manager = ErrorRecoveryManager()
     
     async def process_request(
         self, 
@@ -294,6 +297,19 @@ class Orchestrator:
         
         return result
     
+    # Update in angela/orchestrator.py
+    # Add this import at the top
+    from angela.intent.advanced_planner import advanced_task_planner
+    from angela.execution.error_recovery import ErrorRecoveryManager
+    
+    # Add this as a class member in the Orchestrator class
+    def __init__(self):
+        """Initialize the orchestrator."""
+        self._logger = logger
+        self._background_tasks = set()
+        self._error_recovery_manager = ErrorRecoveryManager()
+    
+    # Update the _process_multi_step_request method
     async def _process_multi_step_request(
         self, 
         request: str, 
@@ -302,7 +318,7 @@ class Orchestrator:
         dry_run: bool
     ) -> Dict[str, Any]:
         """
-        Process a multi-step operation request.
+        Process a multi-step operation request with advanced planning.
         
         Args:
             request: The user request
@@ -315,9 +331,75 @@ class Orchestrator:
         """
         self._logger.info(f"Processing multi-step request: {request}")
         
-        # Use the task planner to create a plan
-        plan = await task_planner.plan_task(request, context)
+        # Determine if we should use advanced planning
+        complexity = await advanced_task_planner._determine_complexity(request)
         
+        if complexity == "advanced":
+            # Use the advanced planner for complex tasks
+            plan = await advanced_task_planner.plan_task(request, context, complexity)
+            
+            # Create result with the plan
+            if isinstance(plan, AdvancedTaskPlan):
+                # Advanced plan with branching
+                result = {
+                    "request": request,
+                    "type": "advanced_multi_step",
+                    "context": context,
+                    "plan": {
+                        "id": plan.id,
+                        "goal": plan.goal,
+                        "description": plan.description,
+                        "steps": [
+                            {
+                                "id": step_id,
+                                "type": step.type,
+                                "description": step.description,
+                                "command": step.command,
+                                "dependencies": step.dependencies,
+                                "risk": step.estimated_risk
+                            }
+                            for step_id, step in plan.steps.items()
+                        ],
+                        "entry_points": plan.entry_points,
+                        "step_count": len(plan.steps)
+                    }
+                }
+                
+                # Execute the plan if requested
+                if execute or dry_run:
+                    # Display the plan with rich formatting
+                    await terminal_formatter.display_advanced_plan(plan)
+                    
+                    # Get confirmation for plan execution
+                    confirmed = await self._confirm_advanced_plan(plan, dry_run)
+                    
+                    if confirmed or dry_run:
+                        # Execute the plan
+                        execution_results = await advanced_task_planner.execute_plan(plan, dry_run=dry_run)
+                        result["execution_results"] = execution_results
+                        result["success"] = execution_results.get("success", False)
+                    else:
+                        result["cancelled"] = True
+                        result["success"] = False
+            else:
+                # Basic plan (fallback)
+                result = await self._process_basic_multi_step(plan, request, context, execute, dry_run)
+        else:
+            # Use the basic planner for simple tasks
+            plan = await task_planner.plan_task(request, context)
+            result = await self._process_basic_multi_step(plan, request, context, execute, dry_run)
+        
+        return result
+    
+    async def _process_basic_multi_step(
+        self,
+        plan: TaskPlan,
+        request: str,
+        context: Dict[str, Any],
+        execute: bool,
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """Process a basic multi-step plan."""
         # Create result with the plan
         result = {
             "request": request,
@@ -351,11 +433,104 @@ class Orchestrator:
                 execution_results = await task_planner.execute_plan(plan, dry_run=dry_run)
                 result["execution_results"] = execution_results
                 result["success"] = all(result.get("success", False) for result in execution_results)
+                
+                # Handle errors with recovery
+                if not result["success"] and not dry_run:
+                    recovered_results = await self._handle_execution_errors(plan, execution_results)
+                    result["recovery_attempted"] = True
+                    result["recovered_results"] = recovered_results
+                    # Update success status if recovery was successful
+                    if all(r.get("success", False) for r in recovered_results):
+                        result["success"] = True
             else:
                 result["cancelled"] = True
                 result["success"] = False
         
         return result
+    
+    async def _handle_execution_errors(
+        self,
+        plan: TaskPlan,
+        execution_results: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Handle errors in multi-step execution with recovery.
+        
+        Args:
+            plan: The task plan
+            execution_results: Original execution results
+            
+        Returns:
+            Updated execution results after recovery attempts
+        """
+        recovered_results = list(execution_results)  # Copy the original results
+        
+        # Find failed steps
+        for i, result in enumerate(execution_results):
+            if not result.get("success", False):
+                # Get the corresponding step
+                if i < len(plan.steps):
+                    step = plan.steps[i]
+                    
+                    # Attempt recovery
+                    recovery_result = await self._error_recovery_manager.handle_error(
+                        step, result, {"plan": plan}
+                    )
+                    
+                    # Update the result
+                    if recovery_result.get("recovery_success", False):
+                        recovered_results[i] = recovery_result
+        
+        return recovered_results
+    
+    async def _confirm_advanced_plan(self, plan: AdvancedTaskPlan, dry_run: bool) -> bool:
+        """
+        Get confirmation to execute an advanced plan.
+        
+        Args:
+            plan: The advanced task plan
+            dry_run: Whether this is a dry run
+            
+        Returns:
+            True if confirmed, False otherwise
+        """
+        if dry_run:
+            # No confirmation needed for dry run
+            return True
+        
+        # Check if any steps are high risk
+        has_high_risk = any(step.estimated_risk >= 3 for step in plan.steps.values())
+        
+        # Import here to avoid circular imports
+        from rich.console import Console
+        from prompt_toolkit.shortcuts import yes_no_dialog
+        
+        console = Console()
+        
+        if has_high_risk:
+            # Use a more prominent warning for high-risk plans
+            console.print(Panel(
+                "⚠️  [bold red]This plan includes HIGH RISK operations[/bold red] ⚠️\n"
+                "Some of these steps could make significant changes to your system.",
+                border_style="red",
+                expand=False
+            ))
+        
+        # Show complexity warning for advanced plans
+        console.print(Panel(
+            "[bold yellow]This is an advanced plan with complex execution flow.[/bold yellow]\n"
+            "It may include conditional branching and dependency-based execution.",
+            border_style="yellow",
+            expand=False
+        ))
+        
+        # Get confirmation
+        confirmed = yes_no_dialog(
+            title="Confirm Advanced Plan Execution",
+            text=f"Do you want to execute this {len(plan.steps)}-step advanced plan?",
+        ).run()
+        
+        return confirmed
     
     async def _process_file_content_request(
         self, 

@@ -195,6 +195,53 @@ def init():
     console.print("  [blue]angela --help[/blue] - Show help")
 
 
+@app.command("status")
+def show_status():
+    """Show the status of Angela CLI features and components."""
+    from rich.table import Table
+    
+    # Get integration status
+    from angela.integrations import phase_integration
+    status = asyncio.run(phase_integration.status())
+    
+    # Display general status
+    console.print(Panel(
+        f"Angela CLI - Phase {status['phase']}\n"
+        f"{status['description']}",
+        title="Status",
+        expand=False
+    ))
+    
+    # Display enabled features
+    if status.get("enabled_features"):
+        console.print("\n[bold]Enabled Features:[/bold]")
+        for feature in status["enabled_features"]:
+            console.print(f"• {feature}")
+    
+    # Display project information if available
+    if status.get("project"):
+        project = status["project"]
+        console.print("\n[bold]Project Information:[/bold]")
+        console.print(f"• Type: {project['type']}")
+        if project.get("frameworks"):
+            console.print(f"• Frameworks: {', '.join(project['frameworks'])}")
+        if "dependencies_count" in project:
+            console.print(f"• Dependencies: {project['dependencies_count']}")
+    
+    # Display network monitoring status if available
+    if status.get("network_monitoring"):
+        network = status["network_monitoring"]
+        console.print("\n[bold]Network Monitoring:[/bold]")
+        console.print(f"• Status: {network['status']}")
+        console.print(f"• Services Monitored: {network['services_monitored']}")
+        console.print(f"• Dependency Updates: {network['dependency_updates']}")
+    
+    console.print("\n[bold]System Information:[/bold]")
+    console.print(f"• Current Directory: {context_manager.cwd}")
+    if context_manager.project_root:
+        console.print(f"• Project Root: {context_manager.project_root}")
+
+
 @app.command()
 def shell():
     """Launch an interactive shell with Angela."""
