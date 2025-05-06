@@ -1,5 +1,103 @@
 # Angela-CLI
+--
+```bash
+.
+├── MD
+│   ├── Info.md
+│   ├── Phase1.md
+│   ├── Phase2.md
+│   ├── Phase3.md
+│   ├── Phase4.md
+│   ├── Phase5.md
+│   └── context.md
+├── Makefile
+├── README.md
+├── angela
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── ai
+│   │   ├── analyzer.py
+│   │   ├── client.py
+│   │   ├── confidence.py
+│   │   ├── content_analyzer.py
+│   │   ├── content_analyzer_extensions.py
+│   │   ├── file_integration.py
+│   │   ├── intent_analyzer.py
+│   │   ├── parser.py
+│   │   └── prompts.py
+│   ├── cli
+│   │   ├── __init__.py
+│   │   ├── files.py
+│   │   ├── main.py
+│   │   └── workflows.py
+│   ├── cli.py
+│   ├── config.py
+│   ├── constants.py
+│   ├── context
+│   │   ├── __init__.py
+│   │   ├── file_detector.py
+│   │   ├── history.py
+│   │   ├── manager.py
+│   │   ├── preferences.py
+│   │   ├── project_inference.py
+│   │   └── session.py
+│   ├── execution
+│   │   ├── adaptive_engine.py
+│   │   ├── engine.py
+│   │   ├── error_recovery.py
+│   │   ├── filesystem.py
+│   │   └── rollback.py
+│   ├── integrations.py
+│   ├── intent
+│   │   ├── advanced_planner.py
+│   │   ├── models.py
+│   │   └── planner.py
+│   ├── monitoring
+│   │   ├── __init__.py
+│   │   ├── background.py
+│   │   └── network_monitor.py
+│   ├── orchestrator.py
+│   ├── safety
+│   │   ├── __init__.py
+│   │   ├── adaptive_confirmation.py
+│   │   ├── classifier.py
+│   │   ├── confirmation.py
+│   │   ├── preview.py
+│   │   └── validator.py
+│   ├── shell
+│   │   ├── angela.bash
+│   │   ├── angela.zsh
+│   │   └── formatter.py
+│   ├── utils
+│   │   ├── __init__.py
+│   │   └── logging.py
+│   └── workflows
+│       ├── __init__.py
+│       ├── manager.py
+│       └── sharing.py
+├── pyproject.toml
+├── pytest.ini
+├── requirements.txt
+├── scripts
+│   ├── install.sh
+│   └── uninstall.sh
+├── setup.py
+└── tests
+    ├── __init__.py
+    ├── conftest.py
+    ├── test_ai_client.py
+    ├── test_context.py
+    ├── test_execution.py
+    ├── test_file_detector.py
+    ├── test_filesystem.py
+    ├── test_integration.py
+    ├── test_orchestration.py
+    ├── test_prompt_building.py
+    ├── test_response_parsing.py
+    └── test_safety.py
 
+15 directories, 79 files
+```
 **Project Title:** **Angela-CLI** 
 
 **Core Concept:**
