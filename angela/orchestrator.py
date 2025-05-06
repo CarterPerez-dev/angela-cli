@@ -1,10 +1,16 @@
-# angela/orchestrator.py
+"""
+Main orchestration service for Angela CLI.
+
+This module coordinates all the components of Angela CLI, from receiving
+user requests to executing commands with safety checks.
+"""
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List, Tuple
 
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.ai.prompts import build_prompt
 from angela.ai.parser import parse_ai_response, CommandSuggestion
+from angela.ai.file_integration import extract_file_operation, execute_file_operation
 from angela.context import context_manager
 from angela.execution.engine import execution_engine
 from angela.utils.logging import get_logger
@@ -17,7 +23,12 @@ class Orchestrator:
     def __init__(self):
         self._logger = logger
     
-    async def process_request(self, request: str, execute: bool = False) -> Dict[str, Any]:
+    async def process_request(
+        self, 
+        request: str, 
+        execute: bool = False,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
         """Process a request from the user."""
         # Refresh context to ensure we have the latest information
         context_manager.refresh_context()
@@ -37,16 +48,48 @@ class Orchestrator:
             }
             
             # Execute the command if requested
-            if execute:
-                self._logger.info(f"Executing suggested command: {suggestion.command}")
-                stdout, stderr, return_code = await execution_engine.execute_command(suggestion.command)
+            if execute or dry_run:
+                self._logger.info(f"{'Dry run' if dry_run else 'Executing'} suggested command: {suggestion.command}")
                 
-                result["execution"] = {
-                    "stdout": stdout,
-                    "stderr": stderr,
-                    "return_code": return_code,
-                    "success": return_code == 0
-                }
+                # Check if this is a file operation that we can handle directly
+                file_operation = await extract_file_operation(suggestion.command)
+                
+                if file_operation:
+                    # Handle file operation directly
+                    operation_type, parameters = file_operation
+                    self._logger.info(f"Extracted file operation: {operation_type}")
+                    
+                    operation_result = await execute_file_operation(
+                        operation_type, parameters, dry_run=dry_run
+                    )
+                    
+                    result["file_operation"] = operation_result
+                    result["execution"] = {
+                        "stdout": f"File operation executed: {operation_type}",
+                        "stderr": operation_result.get("error", ""),
+                        "return_code": 0 if operation_result.get("success", False) else 1,
+                        "success": operation_result.get("success", False),
+                        "dry_run": dry_run
+                    }
+                    
+                    # If it's a read operation and successful, add content to stdout
+                    if operation_type == "read_file" and operation_result.get("success", False):
+                        result["execution"]["stdout"] = operation_result.get("content", "")
+                else:
+                    # Regular command execution
+                    stdout, stderr, return_code = await execution_engine.execute_command(
+                        suggestion.command,
+                        check_safety=True,
+                        dry_run=dry_run
+                    )
+                    
+                    result["execution"] = {
+                        "stdout": stdout,
+                        "stderr": stderr,
+                        "return_code": return_code,
+                        "success": return_code == 0,
+                        "dry_run": dry_run
+                    }
             
             return result
             
@@ -77,6 +120,26 @@ class Orchestrator:
         
         self._logger.info(f"Received suggestion: {suggestion.command}")
         return suggestion
+    
+    async def process_file_operation(
+        self, 
+        operation: str, 
+        parameters: Dict[str, Any],
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Process a file operation request.
+        
+        Args:
+            operation: The type of file operation (e.g., 'create_file', 'read_file').
+            parameters: Parameters for the operation.
+            dry_run: Whether to simulate the operation without making changes.
+            
+        Returns:
+            A dictionary with the operation results.
+        """
+        # Execute the file operation
+        return await execute_file_operation(operation, parameters, dry_run=dry_run)
 
 # Global orchestrator instance
 orchestrator = Orchestrator()
