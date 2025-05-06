@@ -68,7 +68,7 @@
 - Enhanced error handling
 - Command validation
 
-### Phase 3: Safety Framework & File Operations
+### Phase 3: File Operations
 **Milestone 3A: Safety System)**
 - Operation risk classification system
 - Confirmation interface with previews
