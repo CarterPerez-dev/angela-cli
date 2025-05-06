@@ -462,16 +462,6 @@ Loading configuration from: /home/yoshi/.config/angela/config.toml
 
 ## Next Steps
 
-With Phase 3 complete, Angela-CLI now has a robust safety system and powerful file operation capabilities. The next phase (Phase 4) will focus on:
-
-1. Enhanced Context & Developer Workflows
-2. Project type inference and specialized actions
-3. Integration with development tools like Git and Docker
-4. Command chaining and workflow automation
-5. Performance optimizations
-
-The foundation built in Phase 3 provides a solid platform for these advanced features. The combination of natural language understanding, safety systems, and file operations enables a truly intelligent command-line assistant.
-
 ***************************IMPORTANT IMPORTANT**************************************
 # ****************MOVING FORWARD: PROJECT DIRECTION FOR ANGELA-CLI********************
 
@@ -492,7 +482,13 @@ As we continue development of Angela-CLI, we need to rebalance our priorities to
 5. **Remember User Preferences**: Develop persistent settings for execution preferences, allowing the experience to be customized to each user's comfort level.
 
 6. **Task Continuity**: Enable Angela to maintain context across multiple requests, allowing for more conversational interactions rather than isolated commands.
-
+### Step 4: Intelligent Interaction & Contextual Execution
+(Focus: Make single commands/simple sequences smarter, faster, and provide richer feedback. Enhance immediate context use.)
+Enhanced NLU & Tolerant Parsing: Implement more sophisticated Natural Language Understanding (ai/parser.py, intent/analyzer.py) to handle more complex or slightly misspelled/ambiguous single commands or simple sequences. Introduce interactive clarification (safety/confirmation.py using prompt_toolkit) but only when confidence is low (e.g., below ~70% match or high ambiguity); otherwise, attempt the most likely interpretation to maintain flow.
+Rich Feedback & Asynchronous Streaming: Integrate rich and asyncio deeply (execution/engine.py, shell/formatter.py) for real-time, well-formatted feedback during command execution. Provide progress indicators (spinners/bars), stream stdout/stderr asynchronously, and give clear status updates, making Angela feel highly responsive. Capture all output cleanly.
+Context-Aware Adaptive Confirmation: Leverage project type, recent activity, and command history (context/manager.py) to dynamically adjust confirmation needs (safety/classifier.py, orchestrator.py). Frequently used, low-risk commands in familiar contexts execute with minimal friction, while riskier operations still get detailed previews (safety/preview.py), balancing seamlessness with safety. Add detailed command history tracking (context/history.py).
+Intelligent Error Analysis & Basic Fix Suggestions: When commands fail, use the AI (ai/parser.py, execution/engine.py) to analyze stderr in context. Proactively suggest potential fixes, relevant commands (e.g., ls if a file isn't found, permission checks), or documentation lookups based on the error message and command attempted.
+Enhanced File/Directory Operations & Context: Implement more robust and complex file/directory operations (execution/filesystem.py) building on Phase 3 basics (e.g., recursive operations, pattern matching). Enhance context (context/filesystem.py) with reliable file type detection and basic metadata understanding to inform AI suggestions and operations.
 ### Implementation Priorities:
 
 - Modify `request` function in `angela/cli/main.py` to default `execute=True`
