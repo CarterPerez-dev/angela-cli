@@ -214,41 +214,35 @@ angela-cli/
 4. Build basic intent classification (command vs. file operation)
 5. Add simple command suggestion capability (non-executing)
 
-### Step 4: Command Execution Engine
-1. Implement safe command execution with `subprocess`
-2. Add support for read-only information commands
-3. Create output capture and formatting
-4. Implement command validation
-5. Add history tracking for executed commands
-6. Implement safety classification for commands
+### Step 4: Intelligent Interaction & Contextual Execution
+(Focus: Make single commands/simple sequences smarter, faster, and provide richer feedback. Enhance immediate context use.)
+Enhanced NLU & Tolerant Parsing: Implement more sophisticated Natural Language Understanding (ai/parser.py, intent/analyzer.py) to handle more complex or slightly misspelled/ambiguous single commands or simple sequences. Introduce interactive clarification (safety/confirmation.py using prompt_toolkit) but only when confidence is low (e.g., below ~70% match or high ambiguity); otherwise, attempt the most likely interpretation to maintain flow.
+Rich Feedback & Asynchronous Streaming: Integrate rich and asyncio deeply (execution/engine.py, shell/formatter.py) for real-time, well-formatted feedback during command execution. Provide progress indicators (spinners/bars), stream stdout/stderr asynchronously, and give clear status updates, making Angela feel highly responsive. Capture all output cleanly.
+Context-Aware Adaptive Confirmation: Leverage project type, recent activity, and command history (context/manager.py) to dynamically adjust confirmation needs (safety/classifier.py, orchestrator.py). Frequently used, low-risk commands in familiar contexts execute with minimal friction, while riskier operations still get detailed previews (safety/preview.py), balancing seamlessness with safety. Add detailed command history tracking (context/history.py).
+Intelligent Error Analysis & Basic Fix Suggestions: When commands fail, use the AI (ai/parser.py, execution/engine.py) to analyze stderr in context. Proactively suggest potential fixes, relevant commands (e.g., ls if a file isn't found, permission checks), or documentation lookups based on the error message and command attempted.
+Enhanced File/Directory Operations & Context: Implement more robust and complex file/directory operations (execution/filesystem.py) building on Phase 3 basics (e.g., recursive operations, pattern matching). Enhance context (context/filesystem.py) with reliable file type detection and basic metadata understanding to inform AI suggestions and operations.
 
-### Step 5: Safety Framework
-1. Create action preview generation
-2. Implement user confirmation interface
-3. Build risk classification system
-4. Add command impact analysis
-5. Create dry-run capability to show expected outcomes
-
-### Step 6: File Operations
-1. Implement directory operations
-2. Add file creation operations
-3. Create file content manipulation utilities
-4. Enhance context with file type detection
-5. Build rollback mechanisms for safety
+### Step 5: Autonomous Task Orchestration & Proactive Assistance
+(Focus: Enable high-level goal execution, deep content understanding, learning user workflows, and proactive behaviour.)
+High-Level Goal Decomposition & Multi-Step Orchestration: Empower the AI (intent/planner.py, orchestrator.py) to break down complex user goals ("Deploy latest dev to staging") into sequences of commands/actions. Plan dependencies, visualize the execution flow (shell/formatter.py with rich), gain confirmation, and execute the orchestrated plan, monitoring progress and handling intermediate steps/errors gracefully.
+Conversational Context & Session Memory: Implement robust session memory (context/manager.py, orchestrator.py) allowing Angela to understand follow-up commands referencing entities (files, outputs, errors) from the current interaction ("Try that again with sudo", "Analyze those errors").
+AI-Powered File Content Comprehension & Manipulation: Integrate AI (ai/client.py, potentially new ai/content_analyzer.py) to understand the content of files (code functions, config values, text). Enable natural language requests for content-aware tasks like refactoring simple functions, updating configuration entries, or summarizing logs (execution/filesystem.py, safety/preview.py showing diffs). Create underlying utilities for safe content manipulation.
+User-Defined Workflows via Natural Language: Allow users to teach Angela reusable multi-step workflows ("Define 'publish package' as: run tests, bump version, build, upload"). Angela (intent/planner.py, new workflows/manager.py) translates, confirms, saves, and allows invocation by the user-defined name.
+Proactive Monitoring, Suggestions & Advanced Rollback: Implement optional background monitoring (orchestrator.py, asyncio) for contextual nudges (lint errors, git status, process crashes) via shell/formatter.py. Offer proactive suggestions/autofill based on deeper context (context/*, ai/*). Enhance rollback mechanisms (safety/*, execution/*) to specifically support undoing multi-step or content-manipulation actions where feasible, maintaining safety without hindering the autonomous capabilities.
 
 ### Step 7: Enhanced Project Context
 1. Implement project type inference
 2. Add dependency detection in projects
 3. Create file reference resolution from natural language
 4. Implement recent activity tracking
-5. Enhance prompt engineering with project context
+5. massivly Enhance prompt engineering with project context
 
-### Step 8: Developer Tool Integration
+### Step 8: Developer Tool Integration (MAIN ASPECTY OF THIS WHOLE THING WERE IT COMES ALL TOGETHOR)
 1. Add Git commands integration
 2. Implement Docker support
-3. Create code snippet generation
+3. Create code generation flow. it shoudl be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
 4. Build multi-step workflow execution
-5. Perform final testing, optimization, and documentation
+5. Perform final testing, optimization, and documentation, containeriziation and even CI/CD if needed
 
 ## Initial Implementation Focus
 
