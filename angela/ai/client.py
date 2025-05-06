@@ -63,12 +63,35 @@ class GeminiClient:
                 # Don't wrap this in a try/except - let it propagate directly
                 raise ValueError("Empty response from Gemini API.")
             
-            # Create a structured response
-            result = GeminiResponse(
-                text=response.text,
-                generated_text=response.text,
-                raw_response=response.candidates[0],
-            )
+            # Create a structured response - handle different response structures
+            try:
+                # Try to adapt to different response formats
+                if hasattr(response, 'candidates') and response.candidates:
+                    # Convert candidate to dict if possible
+                    if hasattr(response.candidates[0], '__dict__'):
+                        raw_response = response.candidates[0].__dict__
+                    elif hasattr(response.candidates[0], 'to_dict'):
+                        raw_response = response.candidates[0].to_dict()
+                    else:
+                        # Fallback - create a simple dict with text
+                        raw_response = {"text": response.text}
+                else:
+                    # Fallback to a simpler format if candidates not available
+                    raw_response = {"text": response.text}
+                    
+                result = GeminiResponse(
+                    text=response.text,
+                    generated_text=response.text,
+                    raw_response=raw_response,
+                )
+            except Exception as format_error:
+                logger.exception(f"Error formatting Gemini response: {str(format_error)}")
+                # Even if formatting fails, still provide a valid response
+                result = GeminiResponse(
+                    text=response.text,
+                    generated_text=response.text,
+                    raw_response={"text": response.text},
+                )
             
             logger.debug(f"Gemini API response received. Length: {len(result.text)}")
             return result
