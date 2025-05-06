@@ -42,6 +42,9 @@ def main(
     version: bool = typer.Option(
         False, "--version", "-v", callback=version_callback, help="Show version and exit"
     ),
+    monitor: bool = typer.Option(
+        False, "--monitor", "-m", help="Enable background monitoring for proactive assistance"
+    ),
 ):
     """Angela: AI-powered command-line assistant"""
     # Set debug mode
@@ -49,6 +52,12 @@ def main(
     
     # Configure logging
     setup_logging(debug=debug)
+    
+    # Start background monitoring if requested
+    if monitor:
+        # Import here to avoid circular imports
+        from angela.monitoring.background import background_monitor
+        background_monitor.start_monitoring()
 
 
 @app.command()
