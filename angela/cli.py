@@ -2,13 +2,15 @@
 """
 Command-line interface for Angela CLI.
 """
-import sys
-from typing import Optional, List
+iimport sys
+import asyncio
+from typing import List
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+from rich.syntax import Syntax
 from rich import print as rich_print
 
 from angela import __version__
@@ -16,67 +18,74 @@ from angela.config import config_manager
 from angela.orchestrator import orchestrator
 from angela.utils.logging import setup_logging, get_logger
 
-app = typer.Typer(
-    name="angela",
-    help="AI-powered command-line assistant integrated into your terminal shell",
-    add_completion=False,
-)
-
-console = Console()
-logger = get_logger(__name__)
-
-
-def version_callback(value: bool):
-    """Callback for --version flag."""
-    if value:
-        console.print(f"Angela CLI version: {__version__}")
-        raise typer.Exit()
-
-
-@app.callback()
-def main(
-    version: bool = typer.Option(
-        False, "--version", "-v", callback=version_callback, help="Show version and exit."
-    ),
-    debug: bool = typer.Option(
-        False, "--debug", "-d", help="Enable debug mode with verbose logging."
-    ),
-):
-    """
-    Angela CLI - Your AI-powered command-line assistant.
-    """
-    # Set up logging first
-    setup_logging(debug=debug)
-    
-    # Load configuration
-    config_manager.load_config()
-    
-    # Override debug setting from command line if specified
-    if debug:
-        config_manager.config.debug = True
-
+# Keep existing app definition and version_callback
 
 @app.command()
 def request(
     request_text: List[str] = typer.Argument(
         ..., help="The natural language request for Angela."
-    )
+    ),
+    execute: bool = typer.Option(
+        False, "--execute", "-e", help="Execute the suggested command."
+    ),
 ):
-    """
-    Send a natural language request to Angela.
-    """
+    """Send a natural language request to Angela."""
     # Combine all arguments into a single request string
     full_request = " ".join(request_text)
     
     try:
         # Process the request
-        result = orchestrator.process_request(full_request)
+        result = asyncio.run(orchestrator.process_request(full_request, execute))
         
         # Display the response
         panel_title = Text("Angela", style="bold green")
-        panel_content = Text(result["response"])
         
-        console.print(Panel(panel_content, title=panel_title, expand=False))
+        if "suggestion" in result:
+            suggestion = result["suggestion"]
+            
+            # Build panel content with command suggestion
+            panel_content = Text()
+            panel_content.append("I suggest using this command:\n\n", style="bold")
+            
+            # Add the command with syntax highlighting
+            command_syntax = Syntax(suggestion.command, "bash", theme="monokai", word_wrap=True)
+            console.print(Panel(command_syntax, title="Command", expand=False))
+            
+            # Show explanation
+            console.print("\n[bold]Explanation:[/bold]")
+            console.print(suggestion.explanation)
+            
+            # Show execution results if executed
+            if "execution" in result:
+                execution = result["execution"]
+                console.print("\n[bold]Command Output:[/bold]")
+                
+                if execution["success"]:
+                    if execution["stdout"].strip():
+                        output_panel = Panel(
+                            execution["stdout"], 
+                            title="Output", 
+                            expand=False,
+                            border_style="green"
+                        )
+                        console.print(output_panel)
+                    else:
+                        console.print("[green]Command executed successfully with no output.[/green]")
+                else:
+                    console.print("[bold red]Command failed[/bold red]")
+                    if execution["stderr"].strip():
+                        error_panel = Panel(
+                            execution["stderr"], 
+                            title="Error", 
+                            expand=False,
+                            border_style="red"
+                        )
+                        console.print(error_panel)
+            
+        else:
+            # Fall back to simple response if no suggestion
+            panel_content = Text(result.get("response", "I couldn't process that request."))
+            console.print(Panel(panel_content, title=panel_title, expand=False))
         
         # In debug mode, show context information
         if config_manager.config.debug:
