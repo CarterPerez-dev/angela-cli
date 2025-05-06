@@ -91,3 +91,21 @@ def test_get_context_dict(temp_dir):
     assert context_dict["project_type"] == "git"
     assert context_dict["is_in_project"] is True
     assert context_dict["relative_path"] == "."
+
+
+
+def test_context_manager_init(monkeypatch):
+    """Test ContextManager initialization."""
+    # Patch the _detect_project_root method to return None for this test
+    def mock_detect_project_root(self):
+        self._project_root = None
+        self._project_type = None
+    
+    monkeypatch.setattr(ContextManager, "_detect_project_root", mock_detect_project_root)
+    
+    cm = ContextManager()
+    assert cm.cwd == Path.cwd()
+    assert cm.project_root is None
+    assert cm.project_type is None
+    assert not cm.is_in_project
+    assert cm.relative_path is None

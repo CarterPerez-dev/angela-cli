@@ -41,6 +41,7 @@ class GeminiClient:
         self.model = genai.GenerativeModel(GEMINI_MODEL)
         logger.debug(f"Gemini API client initialized with model: {GEMINI_MODEL}")
         
+    # Update angela/ai/client.py
     async def generate_text(self, request: GeminiRequest) -> GeminiResponse:
         """Generate text using the Gemini API."""
         try:
@@ -59,6 +60,7 @@ class GeminiClient:
             
             # Process the response
             if not response.text:
+                # Don't wrap this in a try/except - let it propagate directly
                 raise ValueError("Empty response from Gemini API.")
             
             # Create a structured response
@@ -71,7 +73,12 @@ class GeminiClient:
             logger.debug(f"Gemini API response received. Length: {len(result.text)}")
             return result
         
+        except ValueError as ve:
+            # Let ValueError propagate directly
+            logger.exception(f"Gemini API returned empty response: {str(ve)}")
+            raise
         except Exception as e:
+            # Wrap other exceptions
             logger.exception(f"Error calling Gemini API: {str(e)}")
             raise RuntimeError(f"Failed to generate text with Gemini API: {str(e)}")
 

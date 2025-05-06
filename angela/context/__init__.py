@@ -1,5 +1,4 @@
-"""
-Context management for Angela CLI.
-"""
+from .manager import context_manager
 
-from angela.context.manager import ContextManager
+
+"""Context management package for Angela CLI."""
