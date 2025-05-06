@@ -53,8 +53,8 @@ def request(
     request_text: List[str] = typer.Argument(
         ..., help="The natural language request for Angela."
     ),
-    execute: bool = typer.Option(
-        False, "--execute", "-e", help="Execute the suggested command."
+    suggest_only: bool = typer.Option(
+        False, "--suggest-only", "-s", help="Only suggest commands without executing."
     ),
     dry_run: bool = typer.Option(
         False, "--dry-run", help="Preview command execution without making changes."
@@ -65,7 +65,10 @@ def request(
     full_request = " ".join(request_text)
     
     try:
-        # Process the request
+        # Process the request - note execute=True is now the default
+        # Only switch to false if suggest_only is True
+        execute = not suggest_only
+        
         result = asyncio.run(orchestrator.process_request(
             full_request, execute=execute, dry_run=dry_run
         ))

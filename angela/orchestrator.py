@@ -14,6 +14,10 @@ from angela.ai.file_integration import extract_file_operation, execute_file_oper
 from angela.context import context_manager
 from angela.execution.engine import execution_engine
 from angela.utils.logging import get_logger
+from angela.execution.adaptive_engine import adaptive_engine
+from angela.context.session import session_manager
+from angela.context.history import history_manager
+from angela.ai.analyzer import error_analyzer
 
 logger = get_logger(__name__)
 
@@ -26,7 +30,7 @@ class Orchestrator:
     async def process_request(
         self, 
         request: str, 
-        execute: bool = False,
+        execute: bool = True,  # Note: Now defaults to True
         dry_run: bool = False
     ) -> Dict[str, Any]:
         """Process a request from the user."""
@@ -34,12 +38,19 @@ class Orchestrator:
         context_manager.refresh_context()
         context = context_manager.get_context_dict()
         
+        # Add session context for continuity across requests
+        session_context = session_manager.get_context()
+        context["session"] = session_context
+        
         self._logger.info(f"Processing request: {request}")
         self._logger.debug(f"Context: {context}")
         
         try:
+            # Check if we've seen a similar request before
+            similar_command = history_manager.search_similar_command(request)
+            
             # Get command suggestion from AI
-            suggestion = await self._get_ai_suggestion(request, context)
+            suggestion = await self._get_ai_suggestion(request, context, similar_command)
             
             result = {
                 "request": request,
@@ -51,51 +62,21 @@ class Orchestrator:
             if execute or dry_run:
                 self._logger.info(f"{'Dry run' if dry_run else 'Executing'} suggested command: {suggestion.command}")
                 
-                # Check if this is a file operation that we can handle directly
-                file_operation = await extract_file_operation(suggestion.command)
+                # Execute using the adaptive engine
+                execution_result = await adaptive_engine.execute_command(
+                    command=suggestion.command,
+                    natural_request=request,
+                    explanation=suggestion.explanation,
+                    dry_run=dry_run
+                )
                 
-                if file_operation:
-                    # Handle file operation directly
-                    operation_type, parameters = file_operation
-                    self._logger.info(f"Extracted file operation: {operation_type}")
-                    
-                    operation_result = await execute_file_operation(
-                        operation_type, parameters, dry_run=dry_run
-                    )
-                    
-                    result["file_operation"] = operation_result
-                    result["execution"] = {
-                        "stdout": f"File operation executed: {operation_type}",
-                        "stderr": operation_result.get("error", ""),
-                        "return_code": 0 if operation_result.get("success", False) else 1,
-                        "success": operation_result.get("success", False),
-                        "dry_run": dry_run
-                    }
-                    
-                    # If it's a read operation and successful, add content to stdout
-                    if operation_type == "read_file" and operation_result.get("success", False):
-                        result["execution"]["stdout"] = operation_result.get("content", "")
-                else:
-                    # Regular command execution
-                    stdout, stderr, return_code = await execution_engine.execute_command(
-                        suggestion.command,
-                        check_safety=True,
-                        dry_run=dry_run
-                    )
-                    
-                    result["execution"] = {
-                        "stdout": stdout,
-                        "stderr": stderr,
-                        "return_code": return_code,
-                        "success": return_code == 0,
-                        "dry_run": dry_run
-                    }
+                result["execution"] = execution_result
             
             return result
             
         except Exception as e:
             self._logger.exception(f"Error processing request: {str(e)}")
-            # Fallback to old behavior if AI service fails
+            # Fallback behavior
             return {
                 "request": request,
                 "response": f"Echo: {request}",
@@ -103,10 +84,15 @@ class Orchestrator:
                 "context": context,
             }
     
-    async def _get_ai_suggestion(self, request: str, context: Dict[str, Any]) -> CommandSuggestion:
+    async def _get_ai_suggestion(
+        self, 
+        request: str, 
+        context: Dict[str, Any],
+        similar_command: Optional[str] = None
+    ) -> CommandSuggestion:
         """Get a command suggestion from the AI service."""
-        # Build prompt with context
-        prompt = build_prompt(request, context)
+        # Build prompt with context, including session context if available
+        prompt = build_prompt(request, context, similar_command)
         
         # Create a request to the Gemini API
         api_request = GeminiRequest(prompt=prompt)

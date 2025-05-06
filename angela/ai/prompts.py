@@ -105,7 +105,11 @@ FILE_OPERATION_EXAMPLES = [
     }
 ]
 
-def build_prompt(request: str, context: Dict[str, Any]) -> str:
+def build_prompt(
+    request: str, 
+    context: Dict[str, Any],
+    similar_command: Optional[str] = None
+) -> str:
     """Build a prompt for the Gemini API with context information."""
     # Create a context description
     context_str = "Current context:\n"
@@ -126,7 +130,26 @@ def build_prompt(request: str, context: Dict[str, Any]) -> str:
             context_str += f"- File language: {file_info.get('language')}\n"
         if file_info.get("type"):
             context_str += f"- File type: {file_info.get('type')}\n"
+            
+    if "session" in context:
+        session = context["session"]
+        
+        # Add recent commands for continuity
+        if session.get("recent_commands"):
+            context_str += "Recent commands:\n"
+            for cmd in session.get("recent_commands", []):
+                context_str += f"- {cmd}\n"
+        
+        # Add entities for reference resolution
+        if session.get("entities"):
+            context_str += "Referenced entities:\n"
+            for name, entity in session.get("entities", {}).items():
+                context_str += f"- {name}: {entity.get('type')} - {entity.get('value')}\n"
     
+    # Add similar command suggestion if available
+    if similar_command:
+        context_str += f"\nYou previously suggested this similar command: {similar_command}\n"
+        
     # Add examples for few-shot learning
     examples_str = "Examples:\n"
     
