@@ -27,7 +27,6 @@ from angela.intent.planner import task_planner
 from angela.workflows.manager import workflow_manager
 from angela.utils.logging import get_logger
 from angela.shell.formatter import terminal_formatter, OutputType
-from angela.intent.advanced_planner import advanced_task_planner
 from angela.execution.error_recovery import ErrorRecoveryManager
 from angela.context.enhancer import context_enhancer
 from angela.context.file_resolver import file_resolver
@@ -324,7 +323,7 @@ class Orchestrator:
     
     # Update in angela/orchestrator.py
     # Add this import at the top
-    from angela.intent.advanced_planner import advanced_task_planner
+    from angela.intent.planner import task_planner
     from angela.execution.error_recovery import ErrorRecoveryManager
     
     # Add this as a class member in the Orchestrator class
@@ -357,11 +356,11 @@ class Orchestrator:
         self._logger.info(f"Processing multi-step request: {request}")
         
         # Determine if we should use advanced planning
-        complexity = await advanced_task_planner._determine_complexity(request)
+        complexity = await task_planner._determine_complexity(request)
         
         if complexity == "advanced":
             # Use the advanced planner for complex tasks
-            plan = await advanced_task_planner.plan_task(request, context, complexity)
+            plan = await task_planner.plan_task(request, context, complexity)
             
             # Create result with the plan
             if isinstance(plan, AdvancedTaskPlan):
@@ -400,7 +399,7 @@ class Orchestrator:
                     
                     if confirmed or dry_run:
                         # Execute the plan
-                        execution_results = await advanced_task_planner.execute_plan(plan, dry_run=dry_run)
+                        execution_results = await task_planner.execute_plan(plan, dry_run=dry_run)
                         result["execution_results"] = execution_results
                         result["success"] = execution_results.get("success", False)
                     else:
