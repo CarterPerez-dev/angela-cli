@@ -85,12 +85,7 @@ The `angela/execution/hooks.py` module introduces the `ExecutionHooks` class, wh
 **`angela/context/file_detector.py`**
 This module is crucial for Angela's contextual awareness, providing the `detect_file_type` function to identify file characteristics such as general type (e.g., image, text, source_code), specific programming language, MIME type, and binary status. It employs a multi-layered detection strategy, using Python's `mimetypes` library, extensive predefined dictionaries like `LANGUAGE_EXTENSIONS` (e.g., `.py` to Python) and `FILENAME_MAPPING` (e.g., `Dockerfile` to Docker), and checking for common `SHEBANG_PATTERNS` in the first line of text files. A binary check is performed by searching for null bytes in an initial chunk of the file, and the module also offers a `get_content_preview` function to display the beginning of text files. This detailed file information is then used by other Angela components for tasks like syntax highlighting, forming appropriate AI prompts, or deciding on safe file handling procedures.
 ----
-**`angela/intent/planner.py` (TaskPlanner)**
-The `angela/intent/planner.py` module implements a `TaskPlanner` that uses an AI model (`gemini_client`) to break down high-level natural language user goals into a sequence of executable shell commands. It defines `PlanStep` and `TaskPlan` Pydantic models, where each step includes the command, an explanation, dependencies on previous steps, and an estimated risk level. The core `_build_planning_prompt` method constructs a detailed request for the AI, providing the goal, current environmental context (like CWD files via `context_manager`), and a JSON schema for the expected output. `_parse_plan_response` then processes the AI's output, converting it into a `TaskPlan`, with a fallback mechanism for parsing errors. This `TaskPlan` can then be converted to a simpler `ActionPlan` and executed via the `execution_engine`, enabling Angela to tackle complex, multi-step objectives.
----
-**`angela/intent/advanced_planner.py` (AdvancedTaskPlanner)**
-This module introduces the `AdvancedTaskPlanner`, an enhanced version of the task planner designed to handle more complex user goals by creating sophisticated execution plans that can include branching, conditional logic, and various step types. It defines `PlanStepType` (Enum), `AdvancedPlanStep` (supporting commands, code, file operations, API calls, decisions, loops), and `AdvancedTaskPlan` Pydantic models, allowing for a graph-like structure with unique step IDs and explicit entry points. The planner first determines the goal's complexity; for simple goals, it may delegate to the basic `task_planner`, while for complex ones, `_build_advanced_planning_prompt` instructs the `gemini_client` AI to generate a JSON plan with these advanced features. The `execute_plan` method then interprets this `AdvancedTaskPlan`, managing a queue of pending steps, respecting dependencies, and dispatching execution based on step type, with placeholder or simplified implementations for non-command steps and basic retry logic.
--------
+
 # Current Project Tree/Structure
 ```bash
 .
@@ -165,7 +160,6 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   └── validators.py
 │   ├── intent
 │   │   ├── __init__.py
-│   │   ├── advanced_planner.py
 │   │   ├── models.py
 │   │   └── planner.py
 │   ├── interfaces
@@ -235,5 +229,6 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
     ├── test_response_parsing.py
     └── test_safety.py
 
-21 directories, 120 files
+21 directories, 119 files
+
 ```

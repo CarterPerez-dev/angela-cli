@@ -15,6 +15,7 @@ from angela.ai.prompts import build_prompt
 from angela.ai.parser import parse_ai_response, CommandSuggestion
 from angela.ai.file_integration import extract_file_operation, execute_file_operation
 from angela.ai.content_analyzer import content_analyzer
+from angela.ai.content_analyzer_extensions EnhancedContentAnalyzer
 from angela.context import context_manager
 from angela.context.session import session_manager
 from angela.context.history import history_manager
@@ -33,6 +34,7 @@ from angela.context.file_resolver import file_resolver
 from angela.context.file_activity import file_activity_tracker, ActivityType
 from angela.execution.hooks import execution_hooks
 from angela.core.registry import registry
+from angela.shell import advanced_formatter
 
 logger = get_logger(__name__)
 

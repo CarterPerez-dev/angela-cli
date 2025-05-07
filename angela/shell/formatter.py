@@ -21,6 +21,11 @@ from rich.layout import Layout
 from rich.tree import Tree
 from rich import box
 
+terminal_formatter.display_advanced_plan = display_advanced_plan
+terminal_formatter.display_execution_results = display_execution_results
+terminal_formatter.display_step_details = display_step_details
+terminal_formatter.display_step_error = display_step_error
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -660,6 +665,8 @@ class TerminalFormatter:
             border_style="green",
             expand=False
         ))
+
+
 
 # Global formatter instance
 terminal_formatter = TerminalFormatter()
