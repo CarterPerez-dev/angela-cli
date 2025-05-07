@@ -195,6 +195,7 @@ def add_feature(
     try:
         # Get current context
         context = context_manager.get_context_dict()
+        context = asyncio.run(context_enhancer.enrich_context(context))
         
         # Check if project directory exists
         project_path = Path(project_dir)
@@ -230,31 +231,99 @@ def add_feature(
             else:
                 console.print(f"[green]Detected project type: {project_type}[/green]")
         
-        # TODO: Implement the actual feature addition using the code_generation_engine
-        # This would involve:
-        # 1. Analyzing the existing project structure
-        # 2. Generating new files or modifications
-        # 3. Applying the changes
-        
-        # Placeholder for feature addition
+        # Generate feature implementation
         console.print("\n[bold]Generating feature implementation...[/bold]")
-        console.print("[yellow]Feature addition is not yet implemented[/yellow]")
         
-        # Commit changes if requested
-        if auto_commit and not dry_run:
-            console.print("\n[bold]Committing changes...[/bold]")
+        with console.status("[bold green]Generating feature implementation...[/bold green]"):
+            # Use the new feature addition method
+            result = asyncio.run(code_generation_engine.add_feature_to_project(
+                description=description,
+                project_dir=project_dir,
+                context=context
+            ))
+        
+        if result["success"]:
+            # Display results
+            console.print(f"[green]Successfully added feature to project![/green]")
             
-            with console.status("[bold green]Creating commit...[/bold green]"):
-                commit_result = asyncio.run(git_integration.commit_changes(
-                    path=project_dir,
-                    message=f"Add feature: {description}",
-                    auto_stage=True
-                ))
+            if result.get("new_files"):
+                console.print("\n[bold]Created Files:[/bold]")
+                for file_path in result["new_files"]:
+                    console.print(f"  ✅ {file_path}")
             
-            if commit_result["success"]:
-                console.print("[green]Committed changes successfully[/green]")
-            else:
-                console.print(f"[yellow]Failed to commit changes: {commit_result.get('error', 'Unknown error')}[/yellow]")
+            if result.get("modified_files"):
+                console.print("\n[bold]Modified Files:[/bold]")
+                for file_path in result["modified_files"]:
+                    console.print(f"  ✏️ {file_path}")
+            
+            # Generate tests if requested
+            if generate_tests and not dry_run:
+                console.print("\n[bold]Generating tests for new feature...[/bold]")
+                
+                with console.status("[bold green]Generating tests...[/bold green]"):
+                    # Create a list of new files with CodeFile objects
+                    src_files = []
+                    for file_path in result.get("new_files", []):
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                                content = f.read()
+                                
+                            rel_path = str(Path(file_path).relative_to(project_dir))
+                            src_files.append(CodeFile(
+                                path=rel_path,
+                                content=content,
+                                purpose=f"New feature: {description}",
+                                dependencies=[],
+                                language=project_type
+                            ))
+                        except Exception as e:
+                            console.print(f"[yellow]Error reading file {file_path}: {str(e)}[/yellow]")
+                    
+                    if src_files:
+                        test_result = asyncio.run(test_framework_integration.generate_test_files(
+                            src_files=src_files,
+                            project_type=project_type,
+                            root_dir=project_dir
+                        ))
+                        
+                        if test_result["success"]:
+                            console.print(f"[green]Generated {test_result['file_count']} test files[/green]")
+                        else:
+                            console.print(f"[yellow]Failed to generate test files: {test_result.get('error', 'Unknown error')}[/yellow]")
+                    else:
+                        console.print("[yellow]No source files available for test generation[/yellow]")
+            
+            # Install dependencies if requested
+            if install_deps and not dry_run:
+                console.print("\n[bold]Installing dependencies...[/bold]")
+                
+                with console.status("[bold green]Installing dependencies...[/bold green]"):
+                    # This is a placeholder - in a real implementation, you would
+                    # extract dependencies from the added feature and install them
+                    console.print("[yellow]Dependency installation not fully implemented yet.[/yellow]")
+            
+            # Commit changes if requested
+            if auto_commit and not dry_run:
+                console.print("\n[bold]Committing changes...[/bold]")
+                
+                with console.status("[bold green]Creating commit...[/bold green]"):
+                    commit_result = asyncio.run(git_integration.commit_changes(
+                        path=project_dir,
+                        message=f"Add feature: {description}",
+                        auto_stage=True
+                    ))
+                
+                if commit_result["success"]:
+                    console.print("[green]Committed changes successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to commit changes: {commit_result.get('error', 'Unknown error')}[/yellow]")
+        else:
+            console.print(f"[bold red]Feature addition failed:[/bold red] {result.get('error', 'Unknown error')}")
+            
+            if result.get("errors"):
+                console.print("\n[bold]Errors:[/bold]")
+                for error in result.get("errors"):
+                    console.print(f"  ❌ {error.get('path')}: {error.get('error')}")
     
     except Exception as e:
         logger.exception("Error adding feature")

@@ -1504,8 +1504,6 @@ async def _apply_feature_changes(
 
 # Now update the add_feature function in angela/cli/generation.py to use this new functionality
 
-# This is the updated implementation for the add_feature function in angela/cli/generation.py
-
 @app.command("add-feature")
 def add_feature(
     description: str = typer.Argument(..., help="Description of the feature to add"),
@@ -1661,7 +1659,5 @@ def add_feature(
     except Exception as e:
         logger.exception("Error adding feature")
         console.print(f"[bold red]Error adding feature:[/bold red] {str(e)}")
-
-
 
 code_generation_engine = CodeGenerationEngine()
