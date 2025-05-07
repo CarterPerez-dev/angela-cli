@@ -297,33 +297,53 @@ def add_feature(
             if install_deps and not dry_run:
                 console.print("\n[bold]Installing dependencies...[/bold]")
                 
-                with console.status("[bold green]Installing dependencies...[/bold green]"):
-                    # This is a placeholder - in a real implementation, you would
-                    # extract dependencies from the added feature and install them
-                    console.print("[yellow]Dependency installation not fully implemented yet.[/yellow]")
-            
-            # Commit changes if requested
-            if auto_commit and not dry_run:
-                console.print("\n[bold]Committing changes...[/bold]")
-                
-                with console.status("[bold green]Creating commit...[/bold green]"):
-                    commit_result = asyncio.run(git_integration.commit_changes(
-                        path=project_dir,
-                        message=f"Add feature: {description}",
-                        auto_stage=True
-                    ))
-                
-                if commit_result["success"]:
-                    console.print("[green]Committed changes successfully[/green]")
-                else:
-                    console.print(f"[yellow]Failed to commit changes: {commit_result.get('error', 'Unknown error')}[/yellow]")
-        else:
-            console.print(f"[bold red]Feature addition failed:[/bold red] {result.get('error', 'Unknown error')}")
-            
-            if result.get("errors"):
-                console.print("\n[bold]Errors:[/bold]")
-                for error in result.get("errors"):
-                    console.print(f"  ❌ {error.get('path')}: {error.get('error')}")
+                with console.status("[bold green]Extracting and installing dependencies...[/bold green]"):
+                    # Extract dependencies from the feature files
+                    dependencies = await code_generation_engine._extract_dependencies_from_feature(
+                        feature_files={
+                            "new_files": [{"path": path, "content": open(path, 'r', encoding='utf-8', errors='replace').read()} 
+                                          for path in result.get("new_files", []) if Path(path).exists()],
+                            "modified_files": [{"path": path, 
+                                               "original_content": "", # We don't need original content for dependency extraction
+                                               "modified_content": open(path, 'r', encoding='utf-8', errors='replace').read()} 
+                                              for path in result.get("modified_files", []) if Path(path).exists()]
+                        },
+                        project_type=project_type
+                    )
+                    
+                    if not dependencies["runtime"] and not dependencies["development"]:
+                        console.print("[yellow]No new dependencies detected in the feature.[/yellow]")
+                    else:
+                        # Install the detected dependencies
+                        runtime_deps = dependencies.get("runtime", [])
+                        dev_deps = dependencies.get("development", [])
+                        
+                        if runtime_deps:
+                            console.print(f"[bold]Runtime dependencies to install:[/bold] {', '.join(runtime_deps)}")
+                            install_result = await package_manager_integration.install_dependencies(
+                                path=project_dir,
+                                dependencies=runtime_deps,
+                                project_type=project_type
+                            )
+                            
+                            if install_result["success"]:
+                                console.print(f"[green]Successfully installed runtime dependencies[/green]")
+                            else:
+                                console.print(f"[yellow]Failed to install runtime dependencies: {install_result.get('error', 'Unknown error')}[/yellow]")
+                        
+                        if dev_deps:
+                            console.print(f"[bold]Development dependencies to install:[/bold] {', '.join(dev_deps)}")
+                            dev_install_result = await package_manager_integration.install_dependencies(
+                                path=project_dir,
+                                dependencies=[],
+                                dev_dependencies=dev_deps,
+                                project_type=project_type
+                            )
+                            
+                            if dev_install_result["success"]:
+                                console.print(f"[green]Successfully installed development dependencies[/green]")
+                            else:
+                                console.print(f"[yellow]Failed to install development dependencies: {dev_install_result.get('error', 'Unknown error')}[/yellow]")
     
     except Exception as e:
         logger.exception("Error adding feature")

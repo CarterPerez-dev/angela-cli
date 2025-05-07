@@ -10,6 +10,7 @@ import difflib
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Union
 
+from angela.review.diff_manager import diff_manager
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.context import context_manager
 from angela.context.file_detector import detect_file_type
@@ -199,7 +200,7 @@ Summary:
         modified_content = self._extract_modified_content(response.text, original_content)
         
         # Generate diff
-        diff = self._generate_diff(original_content, modified_content)
+        diff = diff_manager.generate_diff(original_content, modified_content)
         
         # Return the results
         return {
@@ -452,29 +453,6 @@ Modified file content:
         
         return response.strip()
     
-    def _generate_diff(self, original: str, modified: str) -> str:
-        """
-        Generate a diff between original and modified content.
-        
-        Args:
-            original: The original content
-            modified: The modified content
-            
-        Returns:
-            A string with the unified diff
-        """
-        original_lines = original.splitlines(keepends=True)
-        modified_lines = modified.splitlines(keepends=True)
-        
-        diff_lines = difflib.unified_diff(
-            original_lines, 
-            modified_lines,
-            fromfile='original',
-            tofile='modified',
-            n=3  # Context lines
-        )
-        
-        return ''.join(diff_lines)
     
     def _parse_search_results(
         self, 

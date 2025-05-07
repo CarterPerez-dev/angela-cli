@@ -11,6 +11,7 @@
 │   ├── Phase4.md
 │   ├── Phase5.md
 │   ├── Phase6.md
+│   ├── Phase7.md
 │   ├── context.md
 │   └── tree.md
 ├── Makefile
@@ -33,6 +34,7 @@
 │   │   ├── __init__.py
 │   │   ├── files.py
 │   │   ├── files_extensions.py
+│   │   ├── generation.py
 │   │   ├── main.py
 │   │   └── workflows.py
 │   ├── cli.py
@@ -56,6 +58,13 @@
 │   │   ├── filesystem.py
 │   │   ├── hooks.py
 │   │   └── rollback.py
+│   ├── generation
+│   │   ├── architecture.py
+│   │   ├── documentation.py
+│   │   ├── engine.py
+│   │   ├── frameworks.py
+│   │   ├── planner.py
+│   │   └── validators.py
 │   ├── integrations
 │   │   ├── integrations5.py
 │   │   └── integrations6.py
@@ -68,6 +77,9 @@
 │   │   ├── background.py
 │   │   └── network_monitor.py
 │   ├── orchestrator.py
+│   ├── review
+│   │   ├── diff_manager.py
+│   │   └── feedback.py
 │   ├── safety
 │   │   ├── __init__.py
 │   │   ├── adaptive_confirmation.py
@@ -79,6 +91,10 @@
 │   │   ├── angela.bash
 │   │   ├── angela.zsh
 │   │   └── formatter.py
+│   ├── toolchain
+│   │   ├── ci_cd.py
+│   │   ├── git.py
+│   │   └── package_managers.py
 │   ├── utils
 │   │   ├── __init__.py
 │   │   └── logging.py
@@ -93,6 +109,7 @@
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+├── test_frameworks.py
 └── tests
     ├── __init__.py
     ├── conftest.py
@@ -110,7 +127,8 @@
     ├── test_response_parsing.py
     └── test_safety.py
 
-16 directories, 92 files
+19 directories, 106 files
+                             
 
 ```
 **Project Title:** **Angela-CLI** 

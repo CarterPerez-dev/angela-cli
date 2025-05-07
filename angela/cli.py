@@ -2,7 +2,7 @@
 """
 Command-line interface for Angela CLI.
 """
-iimport sys
+import sys
 import asyncio
 from typing import List
 

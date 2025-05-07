@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Set, Callable, Awaitable
 from datetime import datetime, timedelta
 
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.ai.client import GeminiRequest
 from angela.context import context_manager
 from angela.utils.logging import get_logger
 from angela.shell.formatter import terminal_formatter

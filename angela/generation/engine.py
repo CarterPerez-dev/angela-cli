@@ -1503,5 +1503,118 @@ async def _apply_feature_changes(
     return result
 
 
+async def _extract_dependencies_from_feature(
+    self, 
+    feature_files: Dict[str, Any],
+    project_type: str
+) -> Dict[str, List[str]]:
+    """
+    Extract dependencies from newly added or modified feature files.
+    
+    Args:
+        feature_files: Dictionary with new and modified files
+        project_type: Type of the project (python, node, etc.)
+        
+    Returns:
+        Dictionary with runtime and development dependencies
+    """
+    self._logger.info("Extracting dependencies from feature files")
+    
+    dependencies = {
+        "runtime": [],
+        "development": []
+    }
+    
+    # Process based on project type
+    if project_type == "python":
+        # Look for Python import statements in new files
+        for file_info in feature_files.get("new_files", []):
+            if file_info["path"].endswith(".py"):
+                content = file_info["content"]
+                
+                # Extract import statements using regex
+                import_lines = re.findall(r'^(?:import|from)\s+([^\s.]+)(?:\.|.*?import)', content, re.MULTILINE)
+                
+                # Filter out standard library modules
+                for module in import_lines:
+                    if module not in sys.modules or (hasattr(sys.modules[module], '__file__') and 
+                                                    sys.modules[module].__file__ and 
+                                                    'site-packages' in sys.modules[module].__file__):
+                        if module not in dependencies["runtime"] and module not in ["__future__", "typing", "os", "sys", "re", "json", "time", "datetime"]:
+                            dependencies["runtime"].append(module)
+        
+        # Also check modified files for new imports
+        for file_info in feature_files.get("modified_files", []):
+            if file_info["path"].endswith(".py"):
+                original_content = file_info["original_content"]
+                modified_content = file_info["modified_content"]
+                
+                # Extract imports from original and modified content
+                original_imports = set(re.findall(r'^(?:import|from)\s+([^\s.]+)(?:\.|.*?import)', original_content, re.MULTILINE))
+                modified_imports = set(re.findall(r'^(?:import|from)\s+([^\s.]+)(?:\.|.*?import)', modified_content, re.MULTILINE))
+                
+                # Find new imports
+                new_imports = modified_imports - original_imports
+                
+                # Add to dependencies list
+                for module in new_imports:
+                    if module not in dependencies["runtime"] and module not in ["__future__", "typing", "os", "sys", "re", "json", "time", "datetime"]:
+                        dependencies["runtime"].append(module)
+                        
+    elif project_type == "node":
+        # Look for import/require statements in JavaScript/TypeScript files
+        js_extensions = [".js", ".jsx", ".ts", ".tsx"]
+        
+        for file_info in feature_files.get("new_files", []):
+            if any(file_info["path"].endswith(ext) for ext in js_extensions):
+                content = file_info["content"]
+                
+                # Look for ES6 imports
+                es6_imports = re.findall(r'import\s+.*?from\s+[\'"]([^\'".][^\'"]*)[\'"]\s*;?', content)
+                
+                # Look for require statements
+                require_imports = re.findall(r'(?:const|let|var)\s+.*?=\s+require\([\'"]([^\'".][^\'"]*)[\'"]\)\s*;?', content)
+                
+                # Combine all found imports
+                all_imports = es6_imports + require_imports
+                
+                # Filter out relative imports
+                for module in all_imports:
+                    if not module.startswith(".") and module not in dependencies["runtime"]:
+                        dependencies["runtime"].append(module)
+        
+        # Also check modified files
+        for file_info in feature_files.get("modified_files", []):
+            if any(file_info["path"].endswith(ext) for ext in js_extensions):
+                original_content = file_info["original_content"]
+                modified_content = file_info["modified_content"]
+                
+                # Extract imports from original content
+                original_es6 = set(re.findall(r'import\s+.*?from\s+[\'"]([^\'".][^\'"]*)[\'"]\s*;?', original_content))
+                original_require = set(re.findall(r'(?:const|let|var)\s+.*?=\s+require\([\'"]([^\'".][^\'"]*)[\'"]\)\s*;?', original_content))
+                original_imports = original_es6.union(original_require)
+                
+                # Extract imports from modified content
+                modified_es6 = set(re.findall(r'import\s+.*?from\s+[\'"]([^\'".][^\'"]*)[\'"]\s*;?', modified_content))
+                modified_require = set(re.findall(r'(?:const|let|var)\s+.*?=\s+require\([\'"]([^\'".][^\'"]*)[\'"]\)\s*;?', modified_content))
+                modified_imports = modified_es6.union(modified_require)
+                
+                # Find new imports
+                new_imports = modified_imports - original_imports
+                
+                # Add to dependencies list
+                for module in new_imports:
+                    if not module.startswith(".") and module not in dependencies["runtime"]:
+                        dependencies["runtime"].append(module)
+    
+    # Add common testing libraries based on project type
+    if project_type == "python":
+        dependencies["development"] = ["pytest", "pytest-cov"]
+    elif project_type == "node":
+        dependencies["development"] = ["jest", "eslint"]
+    
+    return dependencies
+
+
 
 code_generation_engine = CodeGenerationEngine()

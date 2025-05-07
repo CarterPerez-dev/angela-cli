@@ -312,7 +312,7 @@ class DocumentationGenerator:
                 # Try to determine file type and language
                 try:
                     from angela.context.file_detector import detect_file_type
-                    type_info = detect_file_detector.detect_file_type(file_path)
+                    type_info = detect_file_type(file_path)
                     file_info["type"] = type_info.get("type")
                     file_info["language"] = type_info.get("language")
                     

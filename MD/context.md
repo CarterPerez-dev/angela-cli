@@ -151,8 +151,12 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── hooks.py
 │   │   └── rollback.py
 │   ├── generation
+│   │   ├── architecture.py
+│   │   ├── documentation.py
 │   │   ├── engine.py
-│   │   └── planner.py
+│   │   ├── frameworks.py
+│   │   ├── planner.py
+│   │   └── validators.py
 │   ├── integrations
 │   │   ├── integrations5.py
 │   │   └── integrations6.py
@@ -215,5 +219,6 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
     ├── test_response_parsing.py
     └── test_safety.py
 
-19 directories, 102 files
+19 directories, 106 files
+
 ```
