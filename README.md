@@ -199,118 +199,9 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
 - **Google Gemini API**: AI service backbone
 - **Ubuntu Linux**: Primary target platform
 
-### Key Technical Components
-
-1. **Shell Integration Libraries**
-   - `pexpect`/`pty`: Terminal interaction and process control
-   - `prompt_toolkit`: Rich terminal user interfaces
-   - Native shell hooks (PROMPT_COMMAND, preexec, DEBUG trap)
-
-2. **Core Framework**
-   - `typer`/`click`: Command-line argument processing
-   - `rich`: Terminal formatting and display
-   - `asyncio`: Asynchronous operation support
-
-3. **AI & NLP**
-   - `google-generativeai`: Official Gemini SDK
-   - `aiohttp`: Async API communication
-   - Custom prompt engineering framework
-
-4. **Execution & Safety**
-   - `subprocess`: Safe command execution
-   - `shlex`: Command parsing and escaping
-   - `difflib`: File diff generation
-   - `pathlib`: Modern file path handling
-
-5. **Configuration & Context**
-   - `configparser`/`tomli`: Configuration management
-   - `python-dotenv`: Environment variable handling
-   - Custom project detection logic
 
 ## Brief Roadmap
-```
-angela-cli/
-├── README.md                   # Project documentation
-├── pyproject.toml              # Project metadata & build config
-├── requirements.txt            # Python dependencies
-├── setup.py                    # Package installation
-├── Makefile                    # Build automation
-├── .env.example                # Environment variable template
-│
-├── scripts/                    # Installation scripts
-│   ├── install.sh              # Install shell integration
-│   └── uninstall.sh            # Clean removal
-│
-├── angela/                     # Main package
-│   ├── __init__.py             # Package initialization
-│   ├── __main__.py             # CLI entry point
-│   ├── cli.py                  # Command-line interface
-│   ├── config.py               # Configuration management
-│   ├── constants.py            # Global constants
-│   ├── orchestrator.py         # Main orchestration service
-│   │
-│   ├── shell/                  # Shell integration
-│   │   ├── __init__.py
-│   │   ├── hooks.py            # Shell hook implementations
-│   │   ├── processor.py        # Request preprocessing
-│   │   └── formatter.py        # Terminal output formatting
-│   │
-│   ├── ai/                     # AI service interaction
-│   │   ├── __init__.py
-│   │   ├── client.py           # Gemini API client
-│   │   ├── prompts.py          # Prompt engineering templates
-│   │   ├── parser.py           # Response parsing
-│   │   └── models.py           # AI data models
-│   │
-│   ├── context/                # Context management
-│   │   ├── __init__.py
-│   │   ├── manager.py          # Context orchestration
-│   │   ├── project.py          # Project detection
-│   │   ├── filesystem.py       # File system understanding
-│   │   └── history.py          # Command history
-│   │
-│   ├── intent/                 # Intent understanding
-│   │   ├── __init__.py
-│   │   ├── analyzer.py         # Intent classification
-│   │   ├── planner.py          # Action planning
-│   │   └── models.py           # Intent data structures
-│   │
-│   ├── execution/              # Execution engine
-│   │   ├── __init__.py
-│   │   ├── engine.py           # Main execution controller
-│   │   ├── commands.py         # Shell command execution
-│   │   ├── filesystem.py       # File operations
-│   │   └── tools/              # Tool integrations
-│   │       ├── __init__.py
-│   │       ├── git.py          # Git operations
-│   │       └── docker.py       # Docker operations
-│   │
-│   ├── safety/                 # Safety framework
-│   │   ├── __init__.py
-│   │   ├── classifier.py       # Risk classification
-│   │   ├── confirmation.py     # User confirmation UI
-│   │   ├── preview.py          # Action preview generation
-│   │   └── validator.py        # Safety validation
-│   │
-│   └── utils/                  # Utility functions
-│       ├── __init__.py
-│       ├── logging.py          # Logging setup
-│       ├── exceptions.py       # Custom exception classes
-│       └── helpers.py          # Misc helpers
-│
-├── shell/                      # Shell integration files
-│   ├── angela.bash             # Bash integration
-│   └── angela.zsh              # Zsh integration
-│
-└── tests/                      # Test suite
-    ├── __init__.py
-    ├── conftest.py             # Test fixtures
-    ├── test_cli.py
-    ├── test_shell.py
-    ├── test_context.py
-    ├── test_execution.py
-    └── test_safety.py
-```
+
 
 ## Implementation Plan
 
@@ -368,9 +259,9 @@ Proactive Monitoring, Suggestions & Advanced Rollback: Implement optional backgr
 ### Step 7: Developer Tool Integration (MAIN ASPECTY OF THIS WHOLE THING WERE IT COMES ALL TOGETHOR)
 1. Add Git commands integration
 2. Implement Docker support
-3. Create code generation flow. it shoudl be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
-4. Build multi-step workflow execution
-5. Perform final testing, optimization, and documentation, containeriziation and even CI/CD if needed
+3. Create code generation flow. it should be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
+
+
 
 
 This will establish the core infrastructure before integrating AI capabilities, ensuring a solid foundation for the more complex features to follow, to ocomplish IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****

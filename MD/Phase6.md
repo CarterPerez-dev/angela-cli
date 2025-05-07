@@ -4,7 +4,7 @@ This guide provides detailed instructions on how to implement Phase 6 of the Ang
 
 ## Overview
 
-Phase 6 adds the following capabilities to Angela CLI:
+Phase 6 added the following capabilities to Angela CLI:
 
 1. **Project Type Inference** - Automatically detect project type, frameworks, and dependencies
 2. **File Reference Resolution** - Resolve file references from natural language

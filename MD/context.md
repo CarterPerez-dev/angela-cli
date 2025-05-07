@@ -31,11 +31,6 @@ The `angela/ai/parser.py` file is responsible for parsing responses from an AI m
 `angela/ai/confidence.py` introduces the `ConfidenceScorer` class, designed to evaluate and assign a numerical confidence score (ranging from 0.0 to 1.0) to AI-generated command suggestions. The primary method, `score_command_confidence`, aggregates scores from multiple weighted heuristics: `_check_history` (queries `history_manager` for command frequency and success rate), `_check_complexity` (compares token counts of request and command), `_check_entities` (basic check for entity type matches like files/dirs), and `_check_command_flags` (looks for unusual/conflicting flags). Each heuristic function, like `_check_complexity` which compares request and command token lengths, contributes a value that is then weighted into the final score. The entity check (`_check_entities`) uses simple string matching for terms like "file" or "directory" and `re.findall` for path patterns. The module ensures the final confidence score remains within the 0.0 to 1.0 range and logs the breakdown of contributing factors for debuggability.
 
 ---
-**File: `angela/integrations.py`**
-
-The `angela/integrations.py` file defines the `PhaseIntegration` class, serving as a central module for initializing and managing a suite of advanced "Phase 5.5" features for autonomous task orchestration and proactive assistance. Its `initialize` async method selectively activates components based on configuration, such as project inference by calling `project_inference.infer_project_info` from `angela.context.project_inference`, and network monitoring by starting `network_monitor`. The `get_enhanced_context` method aggregates information from these active features, like inferred project details or network status, to provide richer contextual data for AI interactions. It integrates error handling via an `ErrorRecoveryManager` through the `handle_execution_error` method and enhances content analysis by routing requests to the `EnhancedContentAnalyzer` (from `angela.ai.content_analyzer_extensions`) with added project context. A `status` async method offers a snapshot of the active integrations, including project type inferred by `project_inference` and basic network monitoring status, showcasing the system's current capabilities.
-
----
 **File: `angela/config.py` (inferred from content)**
 
 This configuration management file, `angela/config.py`, establishes a `ConfigManager` class to handle application settings using TOML for file-based configuration and environment variables for sensitive data like API keys. It employs Pydantic models (`ApiConfig`, `UserConfig`, `AppConfig`) to define a clear structure for settings such as Gemini API keys, default project root (`Path`), `confirm_all_actions` (bool), and `debug` mode, ensuring type validation. The manager dynamically selects TOML parsing libraries (`tomllib` for Python 3.11+ or `tomli` for older versions, and `tomli-w` for writing), loading from a predefined `CONFIG_FILE` path and `.env` files via `python-dotenv`. `load_config` reads the TOML file, populates the Pydantic models, and gracefully handles potential `TOMLDecodeError` or missing files by falling back to defaults or saving a new default configuration. The `save_config` method serializes the current `AppConfig` model (converting `Path` objects to strings for TOML compatibility) back to the configuration file, while a global `config_manager` instance ensures the loaded configuration is immediately available upon module import.
@@ -46,7 +41,7 @@ This configuration management file, `angela/config.py`, establishes a `ConfigMan
 This file, `angela/cli/files.py`, defines a Typer-based command-line interface application for managing file and directory operations within the Angela CLI, offering an enhanced user experience through the `rich` library. It implements common filesystem commands such as `ls` (with detailed table views via `rich.Table` and color-coding), `mkdir`, `rmdir`, `touch`, `cat` (with syntax highlighting using `rich.Syntax` based on `context_manager.get_file_info`), `rm`, `cp`, `mv`, and `write` (with interactive content input via `rich.Prompt`). These commands primarily delegate their core logic to async functions from `angela.execution.filesystem` (e.g., `create_directory`, `read_file`) and use `angela.context.context_manager` for path resolution and file metadata. Advanced commands include `find` for pattern-based file searching via `context_manager.find_files` and `info` for displaying detailed file/directory information using `rich.Panel` and content previews. A crucial feature is the `rollback` command, which interacts with `angela.execution.rollback.rollback_manager` to list recent operations and allow users to undo them if backups are available, confirming actions with `rich.Confirm`.
 
 ---
-**File: `angela/cli/workflows.py` (inferred from content)**
+**File: `angela/cli/workflows.py`**
 
 This file, `angela/cli/workflows.py`, implements a Typer-based command-line interface for managing Angela workflows, allowing users to list, create, run, delete, show, export, and import these reusable command sequences. It relies on `angela.workflows.manager.workflow_manager` for core operations like defining workflows (interactively via `rich.Prompt` or from natural language in a file via `create`), executing them with variable substitution (`run`), and managing their lifecycle (`list`, `delete`, `show`). The `export` and `import` commands interface with `angela.workflows.sharing.workflow_sharing_manager` to package workflows into shareable `.angela-workflow` archives and to integrate received packages into the system, handling potential renames or replacements. User interaction is enhanced using the `rich` library, providing formatted tables for listing workflows (`rich.Table`), detailed panels for showing workflow steps via `terminal_formatter.display_workflow`, and interactive prompts/confirmations (`rich.Prompt`, `rich.Confirm`). The `run` command supports dry-run mode for previewing execution and accepts variables via command-line options (`--var NAME=VALUE`), which are then passed to the `workflow_manager` for execution within the current `context_manager` context.
 
@@ -56,7 +51,7 @@ This file, `angela/cli/workflows.py`, implements a Typer-based command-line inte
 `angela/context/history.py` implements the `HistoryManager` class to record and analyze user command execution history, persisting data in `command_history.json` (for `CommandRecord`s) and `command_patterns.json` (for `CommandPattern`s) within the `CONFIG_DIR`. It uses a `CommandRecord` class to store detailed information about each command execution, including the command string, natural language request, success status, ISO-formatted timestamp, output, error, and risk level. The `CommandPattern` class tracks metrics like execution count, success rate, and last used timestamp for base commands (e.g., "git commit", extracted by `_extract_base_command`), which are updated via `_update_patterns` if `auto_learn_patterns` preference is enabled. `HistoryManager` loads history and patterns upon initialization, trims history based on `preferences_manager.preferences.context.max_history_items`, and provides methods to retrieve recent commands, query command frequency/success rates, and search for similar past commands using Jaccard similarity on tokenized natural requests. This historical data is crucial for features like adaptive confirmation scoring, command suggestions, and potentially for AI fine-tuning or error recovery within the Angela CLI.
 
 ---
-**File: `angela/execution/rollback.py` (inferred from content)**
+**File: `angela/execution/rollback.py`**
 
 This file, `angela/execution/rollback.py`, implements a `RollbackManager` to provide undo functionality for file and directory operations performed by the Angela CLI, storing its state in `operation_history.json`. It defines an `OperationRecord` class to store details of each recorded action, including its type (e.g., "create_file", "delete_directory"), parameters, ISO-formatted timestamp, and the path to any created backup within the `BACKUP_DIR`. The manager loads this history on initialization and saves updates when `record_operation` is called after a filesystem action. The `rollback_operation` async method is central to the undo logic: based on the `operation_type` and `backup_path` from the selected `OperationRecord`, it reverses the original action, such as deleting a created file or restoring a deleted file/directory from its backup using `shutil` functions like `copy2` or `copytree`. Users can view recent undoable operations (formatted by `_get_operation_description`) via `get_recent_operations`, and upon successful rollback, the manager truncates the history to reflect the undone state.
 
@@ -64,11 +59,6 @@ This file, `angela/execution/rollback.py`, implements a `RollbackManager` to pro
 **File: `angela/monitoring/network_monitor.py`**
 
 `angela/monitoring/network_monitor.py` defines the `NetworkMonitor` class, responsible for proactively overseeing various network-related aspects such as local service availability, project dependency updates, and general internet connectivity. It utilizes `asyncio` to run concurrent monitoring tasks: `_monitor_local_services` periodically checks common service ports (e.g., 8000, 5432 using `socket.connect_ex` and `aiohttp` for HTTP checks), tailored by project type from `context_manager`. The `_monitor_dependency_updates` task checks for new versions of Python packages (via `pip list --outdated --format=json`) and Node.js packages (via `npm outdated --json`) relevant to the current project by running these as shell commands using the `_run_command` async helper. General network health is assessed by `_monitor_network_connectivity`, which attempts to resolve well-known domains using `asyncio.get_event_loop().getaddrinfo`. When issues or updates are detected, and a suggestion cooldown period managed by `_can_show_suggestion` and `_last_suggestion_time` has passed, the monitor uses `terminal_formatter.print_proactive_suggestion` to inform the user, enhancing Angela's proactive assistance capabilities.
-
----
-**File: `angela/safety/__init__.py`**
-
-The `angela/safety/__init__.py` file serves as the primary public interface and orchestrator for Angela's comprehensive safety system, consolidating functionalities from its various sub-modules. It imports key components such as `classify_command_risk` and `analyze_command_impact` from `.classifier`, `validate_command_safety` and `validate_operation` from `.validator`, `get_confirmation` from `.confirmation` (likely adaptive confirmation), and `generate_preview` from `.preview`. The central async function `check_command_safety` orchestrates a multi-step safety protocol for shell commands: it first validates the command, then classifies its risk and analyzes impact, generates a preview if possible, and finally obtains user confirmation. Similarly, the `check_operation_safety` async function handles safety checks for higher-level abstract operations (e.g., 'create_file') by validating parameters and, where possible, converting them to equivalent shell commands for the full risk analysis pipeline or applying simplified risk logic. This unified approach ensures that both direct shell commands and abstracted operations undergo consistent and thorough safety scrutiny before any execution is attempted by the Angela CLI.
 
 ---
 **File: `angela/safety/adaptive_confirmation.py`**
@@ -101,21 +91,37 @@ The `angela/execution/error_recovery.py` file implements the `ErrorRecoveryManag
 Automatic recovery, determined by `_can_auto_recover`, is attempted for high-confidence strategies or those with a proven success record tracked in the internal `_recovery_history` dictionary (which logs successful strategy applications like `{ "type:command": {"success_count": N}}`). The `_execute_recovery_strategy` async method performs the actual recovery by dispatching actions based on the strategy type, often involving command execution via the `angela.execution.engine.execution_engine`, where safety checks might be selectively skipped for retries or enforced for newly generated commands. Notably, strategies such as `PREPARE_ENV` can execute a preparatory command (e.g., `mkdir` for a missing directory, or `apt-get install` for a missing package) and, if successful and indicated by a `retry_original` flag within the strategy dictionary, will subsequently re-attempt the original failed command. If automatic recovery isn't viable or fails, `_guided_recovery` presents the generated strategies to the user via `terminal_formatter` for display and uses `prompt_toolkit.input_dialog` to capture their choice, subsequently executing the selected strategy. The system thus combines heuristic rule-based error matching, AI-powered suggestion generation, a learning mechanism from past successful recoveries, and user-guided intervention to maximize the chances of successful task completion.
 ----------
 
-**Summary for `BackgroundMonitor`:**
+**Summary for `BackgroundMonitor.py`:**
 
 This Python module implements an asynchronous `BackgroundMonitor` class for the Angela CLI, designed to proactively assist users by observing system state and activities through concurrent, restartable `asyncio` tasks. It actively monitors Git repository status by periodically running `git status -s`, analyzing changes like modified, untracked, or deleted files, and then generating contextual suggestions for commits or additions if significant activity is detected, subject to a cooldown period and repetition avoidance. The monitor also tracks file modifications within the project, identified by `_find_source_files`, and upon detecting changes, it invokes language-specific checkers such as `python -m py_compile` and `flake8` for Python or `node --check` and `eslint` for JavaScript to report syntax errors and linting issues. System resource monitoring is partially implemented, focusing on disk usage by executing platform-specific commands (`wmic` or `df`) via an asynchronous `_run_command` utility, and it alerts the user if usage exceeds a threshold and has significantly increased. All suggestions are managed to prevent repetition using a set of seen suggestions and are displayed via `terminal_formatter`, with overall monitoring controlled by `start_monitoring` and `stop_monitoring` methods that manage the lifecycle of the underlying `asyncio` tasks.
 
-**Summary for `ProjectInference`**
+**Summary for `ProjectInference.py`**
 
 The `ProjectInference` Python module provides advanced, asynchronous capabilities to analyze a given project directory, aiming to deduce its primary type, technological stack, dependencies, and structural characteristics using file system inspection and pattern matching. It determines the project type (e.g., Python, Node, Java) by scoring matches against predefined `PROJECT_SIGNATURES` that include characteristic files (like `requirements.txt` or `package.json`), directories (e.g., `venv`, `node_modules`), and common file extensions, capable of identifying mixed-type projects by combining high-scoring candidates. Framework detection is achieved by cross-referencing project files and contents against `FRAMEWORK_SIGNATURES` (e.g., identifying Django via `manage.py` or React via `package.json` dependencies) and by directly parsing dependency lists from files like `requirements.txt` or `package.json` using dedicated analyzer methods. The module meticulously extracts project dependencies by parsing specific manifest files corresponding to the detected project type, such as `requirements.txt`, `setup.py`, and `pyproject.toml` for Python projects, or `package.json` for Node.js projects, detailing dependency names, version specifiers, and source files. It identifies and lists important project files, including signature files that confirmed the project type, common documentation like READMEs and LICENSEs, and attempts to locate potential entry point files (e.g., `main.py`, `index.js`) based on conventional naming within the project structure. Project structure analysis involves counting files by extension, identifying prominent subdirectories (ignoring common ones like `.git` or `node_modules`), and generating a hierarchical, depth-limited tree representation of the directory layout using the recursive `_generate_directory_structure` method. All inferred information, including project root, type, detected files, frameworks, dependencies, and structural details, is compiled into a comprehensive dictionary, with results cached per project root path to optimize subsequent analyses of the same project.
 
 
+**`angela/cli/file_extensions.py`**
+
+This module extends Angela's command-line interface (CLI) with advanced file-related functionalities, operating within the broader "Angela" application by interfacing with its context management, file resolution, and activity tracking systems. Its primary purpose is to empower users with sophisticated commands for resolving ambiguous file references, extracting file paths from text, viewing recently or frequently accessed files, and inspecting detailed project information. Technically, it leverages `typer` for command-line argument parsing and command definition, and `rich` for creating user-friendly, formatted console output like tables and panels, while also using `asyncio` to run asynchronous operations provided by other Angela modules. Key commands include `resolve` which uses `file_resolver.resolve_reference` and logs views with `file_activity_tracker`, and `extract` which processes text to find and display file references. The `recent` and `active` commands query the `file_activity_tracker` to present historical file interaction data in structured tables. Finally, the `project` command utilizes `context_manager` and `context_enhancer` to gather and present a rich summary of the current project's attributes, dependencies, and structure.
+
+**`angela/cli/files.py`**
+
+This file defines core file and directory manipulation commands for the Angela CLI, offering an enhanced, context-aware alternative to standard shell utilities by integrating with Angela's `context_manager` and `rollback_manager`. It aims to provide a comprehensive suite of operations such as listing (`ls`), creating (`mkdir`, `touch`), deleting (`rmdir`, `rm`), copying (`cp`), moving (`mv`), reading (`cat`), and writing (`write`) files, all augmented with rich console output and Angela's operational oversight. The module heavily relies on `typer` for its command structure and `rich` for visually appealing outputs, including tables, syntax-highlighted file previews, and interactive prompts; asynchronous filesystem operations are imported from `angela.execution.filesystem`. Commands like `ls` offer detailed views with file types and sizes, while `cat` provides syntax highlighting based on language detection from `context_manager`. Operations such as `mkdir` or `rm` include safety features like `--dry-run` and interact with `rollback_manager` to allow for undoing actions. Furthermore, it includes a `find` command for pattern-based file searching and an `info` command to display detailed metadata and previews for specified files or directories.
+
+**`angela/context/history.py`**
+
+The `angela/context/history.py` module provides the `HistoryManager` class, a crucial component for logging and analyzing user command interactions within the Angela ecosystem, supporting features like command suggestions and usage pattern identification. Its purpose is to persistently record details of each executed command—including the raw command, natural language query, success status, output, and risk level—and to derive actionable insights from this historical data. Technical implementation involves `CommandRecord` and `CommandPattern` data classes, with history and learned patterns stored in JSON files (`command_history.json`, `command_patterns.json`) managed by `config_manager` and influenced by `preferences_manager`. The `add_command` method logs new entries and triggers `_update_patterns` which uses `_extract_base_command` to intelligently group commands (e.g., "git commit") and update their frequency and success rates. Retrieval methods like `get_recent_commands`, `get_command_frequency`, and `get_command_success_rate` allow access to this data. Advanced analysis functions include `search_similar_command` using Jaccard similarity on natural language requests and `get_common_command_contexts` to identify typical command sequences.
+
+**`angela/context/file_activity.py`**
+
+This module, `angela/context/file_activity.py`, implements the `FileActivityTracker` to monitor and log interactions with files and directories within the Angela environment, providing a basis for features like "recently used files" and project activity analysis. Its core purpose is to capture various file events such as creations, modifications, deletions, and views, associating them with metadata like timestamps, the triggering command, and custom details for later retrieval and analysis. The system uses an `ActivityType` enum to classify events and a `FileActivity` class to structure logged data, which is maintained in an in-memory list with a configurable maximum size and integrated with `session_manager` to enrich Angela's session context. The `track_activity` method and its specialized wrappers (e.g., `track_file_creation`) are central to logging, appending new `FileActivity` objects and updating the session. Users can query this log via methods like `get_recent_activities`, which returns time-sorted activities filterable by type, and `get_most_active_files`, which aggregates data to highlight frequently accessed files. The `FileActivity` class supports dictionary conversion for serialization, although the primary activity list is currently managed in memory.
 
 
+Okay, here's the analysis for `angela/context/preferences.py`:
 
+**`angela/context/preferences.py`**
 
-
-
+This module provides a `PreferencesManager` class to handle user-configurable settings for the Angela application, influencing behavior related to command trust, UI presentation, and context management. It utilizes Pydantic `BaseModel`s (`TrustPreferences`, `UIPreferences`, `ContextPreferences`, nested under `UserPreferences`) to define a structured, validated schema for all preferences, which are persistently stored and retrieved from a `preferences.json` file located via `config_manager`. The `PreferencesManager` loads these settings upon initialization, creates a default file if one doesn't exist, and provides methods to update and save any changes back to the JSON file. Key functionalities include the `should_auto_execute` method, which determines if a command requires user confirmation based on its risk level (from `angela.constants.RISK_LEVELS`) and the user's `TrustPreferences`, including lists of explicitly trusted or untrusted commands. Users can dynamically modify these trusted/untrusted command lists through dedicated methods like `add_trusted_command`. A global instance, `preferences_manager`, makes these settings readily accessible throughout the Angela application, allowing other components to adapt their behavior accordingly.
 
 
 # Current Project Tree/Structure
@@ -123,12 +129,15 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
 .
 ├── MD
 │   ├── Info.md
+│   ├── NextSteps.md
 │   ├── Phase1.md
 │   ├── Phase2.md
 │   ├── Phase3.md
 │   ├── Phase4.md
 │   ├── Phase5.md
-│   └── context.md
+│   ├── Phase6.md
+│   ├── context.md
+│   └── tree.md
 ├── Makefile
 ├── README.md
 ├── angela
@@ -143,10 +152,12 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
 │   │   ├── file_integration.py
 │   │   ├── intent_analyzer.py
 │   │   ├── parser.py
-│   │   └── prompts.py
+│   │   ├── prompts.py
+│   │   └── prompts_update.py
 │   ├── cli
 │   │   ├── __init__.py
 │   │   ├── files.py
+│   │   ├── files_extensions.py
 │   │   ├── main.py
 │   │   └── workflows.py
 │   ├── cli.py
@@ -154,7 +165,10 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
 │   ├── constants.py
 │   ├── context
 │   │   ├── __init__.py
+│   │   ├── enhancer.py
+│   │   ├── file_activity.py
 │   │   ├── file_detector.py
+│   │   ├── file_resolver.py
 │   │   ├── history.py
 │   │   ├── manager.py
 │   │   ├── preferences.py
@@ -165,8 +179,11 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
 │   │   ├── engine.py
 │   │   ├── error_recovery.py
 │   │   ├── filesystem.py
+│   │   ├── hooks.py
 │   │   └── rollback.py
-│   ├── integrations.py
+│   ├── integrations
+│   │   ├── integrations5.py
+│   │   └── integrations6.py
 │   ├── intent
 │   │   ├── advanced_planner.py
 │   │   ├── models.py
@@ -206,8 +223,11 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
     ├── conftest.py
     ├── test_ai_client.py
     ├── test_context.py
+    ├── test_context_enhancer.py
     ├── test_execution.py
+    ├── test_file_activity.py
     ├── test_file_detector.py
+    ├── test_file_resolver.py
     ├── test_filesystem.py
     ├── test_integration.py
     ├── test_orchestration.py
@@ -215,5 +235,6 @@ The `ProjectInference` Python module provides advanced, asynchronous capabilitie
     ├── test_response_parsing.py
     └── test_safety.py
 
-15 directories, 79 files
+16 directories, 92 files
+
 ```
