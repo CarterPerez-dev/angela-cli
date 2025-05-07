@@ -105,6 +105,7 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   ├── Phase6.md
 │   ├── Phase7.md
 │   ├── context.md
+│   ├── rollback.md
 │   └── tree.md
 ├── Makefile
 ├── README.md
@@ -121,8 +122,7 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── file_integration.py
 │   │   ├── intent_analyzer.py
 │   │   ├── parser.py
-│   │   ├── prompts.py
-│   │   └── prompts_update.py
+│   │   └── prompts.py
 │   ├── cli
 │   │   ├── __init__.py
 │   │   ├── files.py
@@ -153,7 +153,8 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── error_recovery.py
 │   │   ├── filesystem.py
 │   │   ├── hooks.py
-│   │   └── rollback.py
+│   │   ├── rollback.py
+│   │   └── rollback_commands.py
 │   ├── generation
 │   │   ├── __init__.py
 │   │   ├── architecture.py
@@ -221,6 +222,7 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
     ├── test_ai_client.py
     ├── test_context.py
     ├── test_context_enhancer.py
+    ├── test_enhanced_rollback.py
     ├── test_execution.py
     ├── test_file_activity.py
     ├── test_file_detector.py
@@ -233,7 +235,5 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
     ├── test_response_parsing.py
     └── test_safety.py
 
-21 directories, 118 files
-                             
-
+21 directories, 120 files
 ```

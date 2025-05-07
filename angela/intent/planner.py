@@ -383,32 +383,116 @@ Include error handling where appropriate.
             risk_level=risk_level
         )
     
-    async def execute_plan(self, task_plan: TaskPlan, dry_run: bool = False) -> List[Dict[str, Any]]:
+
+    async def execute_plan(
+        self, 
+        plan: Union[TaskPlan, AdvancedTaskPlan], 
+        dry_run: bool = False,
+        transaction_id: Optional[str] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Execute a basic task plan.
+        Execute a task plan with transaction support.
         
         Args:
-            task_plan: The task plan to execute
+            plan: The plan to execute
             dry_run: Whether to simulate execution without making changes
+            transaction_id: ID of the transaction this execution belongs to
             
         Returns:
-            A list of execution results for each step
+            List of execution results for each step
         """
-        # Convert to action plan
-        action_plan = self.create_action_plan(task_plan)
+        self._logger.info(f"Executing plan: {plan.goal}")
         
-        # Import here to avoid circular imports
-        from angela.execution.engine import execution_engine
+        # Handle different plan types
+        if isinstance(plan, AdvancedTaskPlan):
+            return await self._execute_advanced_plan(plan, dry_run, transaction_id)
+        else:
+            return await self._execute_basic_plan(plan, dry_run, transaction_id)
+    
+    async def _execute_basic_plan(
+        self, 
+        plan: TaskPlan, 
+        dry_run: bool = False,
+        transaction_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute a basic task plan with transaction support.
         
-        # Execute the plan
-        results = await execution_engine.execute_plan(
-            action_plan,
-            check_safety=True,
-            dry_run=dry_run
-        )
+        Args:
+            plan: The plan to execute
+            dry_run: Whether to simulate execution without making changes
+            transaction_id: ID of the transaction this execution belongs to
+            
+        Returns:
+            List of execution results for each step
+        """
+        results = []
+        
+        # Execute each step in sequence
+        for i, step in enumerate(plan.steps):
+            self._logger.info(f"Executing step {i+1}/{len(plan.steps)}: {step.command}")
+            
+            # Generate a step_id for tracking
+            step_id = f"step_{i+1}"
+            
+            try:
+                # Execute the command
+                result = await execution_engine.execute_command(
+                    command=step.command,
+                    check_safety=True,
+                    dry_run=dry_run
+                )
+                
+                # Record command execution in the transaction if successful
+                if not dry_run and transaction_id and result[2] == 0:  # return_code == 0
+                    # Import here to avoid circular imports
+                    from angela.execution.rollback import rollback_manager
+                    
+                    await rollback_manager.record_command_execution(
+                        command=step.command,
+                        return_code=result[2],
+                        stdout=result[0],
+                        stderr=result[1],
+                        transaction_id=transaction_id,
+                        step_id=step_id
+                    )
+                
+                # Format the result
+                execution_result = {
+                    "step": i + 1,
+                    "command": step.command,
+                    "explanation": step.explanation,
+                    "stdout": result[0],
+                    "stderr": result[1],
+                    "return_code": result[2],
+                    "success": result[2] == 0
+                }
+                
+                results.append(execution_result)
+                
+                # Stop execution if a step fails
+                if result[2] != 0:
+                    self._logger.warning(f"Step {i+1} failed with return code {result[2]}")
+                    break
+                    
+            except Exception as e:
+                self._logger.exception(f"Error executing step {i+1}: {str(e)}")
+                
+                # Record the error
+                results.append({
+                    "step": i + 1,
+                    "command": step.command,
+                    "explanation": step.explanation,
+                    "error": str(e),
+                    "success": False
+                })
+                
+                # Stop execution on error
+                break
         
         return results
     
+
     #######################
     # Advanced Planning Methods
     #######################
@@ -638,61 +722,147 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
                 context=context
             )
     
-    async def execute_advanced_plan(
+    async def _execute_advanced_plan(
         self, 
-        plan: AdvancedTaskPlan,
-        dry_run: bool = False
+        plan: AdvancedTaskPlan, 
+        dry_run: bool = False,
+        transaction_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Execute an advanced task plan.
+        Execute an advanced task plan with transaction support.
         
         Args:
-            plan: The advanced task plan to execute
+            plan: The plan to execute
             dry_run: Whether to simulate execution without making changes
+            transaction_id: ID of the transaction this execution belongs to
             
         Returns:
             Dictionary with execution results
         """
-        self._logger.info(f"Executing advanced plan for goal: {plan.goal}")
+        self._logger.info(f"Executing advanced plan: {plan.goal}")
         
-        # Track executed steps and results
-        executed_steps = set()
-        pending_steps = set(plan.entry_points)
+        # Initialize execution state
         results = {}
+        completed_steps = set()
+        pending_steps = {}
         
+        # Initialize with entry points
+        for entry_point in plan.entry_points:
+            if entry_point in plan.steps:
+                pending_steps[entry_point] = plan.steps[entry_point]
+        
+        # Execute steps until all are completed or no more can be executed
         while pending_steps:
-            # Get next step to execute
-            next_step_id = self._select_next_step(plan, pending_steps, executed_steps)
-            if not next_step_id:
-                break  # No more executable steps
+            # Find steps that can be executed (all dependencies satisfied)
+            executable_steps = {}
+            for step_id, step in pending_steps.items():
+                if all(dep in completed_steps for dep in step.dependencies):
+                    executable_steps[step_id] = step
             
-            # Get the step
-            step = plan.steps[next_step_id]
+            # If no steps can be executed, we're stuck (circular dependencies or missing steps)
+            if not executable_steps:
+                self._logger.warning("No executable steps found, possible circular dependencies")
+                break
             
-            # Execute the step
-            self._logger.info(f"Executing step {next_step_id}: {step.description}")
-            result = await self._execute_step(step, results, dry_run)
-            
-            # Store the result
-            results[next_step_id] = result
-            
-            # Mark step as executed
-            executed_steps.add(next_step_id)
-            pending_steps.remove(next_step_id)
-            
-            # Add dependent steps to pending
-            if result.get("success", False) or step.type == PlanStepType.DECISION:
-                self._update_pending_steps(plan, step, result, pending_steps, executed_steps)
+            # Execute all executable steps
+            for step_id, step in executable_steps.items():
+                self._logger.info(f"Executing step {step_id}: {step.command}")
+                
+                try:
+                    # Handle different step types
+                    if step.type == "command":
+                        # Execute shell command
+                        result = await execution_engine.execute_command(
+                            command=step.command,
+                            check_safety=True,
+                            dry_run=dry_run
+                        )
+                        
+                        # Record command execution in the transaction if successful
+                        if not dry_run and transaction_id and result[2] == 0:  # return_code == 0
+                            # Import here to avoid circular imports
+                            from angela.execution.rollback import rollback_manager
+                            
+                            await rollback_manager.record_command_execution(
+                                command=step.command,
+                                return_code=result[2],
+                                stdout=result[0],
+                                stderr=result[1],
+                                transaction_id=transaction_id,
+                                step_id=step_id
+                            )
+                        
+                        # Format the result
+                        execution_result = {
+                            "step_id": step_id,
+                            "type": step.type,
+                            "command": step.command,
+                            "description": step.description,
+                            "stdout": result[0],
+                            "stderr": result[1],
+                            "return_code": result[2],
+                            "success": result[2] == 0
+                        }
+                        
+                    else:
+                        # Unsupported step type, mark as failure
+                        execution_result = {
+                            "step_id": step_id,
+                            "type": step.type,
+                            "description": step.description,
+                            "error": f"Unsupported step type: {step.type}",
+                            "success": False
+                        }
+                    
+                    results[step_id] = execution_result
+                    
+                    # Mark step as completed if successful, otherwise the plan failed
+                    if execution_result["success"]:
+                        completed_steps.add(step_id)
+                    else:
+                        self._logger.warning(f"Step {step_id} failed")
+                        return {
+                            "success": False,
+                            "steps_completed": len(completed_steps),
+                            "steps_total": len(plan.steps),
+                            "failed_step": step_id,
+                            "results": results
+                        }
+                        
+                except Exception as e:
+                    self._logger.exception(f"Error executing step {step_id}: {str(e)}")
+                    
+                    # Record the error
+                    results[step_id] = {
+                        "step_id": step_id,
+                        "type": step.type,
+                        "description": step.description,
+                        "error": str(e),
+                        "success": False
+                    }
+                    
+                    # Plan failed
+                    return {
+                        "success": False,
+                        "steps_completed": len(completed_steps),
+                        "steps_total": len(plan.steps),
+                        "failed_step": step_id,
+                        "results": results
+                    }
+                
+                # Remove from pending steps
+                del pending_steps[step_id]
+        
+        # Check if all steps were completed
+        all_completed = len(completed_steps) == len(plan.steps)
         
         return {
-            "plan_id": plan.id,
-            "goal": plan.goal,
-            "steps_executed": len(executed_steps),
+            "success": all_completed,
+            "steps_completed": len(completed_steps),
             "steps_total": len(plan.steps),
-            "results": results,
-            "success": all(results.get(step_id, {}).get("success", False) for step_id in executed_steps),
-            "dry_run": dry_run
+            "results": results
         }
+    
     
     def _select_next_step(
         self, 

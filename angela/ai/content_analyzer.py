@@ -149,17 +149,21 @@ Summary:
             "content_length": len(content)
         }
     
+
+    
     async def manipulate_content(
         self, 
         file_path: Union[str, Path], 
-        instruction: str
+        instruction: str,
+        transaction_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Manipulate file content based on a natural language instruction.
+        Manipulate file content based on a natural language instruction with rollback support.
         
         Args:
             file_path: Path to the file to manipulate
             instruction: Natural language instruction for the manipulation
+            transaction_id: Optional transaction ID for rollback tracking
             
         Returns:
             Dictionary with manipulation results including old and new content
@@ -203,7 +207,7 @@ Summary:
         diff = diff_manager.generate_diff(original_content, modified_content)
         
         # Return the results
-        return {
+        result = {
             "path": str(path_obj),
             "type": file_info.get("type", "unknown"),
             "language": file_info.get("language"),
@@ -213,6 +217,8 @@ Summary:
             "diff": diff,
             "has_changes": original_content != modified_content
         }
+        
+        return result
     
     async def search_content(
         self,

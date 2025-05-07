@@ -34,7 +34,6 @@ from angela.context.file_activity import file_activity_tracker, ActivityType
 from angela.execution.hooks import execution_hooks
 from angela.core.registry import registry
 
-
 logger = get_logger(__name__)
 
 class RequestType(Enum):
@@ -321,10 +320,8 @@ class Orchestrator:
         
         return result
     
-    # Update in angela/orchestrator.py
-    # Add this import at the top
-    from angela.intent.planner import task_planner
-    from angela.execution.error_recovery import ErrorRecoveryManager
+
+
     
     # Add this as a class member in the Orchestrator class
     def __init__(self):
@@ -333,7 +330,11 @@ class Orchestrator:
         self._background_tasks = set()
         self._error_recovery_manager = ErrorRecoveryManager()
     
-    # Update the _process_multi_step_request method
+
+    
+    # Updates for angela/orchestrator.py
+    # Add these methods to the Orchestrator class
+    
     async def _process_multi_step_request(
         self, 
         request: str, 
@@ -342,7 +343,7 @@ class Orchestrator:
         dry_run: bool
     ) -> Dict[str, Any]:
         """
-        Process a multi-step operation request with advanced planning.
+        Process a multi-step operation request with transaction-based rollback support.
         
         Args:
             request: The user request
@@ -358,72 +359,131 @@ class Orchestrator:
         # Determine if we should use advanced planning
         complexity = await task_planner._determine_complexity(request)
         
-        if complexity == "advanced":
-            # Use the advanced planner for complex tasks
-            plan = await task_planner.plan_task(request, context, complexity)
-            
-            # Create result with the plan
-            if isinstance(plan, AdvancedTaskPlan):
-                # Advanced plan with branching
-                result = {
-                    "request": request,
-                    "type": "advanced_multi_step",
-                    "context": context,
-                    "plan": {
-                        "id": plan.id,
-                        "goal": plan.goal,
-                        "description": plan.description,
-                        "steps": [
-                            {
-                                "id": step_id,
-                                "type": step.type,
-                                "description": step.description,
-                                "command": step.command,
-                                "dependencies": step.dependencies,
-                                "risk": step.estimated_risk
-                            }
-                            for step_id, step in plan.steps.items()
-                        ],
-                        "entry_points": plan.entry_points,
-                        "step_count": len(plan.steps)
-                    }
-                }
-                
-                # Execute the plan if requested
-                if execute or dry_run:
-                    # Display the plan with rich formatting
-                    await terminal_formatter.display_advanced_plan(plan)
-                    
-                    # Get confirmation for plan execution
-                    confirmed = await self._confirm_advanced_plan(plan, dry_run)
-                    
-                    if confirmed or dry_run:
-                        # Execute the plan
-                        execution_results = await task_planner.execute_plan(plan, dry_run=dry_run)
-                        result["execution_results"] = execution_results
-                        result["success"] = execution_results.get("success", False)
-                    else:
-                        result["cancelled"] = True
-                        result["success"] = False
-            else:
-                # Basic plan (fallback)
-                result = await self._process_basic_multi_step(plan, request, context, execute, dry_run)
-        else:
-            # Use the basic planner for simple tasks
-            plan = await task_planner.plan_task(request, context)
-            result = await self._process_basic_multi_step(plan, request, context, execute, dry_run)
+        # Start a transaction for this multi-step operation
+        transaction_id = None
+        if not dry_run:
+            transaction_id = await rollback_manager.start_transaction(f"Multi-step plan: {request[:50]}...")
         
-        return result
-    
+        try:
+            if complexity == "advanced":
+                # Use the advanced planner for complex tasks
+                plan = await task_planner.plan_task(request, context, complexity)
+                
+                # Record the plan in the transaction
+                if transaction_id:
+                    await rollback_manager.record_plan_execution(
+                        plan_id=plan.id,
+                        goal=plan.goal,
+                        plan_data=plan.dict(),
+                        transaction_id=transaction_id
+                    )
+                
+                # Create result with the plan
+                if isinstance(plan, AdvancedTaskPlan):
+                    # Advanced plan with branching
+                    result = {
+                        "request": request,
+                        "type": "advanced_multi_step",
+                        "context": context,
+                        "plan": {
+                            "id": plan.id,
+                            "goal": plan.goal,
+                            "description": plan.description,
+                            "steps": [
+                                {
+                                    "id": step_id,
+                                    "type": step.type,
+                                    "description": step.description,
+                                    "command": step.command,
+                                    "dependencies": step.dependencies,
+                                    "risk": step.estimated_risk
+                                }
+                                for step_id, step in plan.steps.items()
+                            ],
+                            "entry_points": plan.entry_points,
+                            "step_count": len(plan.steps)
+                        }
+                    }
+                    
+                    # Execute the plan if requested
+                    if execute or dry_run:
+                        # Display the plan with rich formatting
+                        await terminal_formatter.display_advanced_plan(plan)
+                        
+                        # Get confirmation for plan execution
+                        confirmed = await self._confirm_advanced_plan(plan, dry_run)
+                        
+                        if confirmed or dry_run:
+                            # Execute the plan with transaction support
+                            execution_results = await task_planner.execute_plan(
+                                plan, 
+                                dry_run=dry_run,
+                                transaction_id=transaction_id
+                            )
+                            result["execution_results"] = execution_results
+                            result["success"] = execution_results.get("success", False)
+                            
+                            # Update transaction status
+                            if transaction_id:
+                                status = "completed" if result["success"] else "failed"
+                                await rollback_manager.end_transaction(transaction_id, status)
+                        else:
+                            result["cancelled"] = True
+                            result["success"] = False
+                            
+                            # End the transaction as cancelled
+                            if transaction_id:
+                                await rollback_manager.end_transaction(transaction_id, "cancelled")
+                else:
+                    # Basic plan (fallback)
+                    result = await self._process_basic_multi_step(plan, request, context, execute, dry_run, transaction_id)
+            else:
+                # Use the basic planner for simple tasks
+                plan = await task_planner.plan_task(request, context)
+                result = await self._process_basic_multi_step(plan, request, context, execute, dry_run, transaction_id)
+            
+            return result
+        
+        except Exception as e:
+            # Handle any exceptions and end the transaction
+            if transaction_id:
+                await rollback_manager.end_transaction(transaction_id, "failed")
+            
+            self._logger.exception(f"Error processing multi-step request: {str(e)}")
+            raise
+        
     async def _process_basic_multi_step(
         self,
         plan: TaskPlan,
         request: str,
         context: Dict[str, Any],
         execute: bool,
-        dry_run: bool
+        dry_run: bool,
+        transaction_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Process a basic multi-step plan."""
+        """
+        Process a basic multi-step plan with transaction support.
+        
+        Args:
+            plan: The task plan
+            request: The user request
+            context: Context information
+            execute: Whether to execute the commands
+            dry_run: Whether to simulate execution without making changes
+            transaction_id: Transaction ID for tracking operations
+            
+        Returns:
+            Dictionary with processing results
+        """
+        # Record the plan in the transaction if not already done
+        if transaction_id and not dry_run:
+            await rollback_manager.record_plan_execution(
+                plan_id=getattr(plan, "id", str(uuid.uuid4())),
+                goal=plan.goal,
+                plan_data=plan.dict(),
+                transaction_id=transaction_id
+            )
+        
         # Create result with the plan
         result = {
             "request": request,
@@ -453,10 +513,19 @@ class Orchestrator:
             confirmed = await self._confirm_plan_execution(plan, dry_run)
             
             if confirmed or dry_run:
-                # Execute the plan
-                execution_results = await task_planner.execute_plan(plan, dry_run=dry_run)
+                # Execute the plan with transaction support
+                execution_results = await task_planner.execute_plan(
+                    plan, 
+                    dry_run=dry_run,
+                    transaction_id=transaction_id
+                )
                 result["execution_results"] = execution_results
-                result["success"] = all(result.get("success", False) for result in execution_results)
+                result["success"] = all(r.get("success", False) for r in execution_results)
+                
+                # Update transaction status
+                if transaction_id:
+                    status = "completed" if result["success"] else "failed"
+                    await rollback_manager.end_transaction(transaction_id, status)
                 
                 # Handle errors with recovery
                 if not result["success"] and not dry_run:
@@ -469,8 +538,172 @@ class Orchestrator:
             else:
                 result["cancelled"] = True
                 result["success"] = False
+                
+                # End the transaction as cancelled
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "cancelled")
         
         return result
+    
+    async def _process_file_content_request(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a file content analysis/manipulation request with transaction support.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute file operations
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing file content request: {request}")
+        
+        # Start a transaction for this operation
+        transaction_id = None
+        if not dry_run and execute:
+            transaction_id = await rollback_manager.start_transaction(f"File content operation: {request[:50]}...")
+        
+        try:
+            # Extract file path from request using file_resolver
+            file_path = await self._extract_file_path(request, context)
+            
+            if not file_path:
+                # End the transaction as failed
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "failed")
+                    
+                return {
+                    "request": request,
+                    "type": "file_content",
+                    "context": context,
+                    "error": "Could not determine file path from request",
+                    "response": "I couldn't determine which file you're referring to. Please specify the file path."
+                }
+            
+            # Determine if this is analysis or manipulation
+            operation_type = await self._determine_file_operation_type(request)
+            
+            result = {
+                "request": request,
+                "type": "file_content",
+                "context": context,
+                "file_path": str(file_path),
+                "operation_type": operation_type
+            }
+            
+            if operation_type == "analyze":
+                # Analyze file content (no rollback needed)
+                analysis_result = await content_analyzer.analyze_content(file_path, request)
+                result["analysis"] = analysis_result
+                
+                # End transaction as completed
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "completed")
+                
+            elif operation_type == "summarize":
+                # Summarize file content (no rollback needed)
+                summary_result = await content_analyzer.summarize_content(file_path)
+                result["summary"] = summary_result
+                
+                # End transaction as completed
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "completed")
+                
+            elif operation_type == "search":
+                # Search file content (no rollback needed)
+                search_result = await content_analyzer.search_content(file_path, request)
+                result["search_results"] = search_result
+                
+                # End transaction as completed
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "completed")
+                
+            elif operation_type == "manipulate":
+                # Manipulate file content
+                manipulation_result = await content_analyzer.manipulate_content(file_path, request)
+                result["manipulation"] = manipulation_result
+                
+                # Apply changes if requested
+                if execute and not dry_run and manipulation_result["has_changes"]:
+                    # Get confirmation before applying changes
+                    confirmed = await self._confirm_file_changes(
+                        file_path, 
+                        manipulation_result["diff"]
+                    )
+                    
+                    if confirmed:
+                        # Read original content for rollback
+                        original_content = manipulation_result["original_content"]
+                        modified_content = manipulation_result["modified_content"]
+                        
+                        # Record the content manipulation for rollback
+                        if transaction_id:
+                            await rollback_manager.record_content_manipulation(
+                                file_path=file_path,
+                                original_content=original_content,
+                                modified_content=modified_content,
+                                instruction=request,
+                                transaction_id=transaction_id
+                            )
+                        
+                        # Write the changes to the file
+                        try:
+                            with open(file_path, 'w', encoding='utf-8') as f:
+                                f.write(modified_content)
+                            result["changes_applied"] = True
+                            result["success"] = True
+                            
+                            # End transaction as completed
+                            if transaction_id:
+                                await rollback_manager.end_transaction(transaction_id, "completed")
+                        except Exception as e:
+                            self._logger.error(f"Error applying changes to {file_path}: {str(e)}")
+                            result["error"] = f"Error applying changes: {str(e)}"
+                            result["changes_applied"] = False
+                            result["success"] = False
+                            
+                            # End transaction as failed
+                            if transaction_id:
+                                await rollback_manager.end_transaction(transaction_id, "failed")
+                    else:
+                        result["changes_applied"] = False
+                        result["cancelled"] = True
+                        
+                        # End transaction as cancelled
+                        if transaction_id:
+                            await rollback_manager.end_transaction(transaction_id, "cancelled")
+                elif dry_run and manipulation_result["has_changes"]:
+                    result["changes_applied"] = False
+                    result["success"] = True
+                    result["dry_run"] = True
+                    
+                    # End transaction as completed for dry run
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "completed")
+                else:
+                    # No changes to apply or not executing
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "completed")
+            
+            return result
+            
+        except Exception as e:
+            # Handle any exceptions and end the transaction
+            if transaction_id:
+                await rollback_manager.end_transaction(transaction_id, "failed")
+            
+            self._logger.exception(f"Error processing file content request: {str(e)}")
+            raise
+    
+
     
     async def _handle_execution_errors(
         self,
@@ -556,99 +789,7 @@ class Orchestrator:
         
         return confirmed
     
-    async def _process_file_content_request(
-        self, 
-        request: str, 
-        context: Dict[str, Any], 
-        execute: bool, 
-        dry_run: bool
-    ) -> Dict[str, Any]:
-        """
-        Process a file content analysis/manipulation request.
-        
-        Args:
-            request: The user request
-            context: Context information
-            execute: Whether to execute file operations
-            dry_run: Whether to simulate execution without making changes
-            
-        Returns:
-            Dictionary with processing results
-        """
-        self._logger.info(f"Processing file content request: {request}")
-        
-        # Extract file path from request using AI
-        file_path = await self._extract_file_path(request, context)
-        
-        if not file_path:
-            return {
-                "request": request,
-                "type": "file_content",
-                "context": context,
-                "error": "Could not determine file path from request",
-                "response": "I couldn't determine which file you're referring to. Please specify the file path."
-            }
-        
-        # Determine if this is analysis or manipulation
-        operation_type = await self._determine_file_operation_type(request)
-        
-        result = {
-            "request": request,
-            "type": "file_content",
-            "context": context,
-            "file_path": str(file_path),
-            "operation_type": operation_type
-        }
-        
-        if operation_type == "analyze":
-            # Analyze file content
-            analysis_result = await content_analyzer.analyze_content(file_path, request)
-            result["analysis"] = analysis_result
-            
-        elif operation_type == "summarize":
-            # Summarize file content
-            summary_result = await content_analyzer.summarize_content(file_path)
-            result["summary"] = summary_result
-            
-        elif operation_type == "search":
-            # Search file content
-            search_result = await content_analyzer.search_content(file_path, request)
-            result["search_results"] = search_result
-            
-        elif operation_type == "manipulate":
-            # Manipulate file content
-            manipulation_result = await content_analyzer.manipulate_content(file_path, request)
-            result["manipulation"] = manipulation_result
-            
-            # Apply changes if requested
-            if execute and not dry_run and manipulation_result["has_changes"]:
-                # Get confirmation before applying changes
-                confirmed = await self._confirm_file_changes(
-                    file_path, 
-                    manipulation_result["diff"]
-                )
-                
-                if confirmed:
-                    # Write the changes to the file
-                    try:
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(manipulation_result["modified_content"])
-                        result["changes_applied"] = True
-                        result["success"] = True
-                    except Exception as e:
-                        self._logger.error(f"Error applying changes to {file_path}: {str(e)}")
-                        result["error"] = f"Error applying changes: {str(e)}"
-                        result["changes_applied"] = False
-                        result["success"] = False
-                else:
-                    result["changes_applied"] = False
-                    result["cancelled"] = True
-            elif dry_run and manipulation_result["has_changes"]:
-                result["changes_applied"] = False
-                result["success"] = True
-                result["dry_run"] = True
-        
-        return result
+
     
     async def _process_workflow_definition(
         self, 
