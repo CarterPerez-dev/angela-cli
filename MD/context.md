@@ -112,6 +112,7 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── ai
+│   │   ├── __init__.py
 │   │   ├── analyzer.py
 │   │   ├── client.py
 │   │   ├── confidence.py
@@ -129,7 +130,6 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── generation.py
 │   │   ├── main.py
 │   │   └── workflows.py
-│   ├── cli.py
 │   ├── config.py
 │   ├── constants.py
 │   ├── context
@@ -143,7 +143,11 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── preferences.py
 │   │   ├── project_inference.py
 │   │   └── session.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   └── registry.py
 │   ├── execution
+│   │   ├── __init__.py
 │   │   ├── adaptive_engine.py
 │   │   ├── engine.py
 │   │   ├── error_recovery.py
@@ -151,25 +155,29 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── hooks.py
 │   │   └── rollback.py
 │   ├── generation
+│   │   ├── __init__.py
 │   │   ├── architecture.py
 │   │   ├── documentation.py
 │   │   ├── engine.py
 │   │   ├── frameworks.py
 │   │   ├── planner.py
 │   │   └── validators.py
-│   ├── integrations
-│   │   ├── integrations5.py
-│   │   └── integrations6.py
 │   ├── intent
+│   │   ├── __init__.py
 │   │   ├── advanced_planner.py
 │   │   ├── models.py
 │   │   └── planner.py
+│   ├── interfaces
+│   │   ├── __init__.py
+│   │   ├── execution.py
+│   │   └── safety.py
 │   ├── monitoring
 │   │   ├── __init__.py
 │   │   ├── background.py
 │   │   └── network_monitor.py
 │   ├── orchestrator.py
 │   ├── review
+│   │   ├── __init__.py
 │   │   ├── diff_manager.py
 │   │   └── feedback.py
 │   ├── safety
@@ -184,6 +192,7 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │   │   ├── angela.zsh
 │   │   └── formatter.py
 │   ├── toolchain
+│   │   ├── __init__.py
 │   │   ├── ci_cd.py
 │   │   ├── git.py
 │   │   └── package_managers.py
@@ -194,14 +203,18 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
 │       ├── __init__.py
 │       ├── manager.py
 │       └── sharing.py
+├── integrations
+│   ├── __init__.py
+│   ├── integrations5.py
+│   └── integrations6.py
 ├── pyproject.toml
 ├── pytest.ini
+├── repomix-output.xml
 ├── requirements.txt
 ├── scripts
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
-├── test_frameworks.py
 └── tests
     ├── __init__.py
     ├── conftest.py
@@ -213,12 +226,14 @@ This module introduces the `AdvancedTaskPlanner`, an enhanced version of the tas
     ├── test_file_detector.py
     ├── test_file_resolver.py
     ├── test_filesystem.py
+    ├── test_frameworks.py
     ├── test_integration.py
     ├── test_orchestration.py
     ├── test_prompt_building.py
     ├── test_response_parsing.py
     └── test_safety.py
 
-19 directories, 106 files
+21 directories, 118 files
+                             
 
 ```

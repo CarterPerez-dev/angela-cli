@@ -33,6 +33,8 @@ from angela.context.enhancer import context_enhancer
 from angela.context.file_resolver import file_resolver
 from angela.context.file_activity import file_activity_tracker, ActivityType
 from angela.execution.hooks import execution_hooks
+from angela.core.registry import registry
+
 
 logger = get_logger(__name__)
 
@@ -72,6 +74,12 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         '''
+        # Initialize dependencies we'll need (getting from registry avoids circular imports)
+        if self._error_recovery_manager is None:
+            self._error_recovery_manager = registry.get("error_recovery_manager")
+            
+        # Get context enhancer from registry
+        context_enhancer = registry.get("context_enhancer")
         # Refresh context to ensure we have the latest information
         context_manager.refresh_context()
         context = context_manager.get_context_dict()
