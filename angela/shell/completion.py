@@ -224,6 +224,8 @@ class CompletionHandler:
         
         return []
     
+
+    
     async def _get_rollback_completions(self, args: List[str]) -> List[str]:
         """
         Get completions for rollback commands.
@@ -238,58 +240,34 @@ class CompletionHandler:
             # No subcommand yet, return available subcommands
             return self._static_completions["rollback"]
         
-        # For specific IDs, we would need to get them from the rollback manager
-        # This is just a placeholder
-        return []
-    
-    async def _get_contextual_completions(self, command: str, args: List[str]) -> List[str]:
-        """
-        Get contextual completions for natural language commands.
+        subcommand = args[0]
         
-        Args:
-            command: The main command (fix, explain, help-with)
-            args: Additional arguments
-            
-        Returns:
-            List of contextual completions
-        """
-        # Build context for better completions
-        context = self._build_completion_context()
-        
-        # For the 'fix' command, suggest common error patterns
-        if command == "fix" and not args:
-            return self._get_fix_completions(context)
-        
-        # For the 'explain' command, suggest interesting files or concepts
-        elif command == "explain" and not args:
-            return self._get_explain_completions(context)
-        
-        # For the 'help-with' command, suggest common tasks
-        elif command == "help-with" and not args:
-            return self._get_help_completions(context)
-        
-        # For any natural language command with partial input, use AI to suggest completions
-        elif args:
-            # Join args to get the current partial natural language input
-            partial = " ".join(args)
-            
-            # Check if we have a cached completion for this input
-            cache_key = f"{command}:{partial}"
-            if cache_key in self._completion_cache:
-                return self._completion_cache[cache_key]
-            
-            # If too short, don't try AI completion yet
-            if len(partial) < 3:
+        # For commands that take operation or transaction IDs
+        if subcommand in ["operation", "transaction"] and len(args) <= 2:
+            # Get IDs from rollback manager
+            try:
+                # Import here to avoid circular imports
+                from angela.execution.rollback import rollback_manager
+                
+                if subcommand == "operation":
+                    # Get recent operations
+                    operations = await rollback_manager.get_recent_operations(limit=10)
+                    return [str(op["id"]) for op in operations if op.get("can_rollback", False)]
+                else:  # transaction
+                    # Get recent transactions
+                    transactions = await rollback_manager.get_recent_transactions(limit=10)
+                    return [str(tx["id"]) for tx in transactions if tx.get("can_rollback", False)]
+            except Exception as e:
+                self._logger.error(f"Error fetching rollback IDs: {str(e)}")
                 return []
-            
-            # Use AI to suggest completions based on partial input and context
-            completions = await self._get_ai_completions(command, partial, context)
-            
-            # Cache the result
-            self._completion_cache[cache_key] = completions
-            self._cache_last_update[cache_key] = asyncio.get_event_loop().time()
-            
-            return completions
+        
+        # For the "list" command with options
+        elif subcommand == "list" and len(args) <= 2:
+            return ["--transactions", "--operations", "--limit"]
+        
+        # For the "last" command with options
+        elif subcommand == "last" and len(args) <= 2:
+            return ["--transaction", "--force"]
         
         return []
     

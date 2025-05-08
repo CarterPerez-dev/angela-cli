@@ -113,7 +113,7 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 # Current Project Tree/Structure
 ```bash
 .
-├── Makefile
+
 ├── README.md
 ├── angela
 │   ├── __init__.py
@@ -185,7 +185,8 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   ├── monitoring
 │   │   ├── __init__.py
 │   │   ├── background.py
-│   │   └── network_monitor.py
+│   │   ├── network_monitor.py
+│   │   └── notification_handler.py
 │   ├── orchestrator.py
 │   ├── review
 │   │   ├── __init__.py
@@ -202,8 +203,13 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   │   ├── __init__.py
 │   │   ├── advanced_formatter.py
 │   │   ├── angela.bash
+│   │   ├── angela.tmux
 │   │   ├── angela.zsh
-│   │   └── formatter.py
+│   │   ├── angela_enhanced.bash
+│   │   ├── angela_enhanced.zsh
+│   │   ├── completion.py
+│   │   ├── formatter.py
+│   │   └── inline_feedback.py
 │   ├── toolchain
 │   │   ├── __init__.py
 │   │   ├── ci_cd.py

@@ -1,3 +1,5 @@
+# angela/shell/inline_feedback.py
+
 """
 Inline feedback and interaction system for Angela CLI.
 """
@@ -29,6 +31,7 @@ class InlineFeedback:
         self._message_cooldown = 5  # Seconds between automatic messages
         self._prompt_id_counter = 0
         self._active_threads = {}
+        self._active_messages = {}  # Track messages that might need to be cleared
     
     async def show_message(
         self, 
@@ -65,13 +68,17 @@ class InlineFeedback:
         # Format the message
         formatted_message = f"\n{color_code}[Angela] {message}{reset_code}"
         
+        # Generate a unique message ID
+        message_id = str(time.time())
+        self._active_messages[message_id] = formatted_message
+        
         # Print the message
         print(formatted_message, file=sys.stderr)
         
         # Set up auto-clear if timeout is specified
         if timeout > 0:
             # Schedule message clear after timeout
-            asyncio.create_task(self._clear_message_after_timeout(formatted_message, timeout))
+            asyncio.create_task(self._clear_message_after_timeout(message_id, timeout))
     
     async def ask_question(
         self, 
@@ -201,7 +208,7 @@ class InlineFeedback:
     
     async def _get_edited_command(self, original_command: str) -> Optional[str]:
         """
-        Allow the user to edit a command.
+        Allow the user to edit a command using prompt_toolkit.
         
         Args:
             original_command: The original command
@@ -209,33 +216,91 @@ class InlineFeedback:
         Returns:
             The edited command or None if cancelled
         """
-        # This implementation is simplified - in a real implementation,
-        # you might want to use a library like prompt_toolkit for a more
-        # sophisticated editor
-        
-        print(f"\n\033[36m[Angela] Edit the command (Ctrl+C to cancel):\033[0m", file=sys.stderr)
-        print(f"\033[36m> \033[1m{original_command}\033[0m", file=sys.stderr)
-        
         try:
-            # Start a thread to get user input
-            input_future = asyncio.Future()
+            # Try to import prompt_toolkit for enhanced editing
+            try:
+                from prompt_toolkit import prompt
+                from prompt_toolkit.history import InMemoryHistory
+                from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+                from prompt_toolkit.formatted_text import HTML
+                from prompt_toolkit.key_binding import KeyBindings
+                
+                # Create key bindings for special keys
+                kb = KeyBindings()
+                
+                @kb.add('escape')
+                def _(event):
+                    """Exit on Escape key."""
+                    event.app.exit(result=None)
+                
+                # Create history and add the original command
+                history = InMemoryHistory()
+                history.append_string(original_command)
+                
+                # Create a future for the result
+                input_future = asyncio.Future()
+                
+                def get_input():
+                    try:
+                        # Use prompt_toolkit for enhanced editing
+                        result = prompt(
+                            HTML("<ansiblue>Edit the command: </ansiblue>"),
+                            default=original_command,
+                            history=history,
+                            auto_suggest=AutoSuggestFromHistory(),
+                            key_bindings=kb,
+                            enable_history_search=True,
+                            enable_system_prompt=True,
+                            enable_suspend=True,
+                            mouse_support=True
+                        )
+                        # Set the future result
+                        asyncio.run(self._set_future_result(input_future, result))
+                    except (KeyboardInterrupt, EOFError):
+                        # Cancel on Ctrl+C or Ctrl+D
+                        asyncio.run(self._set_future_result(input_future, None))
+                
+                # Run the prompt in a separate thread to avoid blocking
+                thread = threading.Thread(target=get_input)
+                thread.daemon = True
+                thread.start()
+                
+                # Wait for input with a timeout
+                return await asyncio.wait_for(input_future, timeout=60)
+                
+            except ImportError:
+                # Fall back to basic input if prompt_toolkit is not available
+                self._logger.warning("prompt_toolkit not available, using basic input")
+                raise ImportError("prompt_toolkit not available")
+                
+        except ImportError:
+            # Use basic input as fallback
+            print(f"\n\033[36m[Angela] Edit the command (Ctrl+C to cancel):\033[0m", file=sys.stderr)
+            print(f"\033[36m> \033[1m{original_command}\033[0m", file=sys.stderr)
             
-            def get_input():
-                try:
-                    user_input = input("\033[36m> \033[0m")
-                    asyncio.run(self._set_future_result(input_future, user_input))
-                except (KeyboardInterrupt, EOFError):
-                    asyncio.run(self._set_future_result(input_future, None))
-            
-            thread = threading.Thread(target=get_input)
-            thread.daemon = True
-            thread.start()
-            
-            # Wait for input with a timeout
-            return await asyncio.wait_for(input_future, timeout=60)
-            
-        except asyncio.TimeoutError:
-            print("\n\033[33m[Angela] Edit timed out\033[0m", file=sys.stderr)
+            try:
+                # Start a thread to get user input
+                input_future = asyncio.Future()
+                
+                def get_basic_input():
+                    try:
+                        user_input = input("\033[36m> \033[0m")
+                        asyncio.run(self._set_future_result(input_future, user_input))
+                    except (KeyboardInterrupt, EOFError):
+                        asyncio.run(self._set_future_result(input_future, None))
+                
+                thread = threading.Thread(target=get_basic_input)
+                thread.daemon = True
+                thread.start()
+                
+                # Wait for input with a timeout
+                return await asyncio.wait_for(input_future, timeout=60)
+                
+            except asyncio.TimeoutError:
+                print("\n\033[33m[Angela] Edit timed out\033[0m", file=sys.stderr)
+                return None
+        except Exception as e:
+            self._logger.error(f"Error in command editor: {str(e)}")
             return None
     
     async def _set_future_result(self, future, result):
@@ -303,20 +368,48 @@ class InlineFeedback:
             if not future.done():
                 asyncio.run(self._set_future_result(future, result))
     
-    async def _clear_message_after_timeout(self, message: str, timeout: float) -> None:
+    async def _clear_message_after_timeout(self, message_id: str, timeout: float) -> None:
         """
         Clear a message after a timeout.
         
         Args:
-            message: The message to clear
+            message_id: ID of the message to clear
             timeout: Timeout in seconds
         """
         await asyncio.sleep(timeout)
         
-        # In a real implementation, you would need to handle terminal 
-        # control sequences to actually clear the message
-        # This is a simplified version that just logs the intent
-        self._logger.debug(f"Would clear message after timeout: {message}")
+        if message_id not in self._active_messages:
+            return
+            
+        message = self._active_messages[message_id]
+        
+        try:
+            # Calculate the number of lines in the message
+            lines = message.count('\n') + 1
+            
+            # ANSI escape sequence to move cursor up and clear lines
+            up_sequence = f"\033[{lines}A"  # Move cursor up
+            clear_sequence = "\033[K"  # Clear to end of line
+            
+            # Move up and clear each line
+            clear_command = up_sequence
+            for _ in range(lines):
+                clear_command += clear_sequence + "\033[1B"  # Clear line and move down
+            
+            # Move back up after clearing
+            clear_command += f"\033[{lines}A"
+            
+            # Write the clear sequence to stderr (where we wrote the message)
+            sys.stderr.write(clear_command)
+            sys.stderr.flush()
+            
+            # Remove from active messages
+            del self._active_messages[message_id]
+            
+            self._logger.debug(f"Cleared message after timeout: {message_id}")
+            
+        except Exception as e:
+            self._logger.error(f"Error clearing message: {str(e)}")
     
     def _get_next_prompt_id(self) -> int:
         """
