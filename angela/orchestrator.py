@@ -45,6 +45,7 @@ from angela.execution.rollback import rollback_manager
 from angela.safety.classifier import classify_command_risk, analyze_command_impact 
 from angela.context.preferences import preferences_manager  
 from angela.safety.adaptive_confirmation import get_adaptive_confirmation
+from angela.toolchain.docker import docker_integration
 
 
 logger = get_logger(__name__)
@@ -988,6 +989,14 @@ class Orchestrator:
             details["docker_action"] = "general"
             
         return details
+
+
+
+
+
+
+
+
     
     async def _process_ci_cd_operation(
         self, 
@@ -996,43 +1005,358 @@ class Orchestrator:
         dry_run: bool
     ) -> Dict[str, Any]:
         """
-        Process a CI/CD operation.
+        Process a CI/CD operation request.
         
         Args:
-            operation_details: Details of the operation
+            operation_details: Details about the operation
             context: Context information
             dry_run: Whether to simulate without making changes
             
         Returns:
-            Dictionary with operation results
+            Dictionary with processing results
         """
+        # Import here to avoid circular imports
         from angela.toolchain.ci_cd import ci_cd_integration
         
-        # Get platform and project directory
-        platform = operation_details.get("platform", "github_actions")
-        project_dir = operation_details.get("project_dir", ".")
+        self._logger.info(f"Processing CI/CD operation: {operation_details.get('platform', 'unknown')}")
         
-        # Generate CI configuration
-        with console.status(f"[bold green]Generating CI configuration for {platform}...[/bold green]"):
-            if not dry_run:
-                result = await ci_cd_integration.generate_ci_configuration(
-                    path=project_dir,
-                    platform=platform
-                )
-            else:
-                # For dry run, just return what would be done
-                result = {
+        # Get details
+        platform = operation_details.get("platform", "github_actions")
+        project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+        
+        # Execute CI/CD operation
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would configure CI/CD for {platform} in {project_dir}"
+            }
+        
+        try:
+            result = await ci_cd_integration.generate_ci_configuration(
+                path=project_dir,
+                platform=platform
+            )
+            
+            return {
+                "success": result.get("success", False),
+                "message": result.get("message", "CI/CD configuration completed"),
+                "ci_cd_details": result
+            }
+        except Exception as e:
+            self._logger.exception(f"Error processing CI/CD operation: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error processing CI/CD operation: {str(e)}"
+            }
+    
+    async def _process_package_operation(
+        self,
+        operation_details: Dict[str, Any],
+        context: Dict[str, Any],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a package management operation request.
+        
+        Args:
+            operation_details: Details about the operation
+            context: Context information
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        # Import here to avoid circular imports
+        from angela.toolchain.package_managers import package_manager_integration
+        
+        self._logger.info(f"Processing package operation")
+        
+        # Get details
+        project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+        dependencies = operation_details.get("dependencies", [])
+        dev_dependencies = operation_details.get("dev_dependencies", [])
+        
+        if not dependencies and not dev_dependencies:
+            return {
+                "success": False,
+                "error": "No dependencies specified for package operation"
+            }
+        
+        # Execute package operation
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would install {len(dependencies)} dependencies and {len(dev_dependencies)} dev dependencies in {project_dir}"
+            }
+        
+        try:
+            result = await package_manager_integration.install_dependencies(
+                path=project_dir,
+                dependencies=dependencies,
+                dev_dependencies=dev_dependencies
+            )
+            
+            return {
+                "success": result.get("success", False),
+                "message": result.get("message", "Dependencies installed successfully"),
+                "package_details": result
+            }
+        except Exception as e:
+            self._logger.exception(f"Error processing package operation: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error processing package operation: {str(e)}"
+            }
+    
+    async def _process_git_operation(
+        self,
+        operation_details: Dict[str, Any],
+        context: Dict[str, Any],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a Git operation request.
+        
+        Args:
+            operation_details: Details about the operation
+            context: Context information
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        # Import here to avoid circular imports
+        from angela.toolchain.git import git_integration
+        
+        self._logger.info(f"Processing Git operation: {operation_details.get('git_action', 'unknown')}")
+        
+        # Get details
+        git_action = operation_details.get("git_action", "")
+        project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+        
+        # Handle different Git operations based on git_action
+        if git_action == "init":
+            return await self._process_git_init(operation_details, project_dir, dry_run)
+        elif git_action == "commit":
+            return await self._process_git_commit(operation_details, project_dir, dry_run)
+        elif git_action == "branch":
+            return await self._process_git_branch(operation_details, project_dir, dry_run)
+        elif git_action == "status":
+            return await self._process_git_status(operation_details, project_dir, dry_run)
+        else:
+            # Generate and execute appropriate Git command using AI
+            suggestion = await self._get_ai_suggestion(
+                operation_details.get("request", f"git {git_action}"),
+                context
+            )
+            
+            if dry_run:
+                return {
                     "success": True,
                     "dry_run": True,
-                    "platform": platform,
-                    "project_dir": project_dir,
-                    "message": f"Would generate {platform} CI configuration in {project_dir}"
+                    "command": suggestion.command,
+                    "explanation": suggestion.explanation
                 }
+            
+            # Execute the command
+            stdout, stderr, exit_code = await execution_engine.execute_command(
+                suggestion.command,
+                check_safety=True,
+                working_dir=project_dir
+            )
+            
+            return {
+                "success": exit_code == 0,
+                "command": suggestion.command,
+                "stdout": stdout,
+                "stderr": stderr,
+                "return_code": exit_code,
+                "explanation": suggestion.explanation
+            }
+    
+    async def _process_git_init(self, operation_details, project_dir, dry_run):
+        """Process git init operation."""
+        from angela.toolchain.git import git_integration
+        
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would initialize Git repository in {project_dir}"
+            }
+        
+        # Get initialization parameters
+        branch = operation_details.get("branch", "main")
+        gitignore = operation_details.get("gitignore", True)
+        
+        # Initialize repository
+        result = await git_integration.init_repository(
+            path=project_dir,
+            initial_branch=branch,
+            gitignore_template=operation_details.get("gitignore_template")
+        )
         
         return {
-            "ci_cd_result": result
+            "success": result.get("success", False),
+            "message": result.get("message", "Git repository initialized"),
+            "git_details": result
         }
+    
+    async def _process_git_commit(self, operation_details, project_dir, dry_run):
+        """Process git commit operation."""
+        from angela.toolchain.git import git_integration
         
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would commit changes in {project_dir}"
+            }
+        
+        # Get commit parameters
+        message = operation_details.get("message", "Update via Angela CLI")
+        add_all = operation_details.get("add_all", True)
+        
+        # Stage files if requested
+        if add_all:
+            await git_integration.stage_files(path=project_dir, files=["."])
+        
+        # Commit changes
+        result = await git_integration.commit_changes(
+            path=project_dir,
+            message=message
+        )
+        
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", "Changes committed successfully"),
+            "git_details": result
+        }
+    
+    async def _process_git_branch(self, operation_details, project_dir, dry_run):
+        """Process git branch operation."""
+        from angela.toolchain.git import git_integration
+        
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would create/switch branch in {project_dir}"
+            }
+        
+        # Get branch parameters
+        branch_name = operation_details.get("branch_name", "")
+        if not branch_name:
+            return {
+                "success": False,
+                "error": "Branch name not specified"
+            }
+        
+        checkout = operation_details.get("checkout", True)
+        
+        # Create branch
+        result = await git_integration.create_branch(
+            path=project_dir,
+            branch_name=branch_name,
+            checkout=checkout
+        )
+        
+        return {
+            "success": result.get("success", False),
+            "message": result.get("message", f"Branch {branch_name} created"),
+            "git_details": result
+        }
+    
+    async def _process_git_status(self, operation_details, project_dir, dry_run):
+        """Process git status operation."""
+        from angela.toolchain.git import git_integration
+        
+        # Get repository status
+        result = await git_integration.get_repository_status(path=project_dir)
+        
+        return {
+            "success": result.get("success", False),
+            "message": "Git status retrieved",
+            "status": result.get("status", {}),
+            "git_details": result
+        }
+    
+    async def _process_testing_operation(
+        self,
+        operation_details: Dict[str, Any],
+        context: Dict[str, Any],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a testing operation request.
+        
+        Args:
+            operation_details: Details about the operation
+            context: Context information
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing testing operation")
+        
+        # Get details
+        project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+        test_framework = operation_details.get("test_framework", "")
+        test_path = operation_details.get("test_path", "")
+        
+        # Execute testing operation
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"Would run tests using {test_framework} in {project_dir}"
+            }
+        
+        try:
+            # Determine test command based on framework
+            command = ""
+            if test_framework == "pytest":
+                command = f"pytest {test_path}" if test_path else "pytest"
+            elif test_framework == "jest":
+                command = f"npx jest {test_path}" if test_path else "npx jest"
+            elif test_framework == "go":
+                command = f"go test {test_path}" if test_path else "go test ./..."
+            elif test_framework == "maven":
+                command = "mvn test"
+            elif test_framework == "gradle":
+                command = "./gradlew test"
+            else:
+                # Default to using AI to generate appropriate test command
+                suggestion = await self._get_ai_suggestion(
+                    f"run tests for {test_framework} in {project_dir}",
+                    context
+                )
+                command = suggestion.command
+            
+            # Execute test command
+            stdout, stderr, exit_code = await execution_engine.execute_command(
+                command,
+                check_safety=True,
+                working_dir=project_dir
+            )
+            
+            return {
+                "success": exit_code == 0,
+                "command": command,
+                "stdout": stdout,
+                "stderr": stderr,
+                "return_code": exit_code,
+                "message": "Tests completed successfully" if exit_code == 0 else "Tests failed"
+            }
+        except Exception as e:
+            self._logger.exception(f"Error processing testing operation: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Error processing testing operation: {str(e)}"
+            }
             
     async def _extract_feature_details(
         self, 
@@ -1174,15 +1498,6 @@ class Orchestrator:
             }
 
 
-
-
-
-
-
-
-
-
-
     
     async def _process_command_request(
         self, 
@@ -1285,20 +1600,6 @@ class Orchestrator:
         return result
     
 
-
-    
-    # Add this as a class member in the Orchestrator class
-    def __init__(self):
-        """Initialize the orchestrator."""
-        self._logger = logger
-        self._background_tasks = set()
-        self._error_recovery_manager = ErrorRecoveryManager()
-    
-
-    
-    # Updates for angela/orchestrator.py
-    # Add these methods to the Orchestrator class
-    
     async def _process_multi_step_request(
         self, 
         request: str, 
