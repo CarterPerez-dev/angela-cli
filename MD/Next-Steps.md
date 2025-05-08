@@ -25,9 +25,8 @@
 *   **Goal:** Enable Angela to understand and interact with a wider range of essential developer tools beyond basic Git and package managers.
 *   **Key Objectives:**
     *   **Docker Integration:** Implement understanding and execution of common Docker commands (`build`, `run`, `ps`, `logs`, `stop`, `rm`). Allow requests like "Angela, show me the logs for the webserver container" or "Rebuild the backend Docker image". Requires specific command generation logic and potentially parsing Docker output.
-    *   **Cloud CLI Integration (Select Platforms):** Target one or two major cloud providers (e.g., AWS CLI, gcloud CLI). Implement understanding for common resource listing, status checks, and simple deployment commands (e.g., "List my S3 buckets", "What's the status of my EC2 instances?", "Deploy the app to App Engine"). This involves careful command generation and potentially parsing structured output (JSON/YAML).
-    *   **Database Interaction (Basic & Safe):** Configure safe, read-only interaction with common databases (e.g., PostgreSQL, MySQL). Allow requests like "Show the schema for the 'users' table" or "Count the number of records in the 'orders' table". Requires secure credential management and query generation/validation.
-    *   **Toolchain Module Enhancement:** Refactor and expand `angela/toolchain/` to include dedicated modules for Docker, Cloud CLIs, and Databases, abstracting the interaction logic.
+  
+    *   **Toolchain Module Enhancement:** Refactor and expand `angela/toolchain/` to include dedicated modules for Docker, abstracting the interaction logic.
 
 **Phase 11: Autonomous Multi-File Code Generation & Refinement**
 

@@ -1544,6 +1544,824 @@ async def _generate_content(
         options
     )
 
+
+    async def generate_standard_project_structure(
+        self, 
+        framework: str,
+        description: str,
+        output_dir: Union[str, Path],
+        options: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate a standardized project structure for a framework.
+        
+        This method creates a more complete, production-ready project structure
+        compared to the basic structure from generate_framework_structure.
+        
+        Args:
+            framework: Framework to generate for (e.g., "react", "django")
+            description: Description of the project
+            output_dir: Directory where the project should be generated
+            options: Additional options for the framework
+            
+        Returns:
+            Dictionary with generation results
+        """
+        options = options or {}
+        framework = framework.lower()
+        self._logger.info(f"Generating standard project for {framework}: {description}")
+        
+        try:
+            # Determine project type based on framework
+            project_type = self._framework_project_types.get(framework, "unknown")
+            
+            # Get enhanced project structure if available
+            result = await self._generate_enhanced_framework_structure(
+                framework=framework,
+                description=description,
+                output_dir=output_dir,
+                options=options
+            )
+            
+            # If no specialized enhanced structure, fall back to basic
+            if not result:
+                result = await self.generate_framework_structure(
+                    framework=framework,
+                    description=description,
+                    output_dir=output_dir,
+                    options=options
+                )
+                
+            return result
+        except Exception as e:
+            self._logger.error(f"Error generating standard project for {framework}: {str(e)}")
+            return {
+                "success": False,
+                "framework": framework,
+                "error": f"Failed to generate standard project for {framework}: {str(e)}",
+                "files": []
+            }
+    
+    async def _generate_enhanced_framework_structure(
+        self,
+        framework: str,
+        description: str,
+        output_dir: Union[str, Path],
+        options: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Generate an enhanced framework-specific project structure with best practices.
+        
+        Args:
+            framework: Framework to generate for
+            description: Description of the project
+            output_dir: Output directory
+            options: Additional options
+            
+        Returns:
+            Dictionary with generation results or None if not supported
+        """
+        # Check for enhanced framework handlers
+        handler_method = f"_generate_enhanced_{framework.replace('-', '_')}"
+        if hasattr(self, handler_method):
+            return await getattr(self, handler_method)(description, output_dir, options)
+        
+        # No enhanced handler available
+        return None
+    
+    async def _generate_enhanced_react(
+        self, 
+        description: str,
+        output_dir: Union[str, Path],
+        options: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Generate an enhanced React project structure following best practices.
+        
+        Args:
+            description: Description of the project
+            output_dir: Output directory
+            options: Additional options
+            
+        Returns:
+            Dictionary with generation results
+        """
+        self._logger.info(f"Generating enhanced React project: {description}")
+        
+        # Determine React variant
+        variant = options.get("variant", "cra").lower()
+        
+        # Use TypeScript by default for enhanced projects
+        use_typescript = options.get("typescript", True)
+        
+        # Define common file extensions based on TypeScript usage
+        ext = ".tsx" if use_typescript else ".jsx"
+        style_ext = options.get("style_ext", ".css")
+        
+        # Common options
+        routing = options.get("routing", True)
+        state_management = options.get("state_management", "context")  # context, redux, mobx
+        styling = options.get("styling", "css")  # css, sass, styled-components, tailwind
+        testing = options.get("testing", True)
+        
+        # Initialize files list
+        files = []
+        
+        # Define project structure based on variant
+        if variant == "nextjs":
+            # NextJS project structure
+            
+            # Core configuration files
+            files.extend([
+                {
+                    "path": "next.config.js",
+                    "content": await self._generate_content("nextjs/enhanced/next.config.js", description, options),
+                    "purpose": "Next.js configuration",
+                    "language": "javascript"
+                },
+                {
+                    "path": "package.json",
+                    "content": await self._generate_content("nextjs/enhanced/package.json", description, options),
+                    "purpose": "Package configuration",
+                    "language": "json"
+                },
+                {
+                    "path": ".env.local.example",
+                    "content": await self._generate_content("nextjs/enhanced/.env.local.example", description, options),
+                    "purpose": "Environment variables example",
+                    "language": "env"
+                },
+                {
+                    "path": ".gitignore",
+                    "content": await self._generate_content("nextjs/enhanced/.gitignore", description, options),
+                    "purpose": "Git ignore configuration",
+                    "language": "gitignore"
+                },
+                {
+                    "path": "README.md",
+                    "content": await self._generate_content("nextjs/enhanced/README.md", description, options),
+                    "purpose": "Project documentation",
+                    "language": "markdown"
+                }
+            ])
+            
+            # TypeScript configuration
+            if use_typescript:
+                files.extend([
+                    {
+                        "path": "tsconfig.json",
+                        "content": await self._generate_content("nextjs/enhanced/tsconfig.json", description, options),
+                        "purpose": "TypeScript configuration",
+                        "language": "json"
+                    }
+                ])
+            
+            # Pages or App directory structure
+            if options.get("app_router", True):
+                # Modern App Router structure
+                files.extend([
+                    {
+                        "path": "app/layout" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/app/layout" + ext, description, options),
+                        "purpose": "Root layout component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "app/page" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/app/page" + ext, description, options),
+                        "purpose": "Home page component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "app/globals.css",
+                        "content": await self._generate_content("nextjs/enhanced/app/globals.css", description, options),
+                        "purpose": "Global styles",
+                        "language": "css"
+                    }
+                ])
+                
+                # Add API route
+                files.extend([
+                    {
+                        "path": "app/api/example/route" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("nextjs/enhanced/app/api/example/route.ts", description, options),
+                        "purpose": "Example API route",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+                
+                # Add components directory
+                files.extend([
+                    {
+                        "path": "components/ui/Button" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/components/ui/Button" + ext, description, options),
+                        "purpose": "Reusable button component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "components/layout/Header" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/components/layout/Header" + ext, description, options),
+                        "purpose": "Header component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            else:
+                # Legacy Pages Router structure
+                files.extend([
+                    {
+                        "path": "pages/index" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/pages/index" + ext, description, options),
+                        "purpose": "Home page",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "pages/_app" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/pages/_app" + ext, description, options),
+                        "purpose": "App component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "pages/_document" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/pages/_document" + ext, description, options),
+                        "purpose": "Document component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+                
+                # Add API route
+                files.extend([
+                    {
+                        "path": "pages/api/example" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("nextjs/enhanced/pages/api/example.ts", description, options),
+                        "purpose": "Example API endpoint",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+                
+                # Add components directory
+                files.extend([
+                    {
+                        "path": "components/ui/Button" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/components/ui/Button" + ext, description, options),
+                        "purpose": "Reusable button component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "components/layout/Header" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/components/layout/Header" + ext, description, options),
+                        "purpose": "Header component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            
+            # Add utilities
+            files.extend([
+                {
+                    "path": "lib/utils" + (use_typescript ? ".ts" : ".js"),
+                    "content": await self._generate_content("nextjs/enhanced/lib/utils.ts", description, options),
+                    "purpose": "Utility functions",
+                    "language": "typescript" if use_typescript else "javascript"
+                }
+            ])
+            
+            # Add public directory
+            files.extend([
+                {
+                    "path": "public/favicon.ico",
+                    "content": "",  # Binary content would be handled differently
+                    "purpose": "Favicon",
+                    "language": "binary"
+                }
+            ])
+            
+            # Add testing if requested
+            if testing:
+                files.extend([
+                    {
+                        "path": "__tests__/Home.test" + ext,
+                        "content": await self._generate_content("nextjs/enhanced/__tests__/Home.test" + ext, description, options),
+                        "purpose": "Home page tests",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "jest.config" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("nextjs/enhanced/jest.config.ts", description, options),
+                        "purpose": "Jest configuration",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+        else:
+            # Create React App or similar structure
+            
+            # Core configuration files
+            files.extend([
+                {
+                    "path": "package.json",
+                    "content": await self._generate_content("react/enhanced/package.json", description, options),
+                    "purpose": "Package configuration",
+                    "language": "json"
+                },
+                {
+                    "path": ".env.example",
+                    "content": await self._generate_content("react/enhanced/.env.example", description, options),
+                    "purpose": "Environment variables example",
+                    "language": "env"
+                },
+                {
+                    "path": ".gitignore",
+                    "content": await self._generate_content("react/enhanced/.gitignore", description, options),
+                    "purpose": "Git ignore configuration",
+                    "language": "gitignore"
+                },
+                {
+                    "path": "README.md",
+                    "content": await self._generate_content("react/enhanced/README.md", description, options),
+                    "purpose": "Project documentation",
+                    "language": "markdown"
+                },
+                {
+                    "path": "public/index.html",
+                    "content": await self._generate_content("react/enhanced/public/index.html", description, options),
+                    "purpose": "HTML entry point",
+                    "language": "html"
+                }
+            ])
+            
+            # TypeScript configuration
+            if use_typescript:
+                files.extend([
+                    {
+                        "path": "tsconfig.json",
+                        "content": await self._generate_content("react/enhanced/tsconfig.json", description, options),
+                        "purpose": "TypeScript configuration",
+                        "language": "json"
+                    }
+                ])
+            
+            # Core application files
+            files.extend([
+                {
+                    "path": "src/index" + (use_typescript ? ".tsx" : ".jsx"),
+                    "content": await self._generate_content("react/enhanced/src/index" + ext, description, options),
+                    "purpose": "Application entry point",
+                    "language": "typescript" if use_typescript else "javascript"
+                },
+                {
+                    "path": "src/App" + ext,
+                    "content": await self._generate_content("react/enhanced/src/App" + ext, description, options),
+                    "purpose": "Main App component",
+                    "language": "typescript" if use_typescript else "javascript"
+                },
+                {
+                    "path": "src/index.css",
+                    "content": await self._generate_content("react/enhanced/src/index.css", description, options),
+                    "purpose": "Global styles",
+                    "language": "css"
+                }
+            ])
+            
+            # Add TypeScript types if needed
+            if use_typescript:
+                files.extend([
+                    {
+                        "path": "src/types/index.ts",
+                        "content": await self._generate_content("react/enhanced/src/types/index.ts", description, options),
+                        "purpose": "TypeScript type definitions",
+                        "language": "typescript"
+                    }
+                ])
+            
+            # Add routing if requested
+            if routing:
+                files.extend([
+                    {
+                        "path": "src/pages/Home" + ext,
+                        "content": await self._generate_content("react/enhanced/src/pages/Home" + ext, description, options),
+                        "purpose": "Home page component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "src/pages/About" + ext,
+                        "content": await self._generate_content("react/enhanced/src/pages/About" + ext, description, options),
+                        "purpose": "About page component",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "src/routes" + (use_typescript ? ".tsx" : ".jsx"),
+                        "content": await self._generate_content("react/enhanced/src/routes" + ext, description, options),
+                        "purpose": "Route definitions",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            
+            # Add state management
+            if state_management == "redux":
+                files.extend([
+                    {
+                        "path": "src/store/index" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("react/enhanced/src/store/index.ts", description, options),
+                        "purpose": "Redux store configuration",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "src/store/slices/counterSlice" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("react/enhanced/src/store/slices/counterSlice.ts", description, options),
+                        "purpose": "Example Redux slice",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            elif state_management == "mobx":
+                files.extend([
+                    {
+                        "path": "src/stores/RootStore" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("react/enhanced/src/stores/RootStore.ts", description, options),
+                        "purpose": "MobX root store",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "src/stores/CounterStore" + (use_typescript ? ".ts" : ".js"),
+                        "content": await self._generate_content("react/enhanced/src/stores/CounterStore.ts", description, options),
+                        "purpose": "Example MobX store",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            else:  # context
+                files.extend([
+                    {
+                        "path": "src/context/AppContext" + ext,
+                        "content": await self._generate_content("react/enhanced/src/context/AppContext" + ext, description, options),
+                        "purpose": "Application context",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+            
+            # Add components directory
+            files.extend([
+                {
+                    "path": "src/components/common/Button" + ext,
+                    "content": await self._generate_content("react/enhanced/src/components/common/Button" + ext, description, options),
+                    "purpose": "Reusable button component",
+                    "language": "typescript" if use_typescript else "javascript"
+                },
+                {
+                    "path": "src/components/layout/Header" + ext,
+                    "content": await self._generate_content("react/enhanced/src/components/layout/Header" + ext, description, options),
+                    "purpose": "Header component",
+                    "language": "typescript" if use_typescript else "javascript"
+                },
+                {
+                    "path": "src/components/layout/Footer" + ext,
+                    "content": await self._generate_content("react/enhanced/src/components/layout/Footer" + ext, description, options),
+                    "purpose": "Footer component",
+                    "language": "typescript" if use_typescript else "javascript"
+                }
+            ])
+            
+            # Add utilities
+            files.extend([
+                {
+                    "path": "src/utils/helpers" + (use_typescript ? ".ts" : ".js"),
+                    "content": await self._generate_content("react/enhanced/src/utils/helpers.ts", description, options),
+                    "purpose": "Helper functions",
+                    "language": "typescript" if use_typescript else "javascript"
+                },
+                {
+                    "path": "src/utils/api" + (use_typescript ? ".ts" : ".js"),
+                    "content": await self._generate_content("react/enhanced/src/utils/api.ts", description, options),
+                    "purpose": "API utilities",
+                    "language": "typescript" if use_typescript else "javascript"
+                }
+            ])
+            
+            # Add testing if requested
+            if testing:
+                files.extend([
+                    {
+                        "path": "src/App.test" + ext,
+                        "content": await self._generate_content("react/enhanced/src/App.test" + ext, description, options),
+                        "purpose": "App component tests",
+                        "language": "typescript" if use_typescript else "javascript"
+                    },
+                    {
+                        "path": "src/components/common/Button.test" + ext,
+                        "content": await self._generate_content("react/enhanced/src/components/common/Button.test" + ext, description, options),
+                        "purpose": "Button component tests",
+                        "language": "typescript" if use_typescript else "javascript"
+                    }
+                ])
+        }
+        
+        # Generate files
+        for file_info in files:
+            files.append(CodeFile(
+                path=file_info["path"],
+                content=file_info["content"],
+                purpose=file_info["purpose"],
+                dependencies=[],
+                language=file_info["language"]
+            ))
+        
+        return {
+            "success": True,
+            "framework": "react",
+            "variant": variant,
+            "files": files,
+            "project_type": "node",
+            "typescript": use_typescript,
+            "routing": routing,
+            "state_management": state_management,
+            "styling": styling,
+            "testing": testing
+        }
+    
+    async def _generate_enhanced_django(
+        self, 
+        description: str,
+        output_dir: Union[str, Path],
+        options: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Generate an enhanced Django project structure following best practices.
+        
+        Args:
+            description: Description of the project
+            output_dir: Output directory
+            options: Additional options
+            
+        Returns:
+            Dictionary with generation results
+        """
+        self._logger.info(f"Generating enhanced Django project: {description}")
+        
+        # Get project name and app name
+        project_name = options.get("project_name", "django_project")
+        project_name = re.sub(r'[^a-zA-Z0-9_]', '_', project_name)
+        
+        app_name = options.get("app_name", "main")
+        app_name = re.sub(r'[^a-zA-Z0-9_]', '_', app_name)
+        
+        # Common options
+        include_rest_framework = options.get("rest_framework", True)
+        include_authentication = options.get("authentication", True)
+        include_admin = options.get("admin", True)
+        include_static = options.get("static", True)
+        include_templates = options.get("templates", True)
+        
+        # Initialize files list
+        files = []
+        
+        # Core Django files
+        files.extend([
+            {
+                "path": "manage.py",
+                "content": await self._generate_content("django/enhanced/manage.py", description, {"project_name": project_name, **options}),
+                "purpose": "Django management script",
+                "language": "python"
+            },
+            {
+                "path": "requirements.txt",
+                "content": await self._generate_content("django/enhanced/requirements.txt", description, {"rest_framework": include_rest_framework, **options}),
+                "purpose": "Python dependencies",
+                "language": "text"
+            },
+            {
+                "path": "README.md",
+                "content": await self._generate_content("django/enhanced/README.md", description, {"project_name": project_name, "app_name": app_name, **options}),
+                "purpose": "Project documentation",
+                "language": "markdown"
+            },
+            {
+                "path": ".gitignore",
+                "content": await self._generate_content("django/enhanced/.gitignore", description, options),
+                "purpose": "Git ignore configuration",
+                "language": "gitignore"
+            }
+        ])
+        
+        # Add Docker support
+        if options.get("docker", True):
+            files.extend([
+                {
+                    "path": "Dockerfile",
+                    "content": await self._generate_content("django/enhanced/Dockerfile", description, {"project_name": project_name, **options}),
+                    "purpose": "Docker configuration",
+                    "language": "dockerfile"
+                },
+                {
+                    "path": "docker-compose.yml",
+                    "content": await self._generate_content("django/enhanced/docker-compose.yml", description, {"project_name": project_name, **options}),
+                    "purpose": "Docker Compose configuration",
+                    "language": "yaml"
+                },
+                {
+                    "path": ".dockerignore",
+                    "content": await self._generate_content("django/enhanced/.dockerignore", description, options),
+                    "purpose": "Docker ignore configuration",
+                    "language": "text"
+                }
+            ])
+        }
+        
+        # Project configuration
+        files.extend([
+            {
+                "path": f"{project_name}/__init__.py",
+                "content": "",
+                "purpose": "Package initialization",
+                "language": "python"
+            },
+            {
+                "path": f"{project_name}/settings.py",
+                "content": await self._generate_content("django/enhanced/settings.py", description, {
+                    "project_name": project_name, 
+                    "app_name": app_name,
+                    "rest_framework": include_rest_framework,
+                    **options
+                }),
+                "purpose": "Django settings",
+                "language": "python"
+            },
+            {
+                "path": f"{project_name}/urls.py",
+                "content": await self._generate_content("django/enhanced/urls.py", description, {
+                    "project_name": project_name, 
+                    "app_name": app_name,
+                    "admin": include_admin,
+                    "rest_framework": include_rest_framework,
+                    **options
+                }),
+                "purpose": "URL configuration",
+                "language": "python"
+            },
+            {
+                "path": f"{project_name}/wsgi.py",
+                "content": await self._generate_content("django/enhanced/wsgi.py", description, {"project_name": project_name, **options}),
+                "purpose": "WSGI configuration",
+                "language": "python"
+            },
+            {
+                "path": f"{project_name}/asgi.py",
+                "content": await self._generate_content("django/enhanced/asgi.py", description, {"project_name": project_name, **options}),
+                "purpose": "ASGI configuration",
+                "language": "python"
+            }
+        ])
+        
+        # Main app structure
+        files.extend([
+            {
+                "path": f"{app_name}/__init__.py",
+                "content": "",
+                "purpose": "App initialization",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/admin.py",
+                "content": await self._generate_content("django/enhanced/admin.py", description, {"app_name": app_name, **options}),
+                "purpose": "Admin configuration",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/apps.py",
+                "content": await self._generate_content("django/enhanced/apps.py", description, {"app_name": app_name, **options}),
+                "purpose": "App configuration",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/models.py",
+                "content": await self._generate_content("django/enhanced/models.py", description, {"app_name": app_name, **options}),
+                "purpose": "Data models",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/views.py",
+                "content": await self._generate_content("django/enhanced/views.py", description, {
+                    "app_name": app_name,
+                    "rest_framework": include_rest_framework,
+                    **options
+                }),
+                "purpose": "View functions",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/urls.py",
+                "content": await self._generate_content("django/enhanced/app_urls.py", description, {
+                    "app_name": app_name,
+                    "rest_framework": include_rest_framework,
+                    **options
+                }),
+                "purpose": "App URL configuration",
+                "language": "python"
+            },
+            {
+                "path": f"{app_name}/tests.py",
+                "content": await self._generate_content("django/enhanced/tests.py", description, {"app_name": app_name, **options}),
+                "purpose": "Test cases",
+                "language": "python"
+            }
+        ])
+        
+        # Add REST framework files if requested
+        if include_rest_framework:
+            files.extend([
+                {
+                    "path": f"{app_name}/serializers.py",
+                    "content": await self._generate_content("django/enhanced/serializers.py", description, {"app_name": app_name, **options}),
+                    "purpose": "API serializers",
+                    "language": "python"
+                },
+                {
+                    "path": f"{app_name}/api.py",
+                    "content": await self._generate_content("django/enhanced/api.py", description, {"app_name": app_name, **options}),
+                    "purpose": "API views",
+                    "language": "python"
+                }
+            ])
+        
+        # Add authentication files if requested
+        if include_authentication:
+            files.extend([
+                {
+                    "path": f"{app_name}/auth.py",
+                    "content": await self._generate_content("django/enhanced/auth.py", description, {"app_name": app_name, **options}),
+                    "purpose": "Authentication utilities",
+                    "language": "python"
+                }
+            ])
+        
+        # Add templates if requested
+        if include_templates:
+            files.extend([
+                {
+                    "path": f"{app_name}/templates/{app_name}/base.html",
+                    "content": await self._generate_content("django/enhanced/templates/base.html", description, {"app_name": app_name, **options}),
+                    "purpose": "Base template",
+                    "language": "html"
+                },
+                {
+                    "path": f"{app_name}/templates/{app_name}/index.html",
+                    "content": await self._generate_content("django/enhanced/templates/index.html", description, {"app_name": app_name, **options}),
+                    "purpose": "Index template",
+                    "language": "html"
+                }
+            ])
+        
+        # Add static files if requested
+        if include_static:
+            files.extend([
+                {
+                    "path": f"{app_name}/static/{app_name}/css/style.css",
+                    "content": await self._generate_content("django/enhanced/static/style.css", description, options),
+                    "purpose": "Main stylesheet",
+                    "language": "css"
+                },
+                {
+                    "path": f"{app_name}/static/{app_name}/js/main.js",
+                    "content": await self._generate_content("django/enhanced/static/main.js", description, options),
+                    "purpose": "Main JavaScript file",
+                    "language": "javascript"
+                }
+            ])
+        
+        # Generate files
+        for file_info in files:
+            files.append(CodeFile(
+                path=file_info["path"],
+                content=file_info["content"],
+                purpose=file_info["purpose"],
+                dependencies=[],
+                language=file_info["language"]
+            ))
+        
+        return {
+            "success": True,
+            "framework": "django",
+            "files": files,
+            "project_type": "python",
+            "project_name": project_name,
+            "app_name": app_name,
+            "rest_framework": include_rest_framework,
+            "authentication": include_authentication,
+            "admin": include_admin,
+            "templates": include_templates,
+            "static": include_static
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 async def _generate_file_content(
     self, 
     framework: str,

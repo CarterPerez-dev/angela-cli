@@ -12,6 +12,9 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich import print as rich_print
+from rich.prompt import Prompt, Confirm
+from rich.markdown import Markdown
+
 
 from angela.utils.logging import get_logger
 from angela.generation.engine import code_generation_engine
@@ -22,6 +25,9 @@ from angela.toolchain.ci_cd import ci_cd_integration
 from angela.review.diff_manager import diff_manager
 from angela.review.feedback import feedback_manager
 from angela.context import context_manager
+from angela.generation.refiner import interactive_refiner
+from angela.generation.context_manager import generation_context_manager
+
 
 app = typer.Typer(help="Code generation commands")
 console = Console()
@@ -610,6 +616,562 @@ def generate_ci(
     except Exception as e:
         logger.exception("Error generating CI/CD configuration")
         console.print(f"[bold red]Error generating CI/CD configuration:[/bold red] {str(e)}")
+
+
+
+
+@app.command("create-complex-project")
+def create_complex_project(
+    description: str = typer.Argument(..., help="Description of the project to generate"),
+    output_dir: str = typer.Option(".", help="Directory where the project should be generated"),
+    project_type: Optional[str] = typer.Option(None, help="Project type (python, node, etc.)"),
+    framework: Optional[str] = typer.Option(None, help="Framework to use (django, react, etc.)"),
+    detailed_planning: bool = typer.Option(True, help="Use detailed architecture planning"),
+    git_init: bool = typer.Option(True, help="Initialize Git repository"),
+    install_deps: bool = typer.Option(False, help="Install dependencies"),
+    generate_tests: bool = typer.Option(False, help="Generate test files"),
+    ci_platform: Optional[str] = typer.Option(None, help="Generate CI configuration (github, gitlab, etc.)"),
+    dry_run: bool = typer.Option(False, help="Preview without creating files")
+):
+    """
+    Generate a complex multi-file project with detailed architecture planning.
+    """
+    console.print(Panel(
+        f"[bold green]Generating complex project from description:[/bold green]\n{description}",
+        title="Complex Project Generation",
+        expand=False
+    ))
+    
+    try:
+        # Get current context
+        context = context_manager.get_context_dict()
+        
+        # Generate complex project
+        with console.status("[bold green]Generating project plan and architecture...[/bold green]"):
+            project_plan = asyncio.run(code_generation_engine.generate_complex_project(
+                description=description,
+                output_dir=output_dir,
+                project_type=project_type,
+                framework=framework,
+                use_detailed_planning=detailed_planning,
+                context=context
+            ))
+        
+        # Display project plan
+        console.print("\n[bold blue]Project Plan:[/bold blue]")
+        console.print(f"Name: [bold]{project_plan.name}[/bold]")
+        console.print(f"Type: [bold]{project_plan.project_type}[/bold]")
+        console.print(f"Files: [bold]{len(project_plan.files)}[/bold]")
+        
+        # Generate architecture visualization if available
+        architecture = generation_context_manager.get_global_context("architecture")
+        if architecture:
+            console.print("\n[bold blue]Architecture Overview:[/bold blue]")
+            console.print(f"Structure: [bold]{architecture.get('structure_type', 'layered')}[/bold]")
+            console.print(f"Components: [bold]{len(architecture.get('components', []))}[/bold]")
+            console.print(f"Layers: [bold]{', '.join(architecture.get('layers', []))}[/bold]")
+            
+            # Show design patterns
+            if architecture.get("patterns"):
+                console.print(f"Design Patterns: [bold]{', '.join(architecture.get('patterns', []))}[/bold]")
+        
+        # Show the list of files grouped by component/directory
+        grouped_files = group_files_by_directory(project_plan.files)
+        
+        for group, files in grouped_files.items():
+            table = Table(title=f"Files in {group}")
+            table.add_column("Path", style="cyan")
+            table.add_column("Purpose", style="green")
+            
+            for file in files:
+                table.add_row(file.path, file.purpose)
+            
+            console.print(table)
+        
+        # Interactive refinement phase
+        if not dry_run and Confirm.ask("\nWould you like to refine any aspect of the project before creation?"):
+            feedback = Prompt.ask("\nPlease describe what you'd like to refine")
+            
+            with console.status("[bold green]Refining project based on feedback...[/bold green]"):
+                refined_project, refinement_results = asyncio.run(interactive_refiner.process_refinement_feedback(
+                    feedback=feedback,
+                    project=project_plan
+                ))
+                
+                # Update project plan with refinements
+                project_plan = refined_project
+            
+            # Show refinement summary
+            summary = asyncio.run(interactive_refiner.summarize_refinements(refinement_results))
+            
+            console.print(f"\n[green]Refined {summary['files_modified']} files based on feedback[/green]")
+            
+            if summary["file_summaries"]:
+                for file_summary in summary["file_summaries"]:
+                    console.print(f"- [cyan]{file_summary['file_path']}[/cyan]: {file_summary['lines_added']} lines added, {file_summary['lines_deleted']} lines removed")
+        
+        # Create the files if not dry run
+        if not dry_run:
+            console.print("\n[bold]Creating project files...[/bold]")
+            
+            with console.status("[bold green]Creating files...[/bold green]"):
+                result = asyncio.run(code_generation_engine.create_project_files(project_plan))
+            
+            console.print(f"[green]Created {result['file_count']} files[/green]")
+            
+            # Initialize Git repository if requested
+            if git_init:
+                console.print("\n[bold]Initializing Git repository...[/bold]")
+                
+                with console.status("[bold green]Initializing Git...[/bold green]"):
+                    git_result = asyncio.run(git_integration.init_repository(
+                        path=output_dir,
+                        initial_branch="main",
+                        gitignore_template=project_plan.project_type
+                    ))
+                
+                if git_result["success"]:
+                    console.print("[green]Git repository initialized successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to initialize Git repository: {git_result.get('error', 'Unknown error')}[/yellow]")
+            
+            # Install dependencies if requested
+            if install_deps:
+                console.print("\n[bold]Installing dependencies...[/bold]")
+                
+                with console.status("[bold green]Installing dependencies...[/bold green]"):
+                    deps_result = asyncio.run(package_manager_integration.install_dependencies(
+                        path=output_dir,
+                        dependencies=project_plan.dependencies.get("runtime", []),
+                        dev_dependencies=project_plan.dependencies.get("development", []),
+                        project_type=project_plan.project_type
+                    ))
+                
+                if deps_result["success"]:
+                    console.print("[green]Dependencies installed successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to install dependencies: {deps_result.get('error', 'Unknown error')}[/yellow]")
+            
+            # Generate test files if requested
+            if generate_tests:
+                console.print("\n[bold]Generating test files...[/bold]")
+                
+                with console.status("[bold green]Generating tests...[/bold green]"):
+                    test_result = asyncio.run(test_framework_integration.generate_test_files(
+                        src_files=project_plan.files,
+                        project_type=project_plan.project_type,
+                        root_dir=output_dir
+                    ))
+                
+                if test_result["success"]:
+                    console.print(f"[green]Generated {test_result['file_count']} test files[/green]")
+                else:
+                    console.print(f"[yellow]Failed to generate test files: {test_result.get('error', 'Unknown error')}[/yellow]")
+            
+            # Generate CI/CD configuration if requested
+            if ci_platform:
+                console.print("\n[bold]Generating CI/CD configuration...[/bold]")
+                
+                with console.status(f"[bold green]Generating {ci_platform} configuration...[/bold green]"):
+                    ci_result = asyncio.run(ci_cd_integration.generate_ci_configuration(
+                        path=output_dir,
+                        platform=ci_platform,
+                        project_type=project_plan.project_type
+                    ))
+                
+                if ci_result["success"]:
+                    console.print(f"[green]Generated {ci_platform} configuration successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to generate CI/CD configuration: {ci_result.get('error', 'Unknown error')}[/yellow]")
+            
+            # Create initial commit if Git was initialized
+            if git_init:
+                console.print("\n[bold]Creating initial commit...[/bold]")
+                
+                with console.status("[bold green]Creating commit...[/bold green]"):
+                    commit_result = asyncio.run(git_integration.commit_changes(
+                        path=output_dir,
+                        message="Initial project generation",
+                        auto_stage=True
+                    ))
+                
+                if commit_result["success"]:
+                    console.print("[green]Created initial commit successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to create initial commit: {commit_result.get('error', 'Unknown error')}[/yellow]")
+            
+            console.print(f"\n[bold green]Project generated successfully in: {output_dir}[/bold green]")
+        else:
+            console.print("\n[bold yellow]Dry run - no files were created[/bold yellow]")
+    
+    except Exception as e:
+        logger.exception("Error generating complex project")
+        console.print(f"[bold red]Error generating complex project:[/bold red] {str(e)}")
+
+@app.command("create-framework-project")
+def create_framework_project(
+    framework: str = typer.Argument(..., help="Framework to generate (e.g., react, django)"),
+    description: str = typer.Argument(..., help="Description of the project to generate"),
+    output_dir: str = typer.Option(".", help="Directory where the project should be generated"),
+    variant: Optional[str] = typer.Option(None, help="Framework variant (e.g., nextjs for React)"),
+    typescript: Optional[bool] = typer.Option(None, help="Use TypeScript (for JS frameworks)"),
+    with_auth: Optional[bool] = typer.Option(None, help="Include authentication"),
+    enhanced: bool = typer.Option(True, help="Use enhanced project structure"),
+    install_deps: bool = typer.Option(False, help="Install dependencies"),
+    git_init: bool = typer.Option(True, help="Initialize Git repository"),
+    dry_run: bool = typer.Option(False, help="Preview without creating files")
+):
+    """
+    Generate a project for a specific framework with best practices.
+    """
+    console.print(Panel(
+        f"[bold green]Generating {framework} project:[/bold green]\n{description}",
+        title="Framework Project Generation",
+        expand=False
+    ))
+    
+    try:
+        # Get current context
+        context = context_manager.get_context_dict()
+        
+        # Prepare options
+        options = {
+            "variant": variant,
+            "typescript": typescript,
+            "authentication": with_auth
+        }
+        
+        # Remove None values
+        options = {k: v for k, v in options.items() if v is not None}
+        
+        # Generate framework project
+        from angela.generation.frameworks import framework_generator
+        
+        with console.status(f"[bold green]Generating {framework} project...[/bold green]"):
+            if enhanced:
+                result = asyncio.run(framework_generator.generate_standard_project_structure(
+                    framework=framework,
+                    description=description,
+                    output_dir=output_dir,
+                    options=options
+                ))
+            else:
+                result = asyncio.run(framework_generator.generate_framework_structure(
+                    framework=framework,
+                    description=description,
+                    output_dir=output_dir,
+                    options=options
+                ))
+        
+        if not result["success"]:
+            console.print(f"[bold red]Error generating {framework} project:[/bold red] {result.get('error', 'Unknown error')}")
+            return
+        
+        # Display result information
+        console.print("\n[bold blue]Framework Project:[/bold blue]")
+        console.print(f"Framework: [bold]{result['framework']}[/bold]")
+        
+        if result.get("variant"):
+            console.print(f"Variant: [bold]{result['variant']}[/bold]")
+            
+        console.print(f"Files: [bold]{len(result['files'])}[/bold]")
+        
+        # Group files by directory
+        grouped_files = {}
+        for file in result["files"]:
+            directory = Path(file.path).parent.as_posix()
+            if directory == ".":
+                directory = "Root"
+                
+            if directory not in grouped_files:
+                grouped_files[directory] = []
+                
+            grouped_files[directory].append(file)
+        
+        # Display files by directory
+        for directory, files in grouped_files.items():
+            table = Table(title=f"Files in {directory}")
+            table.add_column("Path", style="cyan")
+            table.add_column("Purpose", style="green")
+            
+            for file in files:
+                table.add_row(file.path, file.purpose)
+            
+            console.print(table)
+        
+        # Create project if not dry run
+        if not dry_run:
+            # Create CodeProject object
+            from angela.generation.engine import CodeProject
+            
+            project = CodeProject(
+                name=f"{framework}_project",
+                description=description,
+                root_dir=output_dir,
+                files=result["files"],
+                dependencies={"runtime": [], "development": []},
+                project_type=result["project_type"],
+                structure_explanation=f"Standard {framework} project structure"
+            )
+            
+            # Create files
+            console.print("\n[bold]Creating project files...[/bold]")
+            
+            with console.status("[bold green]Creating files...[/bold green]"):
+                creation_result = asyncio.run(code_generation_engine.create_project_files(project))
+            
+            console.print(f"[green]Created {creation_result['file_count']} files[/green]")
+            
+            # Initialize Git repository if requested
+            if git_init:
+                console.print("\n[bold]Initializing Git repository...[/bold]")
+                
+                with console.status("[bold green]Initializing Git...[/bold green]"):
+                    git_result = asyncio.run(git_integration.init_repository(
+                        path=output_dir,
+                        initial_branch="main",
+                        gitignore_template=result["project_type"]
+                    ))
+                
+                if git_result["success"]:
+                    console.print("[green]Git repository initialized successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to initialize Git repository: {git_result.get('error', 'Unknown error')}[/yellow]")
+            
+            # Install dependencies if requested
+            if install_deps:
+                console.print("\n[bold]Installing dependencies...[/bold]")
+                
+                with console.status("[bold green]Installing dependencies...[/bold green]"):
+                    # Use package manager based on framework
+                    project_type = result["project_type"]
+                    
+                    deps_result = asyncio.run(package_manager_integration.install_dependencies(
+                        path=output_dir,
+                        project_type=project_type
+                    ))
+                
+                if deps_result["success"]:
+                    console.print("[green]Dependencies installed successfully[/green]")
+                else:
+                    console.print(f"[yellow]Failed to install dependencies: {deps_result.get('error', 'Unknown error')}[/yellow]")
+            
+            console.print(f"\n[bold green]Framework project generated successfully in: {output_dir}[/bold green]")
+        else:
+            console.print("\n[bold yellow]Dry run - no files were created[/bold yellow]")
+    
+    except Exception as e:
+        logger.exception(f"Error generating {framework} project")
+        console.print(f"[bold red]Error generating {framework} project:[/bold red] {str(e)}")
+
+@app.command("refine-generated-project")
+def refine_generated_project(
+    project_dir: str = typer.Argument(..., help="Directory of the generated project"),
+    feedback: str = typer.Argument(..., help="Feedback for project improvement"),
+    focus: Optional[List[str]] = typer.Option(None, help="Files to focus on (glob patterns supported)"),
+    apply: bool = typer.Option(True, help="Apply the changes"),
+    backup: bool = typer.Option(True, help="Create backup before applying changes")
+):
+    """
+    Refine a generated project based on natural language feedback.
+    """
+    console.print(Panel(
+        f"[bold green]Refining project based on feedback:[/bold green]\n{feedback}",
+        title="Project Refinement",
+        expand=False
+    ))
+    
+    try:
+        # Get current context
+        context = context_manager.get_context_dict()
+        
+        # Check if project directory exists
+        project_path = Path(project_dir)
+        if not project_path.exists() or not project_path.is_dir():
+            console.print(f"[bold red]Project directory does not exist: {project_dir}[/bold red]")
+            return
+        
+        # Load project files
+        with console.status("[bold green]Loading project files...[/bold green]"):
+            project_files = []
+            
+            for root, _, files in os.walk(project_path):
+                for file in files:
+                    # Skip common non-source directories
+                    if any(excluded in root for excluded in ['.git', 'node_modules', '__pycache__', '.venv']):
+                        continue
+                    
+                    file_path = Path(root) / file
+                    rel_path = file_path.relative_to(project_path)
+                    
+                    # Skip binary files
+                    if any(file.endswith(ext) for ext in ['.jpg', '.png', '.gif', '.pdf', '.zip', '.pyc']):
+                        continue
+                    
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                            content = f.read()
+                        
+                        # Get file info
+                        file_type = detect_file_type(file_path)
+                        
+                        project_files.append(CodeFile(
+                            path=str(rel_path),
+                            content=content,
+                            purpose="",  # We don't know the purpose
+                            dependencies=[],
+                            language=file_type.get("language")
+                        ))
+                    except Exception as e:
+                        console.print(f"[yellow]Error reading file {file_path}: {str(e)}[/yellow]")
+        
+        console.print(f"[green]Loaded {len(project_files)} project files[/green]")
+        
+        # Create a project object
+        from angela.generation.engine import CodeProject
+        
+        project = CodeProject(
+            name=project_path.name,
+            description="",  # We don't know the description
+            root_dir=str(project_path),
+            files=project_files,
+            dependencies={"runtime": [], "development": []},
+            project_type="unknown",  # We'll try to infer this
+            structure_explanation=""
+        )
+        
+        # Try to infer project type
+        with console.status("[bold green]Analyzing project...[/bold green]"):
+            # Try to detect project type
+            from angela.toolchain.ci_cd import ci_cd_integration
+            detection_result = asyncio.run(ci_cd_integration.detect_project_type(project_dir))
+            
+            if detection_result["project_type"]:
+                project.project_type = detection_result["project_type"]
+                console.print(f"[green]Detected project type: {project.project_type}[/green]")
+            
+            # Analyze code relationships
+            analysis_result = await generation_context_manager.analyze_code_relationships(project.files)
+            
+            console.print(f"[green]Analyzed {analysis_result.get('entity_count', 0)} entities and {analysis_result.get('dependency_count', 0)} dependencies[/green]")
+            
+            # Detect architecture patterns
+            if analysis_result.get("architecture_patterns"):
+                console.print(f"[green]Detected architecture patterns: {', '.join(analysis_result.get('architecture_patterns', []))}[/green]")
+        
+        # Process feedback
+        console.print("\n[bold]Processing feedback...[/bold]")
+        
+        with console.status("[bold green]Generating improvements based on feedback...[/bold green]"):
+            refined_project, refinement_results = asyncio.run(interactive_refiner.process_refinement_feedback(
+                feedback=feedback,
+                project=project,
+                focus_files=focus
+            ))
+        
+        # Display results
+        console.print(f"\n[bold blue]Files analyzed: {len(refinement_results['results'])}[/bold blue]")
+        
+        # Create a table to show the changes
+        table = Table(title="Refinement Results")
+        table.add_column("File", style="cyan")
+        table.add_column("Status", style="green")
+        table.add_column("Changes", style="yellow")
+        
+        for file_result in refinement_results["results"]:
+            file_path = file_result["file_path"]
+            
+            if "error" in file_result:
+                status = "[red]Error[/red]"
+                changes = file_result["error"]
+            elif not file_result.get("has_changes", False):
+                status = "[blue]No changes[/blue]"
+                changes = "No changes needed"
+            else:
+                status = "[green]Changes pending[/green]"
+                diff_lines = file_result["diff"].splitlines()
+                additions = sum(1 for line in diff_lines if line.startswith('+') and not line.startswith('+++'))
+                deletions = sum(1 for line in diff_lines if line.startswith('-') and not line.startswith('---'))
+                changes = f"+{additions} -{deletions}"
+            
+            table.add_row(file_path, status, changes)
+        
+        console.print(table)
+        
+        # Show details for files with changes
+        changed_files = [r for r in refinement_results["results"] if r.get("has_changes", False)]
+        if changed_files:
+            console.print(f"\n[bold blue]Files with changes ({len(changed_files)}):[/bold blue]")
+            
+            for file_result in changed_files:
+                console.print(f"\n[bold cyan]File: {file_result['file_path']}[/bold cyan]")
+                
+                # Display diff
+                syntax = Syntax(
+                    file_result["diff"],
+                    "diff",
+                    theme="monokai",
+                    line_numbers=True,
+                    word_wrap=True
+                )
+                console.print(syntax)
+                
+                # Display explanation
+                if "explanation" in file_result:
+                    explanation_md = Markdown(file_result["explanation"])
+                    console.print(explanation_md)
+        
+        # Apply changes if requested
+        if apply:
+            console.print("\n[bold]Applying changes...[/bold]")
+            
+            with console.status("[bold green]Applying changes...[/bold green]"):
+                apply_result = asyncio.run(feedback_manager.apply_refinements(
+                    refinements=refinement_results,
+                    backup=backup
+                ))
+            
+            if apply_result["files_changed"] > 0:
+                console.print(f"[green]Changes applied to {apply_result['files_changed']} files[/green]")
+                if backup:
+                    console.print("[blue]Backups created for modified files[/blue]")
+            else:
+                console.print("[yellow]No changes were applied[/yellow]")
+        else:
+            console.print("\n[bold yellow]Changes were not applied. Use --apply to apply changes.[/bold yellow]")
+    
+    except Exception as e:
+        logger.exception("Error refining project")
+        console.print(f"[bold red]Error refining project:[/bold red] {str(e)}")
+
+def group_files_by_directory(files: List[CodeFile]) -> Dict[str, List[CodeFile]]:
+    """
+    Group files by their directory.
+    
+    Args:
+        files: List of CodeFile objects
+        
+    Returns:
+        Dictionary mapping directory names to lists of files
+    """
+    grouped = {}
+    
+    for file in files:
+        directory = Path(file.path).parent.as_posix()
+        if directory == ".":
+            directory = "Root"
+            
+        if directory not in grouped:
+            grouped[directory] = []
+            
+        grouped[directory].append(file)
+    
+    return grouped
+
+
+
+
+
 
 @app.command("generate-tests")
 def generate_tests(

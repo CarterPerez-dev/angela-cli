@@ -113,7 +113,29 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 # Current Project Tree/Structure
 ```bash
 .
-
+.
+├── MD
+│   ├── ImplemenationsMD
+│   │   ├── Phase_5_implementation.md
+│   │   ├── Phase_6_implementation.md
+│   │   ├── planner_implementation.md
+│   │   ├── rollback_implementation.md
+│   │   └── shell_enhancement.md
+│   ├── MDHelpers
+│   │   ├── Files.md
+│   │   ├── Info.md
+│   │   ├── context.md
+│   │   └── tree.md
+│   ├── Next-Steps.md
+│   └── PhasesMD
+│       ├── Phase1.md
+│       ├── Phase2.md
+│       ├── Phase3.md
+│       ├── Phase4.md
+│       ├── Phase5.md
+│       ├── Phase6.md
+│       └── Phase7.md
+├── Makefile
 ├── README.md
 ├── angela
 │   ├── __init__.py
@@ -125,12 +147,15 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   │   ├── confidence.py
 │   │   ├── content_analyzer.py
 │   │   ├── content_analyzer_extensions.py
+│   │   ├── enhanced_prompts.py
 │   │   ├── file_integration.py
 │   │   ├── intent_analyzer.py
 │   │   ├── parser.py
-│   │   └── prompts.py
+│   │   ├── prompts.py
+│   │   └── semantic_analyzer.py
 │   ├── cli
 │   │   ├── __init__.py
+│   │   ├── docker.py
 │   │   ├── files.py
 │   │   ├── files_extensions.py
 │   │   ├── generation.py
@@ -140,6 +165,7 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   ├── constants.py
 │   ├── context
 │   │   ├── __init__.py
+│   │   ├── enhanced_file_activity.py
 │   │   ├── enhancer.py
 │   │   ├── file_activity.py
 │   │   ├── file_detector.py
@@ -148,6 +174,8 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   │   ├── manager.py
 │   │   ├── preferences.py
 │   │   ├── project_inference.py
+│   │   ├── project_state_analyzer.py
+│   │   ├── semantic_context_manager.py
 │   │   └── session.py
 │   ├── core
 │   │   ├── __init__.py
@@ -172,12 +200,14 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   │   └── validators.py
 │   ├── integrations
 │   │   ├── __init__.py
-│   │   └── enhanced_planner_integration.py
+│   │   ├── enhanced_planner_integration.py
+│   │   └── semantic_integration.py
 │   ├── intent
 │   │   ├── __init__.py
 │   │   ├── enhanced_task_planner.py
 │   │   ├── models.py
-│   │   └── planner.py
+│   │   ├── planner.py
+│   │   └── semantic_task_planner.py
 │   ├── interfaces
 │   │   ├── __init__.py
 │   │   ├── execution.py
@@ -213,6 +243,7 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   ├── toolchain
 │   │   ├── __init__.py
 │   │   ├── ci_cd.py
+│   │   ├── docker.py
 │   │   ├── git.py
 │   │   └── package_managers.py
 │   ├── utils
@@ -230,4 +261,5 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+
 ```

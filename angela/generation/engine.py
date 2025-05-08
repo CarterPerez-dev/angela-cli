@@ -11,9 +11,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union, Set
 import json
 import re
-
+import time
 from pydantic import BaseModel, Field
 
+from angela.generation.context_manager import generation_context_manager
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.context import context_manager
 from angela.context.enhancer import context_enhancer
@@ -1501,6 +1502,687 @@ async def _apply_feature_changes(
             result["success"] = False
     
     return result
+
+
+    async def generate_complex_project(
+        self, 
+        description: str, 
+        output_dir: Optional[str] = None,
+        project_type: Optional[str] = None,
+        framework: Optional[str] = None,
+        use_detailed_planning: bool = True,
+        context: Optional[Dict[str, Any]] = None
+    ) -> CodeProject:
+        """
+        Generate a complex multi-file project with enhanced architecture planning.
+        
+        Args:
+            description: Natural language description of the project
+            output_dir: Directory where the project should be generated (defaults to cwd)
+            project_type: Optional type of project to generate (auto-detected if None)
+            framework: Optional framework to use (e.g., 'react', 'django')
+            use_detailed_planning: Whether to use detailed architecture planning
+            context: Additional context information
+            
+        Returns:
+            CodeProject object representing the generated project
+        """
+        self._logger.info(f"Generating complex project from description: {description}")
+        
+        start_time = time.time()
+        
+        # Get current context if not provided
+        if context is None:
+            context = context_manager.get_context_dict()
+            context = await context_enhancer.enrich_context(context)
+        
+        # Determine output directory
+        if output_dir is None:
+            output_dir = context.get("cwd", os.getcwd())
+        
+        # Determine project type if not specified
+        if project_type is None:
+            project_type = await self._infer_project_type(description, context)
+            self._logger.debug(f"Inferred project type: {project_type}")
+        
+        # Get project name from description
+        project_name = await self._extract_project_name(description, project_type)
+        self._logger.debug(f"Project name: {project_name}")
+        
+        # Determine framework if not specified
+        if framework is None and project_type in ["python", "node", "java"]:
+            framework = await self._infer_framework(description, project_type)
+            self._logger.debug(f"Inferred framework: {framework}")
+        
+        # Import project planner here to avoid circular imports
+        from angela.generation.planner import project_planner
+        
+        # Create a detailed architecture if requested
+        if use_detailed_planning:
+            # Generate a detailed architecture
+            architecture = await project_planner.create_detailed_project_architecture(
+                description=description,
+                project_type=project_type,
+                framework=framework,
+                context=context
+            )
+            
+            self._logger.info(f"Created detailed architecture with {len(architecture.components)} components")
+            
+            # Generate dependency graph for visualization
+            dependency_graph = await project_planner.generate_dependency_graph(architecture)
+            
+            # Create project plan from architecture
+            project_plan = await project_planner.create_project_plan_from_architecture(
+                architecture=architecture,
+                project_name=project_name,
+                project_type=project_type,
+                description=description,
+                framework=framework,
+                context=context
+            )
+        else:
+            # Use the standard project planning approach
+            project_plan = await self._create_project_plan(
+                description=description,
+                output_dir=output_dir,
+                project_type=project_type,
+                context=context
+            )
+        
+        self._logger.info(f"Created project plan with {len(project_plan.files)} files")
+        
+        # Analyze project structure to understand relationships between files
+        analysis_result = await generation_context_manager.analyze_code_relationships(project_plan.files)
+        self._logger.debug(f"Code relationship analysis complete: {analysis_result}")
+        
+        # Generate file contents with enhanced context
+        project_plan = await self._generate_complex_file_contents(project_plan, context)
+        
+        # Log generation time
+        elapsed_time = time.time() - start_time
+        self._logger.info(f"Project generation completed in {elapsed_time:.2f} seconds")
+        
+        return project_plan
+    
+    async def _extract_project_name(self, description: str, project_type: str) -> str:
+        """
+        Extract a project name from the description.
+        
+        Args:
+            description: Project description
+            project_type: Type of project
+            
+        Returns:
+            Project name
+        """
+        # Build prompt for project name extraction
+        prompt = f"""
+Extract a concise, appropriate project name from this description for a {project_type} project:
+
+"{description}"
+
+Return ONLY the project name as a single phrase, nothing else.
+The name should be concise, memorable, and related to the project's purpose.
+"""
+        
+        # Call AI service
+        api_request = GeminiRequest(
+            prompt=prompt,
+            max_tokens=20,  # Very small limit since we only need the name
+            temperature=0.2
+        )
+        
+        response = await gemini_client.generate_text(api_request)
+        
+        # Clean up the response
+        name = response.text.strip().strip('"\'').strip()
+        
+        # If the name is too long, truncate it
+        if len(name) > 50:
+            name = name[:50]
+        
+        # Replace spaces with underscores and remove special characters
+        name = re.sub(r'[^a-zA-Z0-9 _-]', '', name)
+        
+        # If extraction failed, use a default name
+        if not name:
+            name = f"new_{project_type}_project"
+        
+        return name
+    
+    async def _infer_framework(self, description: str, project_type: str) -> Optional[str]:
+        """
+        Infer the framework from the description.
+        
+        Args:
+            description: Project description
+            project_type: Type of project
+            
+        Returns:
+            Framework name or None
+        """
+        # Build prompt for framework inference
+        prompt = f"""
+Determine the most appropriate framework for this {project_type} project:
+
+"{description}"
+
+Consider only the most popular, mainstream frameworks for {project_type}.
+For Python, consider: Django, Flask, FastAPI
+For Node.js, consider: Express, React, Vue, Angular, Next.js
+For Java, consider: Spring Boot, Jakarta EE, Quarkus
+
+Return ONLY the framework name, nothing else.
+If no specific framework is clearly indicated, return "None".
+"""
+        
+        # Call AI service
+        api_request = GeminiRequest(
+            prompt=prompt,
+            max_tokens=20,  # Very small limit since we only need the framework name
+            temperature=0.2
+        )
+        
+        response = await gemini_client.generate_text(api_request)
+        
+        # Clean up the response
+        framework = response.text.strip().strip('"\'').strip()
+        
+        # Check if a framework was identified
+        if framework.lower() in ["none", "no framework", "unknown"]:
+            return None
+        
+        return framework
+    
+    async def _generate_complex_file_contents(
+        self, 
+        project: CodeProject,
+        context: Dict[str, Any]
+    ) -> CodeProject:
+        """
+        Generate content for each file in the project with enhanced context awareness.
+        
+        Args:
+            project: CodeProject with file information
+            context: Additional context information
+            
+        Returns:
+            Updated CodeProject with file contents
+        """
+        self._logger.info(f"Generating content for {len(project.files)} files with enhanced context")
+        
+        # Process files in dependency order
+        dependency_graph = self._build_dependency_graph(project.files)
+        
+        # Prepare batches of files to generate
+        batches = self._create_file_batches(project.files, dependency_graph)
+        
+        # Generate content for each batch
+        for batch_idx, batch in enumerate(batches):
+            self._logger.debug(f"Processing batch {batch_idx+1}/{len(batches)} with {len(batch)} files")
+            
+            # Generate content for each file in the batch concurrently
+            tasks = []
+            for file in batch:
+                # Get files that this file depends on
+                dependencies = self._get_dependency_files(file, project.files, dependency_graph)
+                
+                task = self._generate_complex_file_content(
+                    file, 
+                    project, 
+                    dependencies,
+                    context
+                )
+                tasks.append(task)
+            
+            # Wait for all tasks in this batch to complete
+            results = await asyncio.gather(*tasks)
+            
+            # Update file contents
+            for file, content in zip(batch, results):
+                file.content = content
+                
+                # Register file in generation context manager
+                await generation_context_manager.extract_entities_from_file(file)
+        
+        return project
+    
+    def _get_dependency_files(
+        self, 
+        file: CodeFile, 
+        all_files: List[CodeFile],
+        dependency_graph: Dict[str, Set[str]]
+    ) -> List[CodeFile]:
+        """
+        Get the files that this file depends on.
+        
+        Args:
+            file: The file to get dependencies for
+            all_files: All files in the project
+            dependency_graph: Dependency graph
+            
+        Returns:
+            List of dependency files
+        """
+        # Get dependency paths
+        dep_paths = dependency_graph.get(file.path, set())
+        
+        # Find the corresponding files
+        return [f for f in all_files if f.path in dep_paths]
+    
+    async def _generate_complex_file_content(
+        self, 
+        file: CodeFile, 
+        project: CodeProject,
+        dependencies: List[CodeFile],
+        context: Dict[str, Any]
+    ) -> str:
+        """
+        Generate content for a single file with enhanced context.
+        
+        Args:
+            file: CodeFile to generate content for
+            project: Parent CodeProject
+            dependencies: Files this file depends on
+            context: Additional context information
+            
+        Returns:
+            Generated file content
+        """
+        self._logger.debug(f"Generating content for file: {file.path}")
+        
+        # Build prompt for file content generation
+        prompt = self._build_complex_file_content_prompt(file, project, dependencies)
+        
+        # Enhance prompt with generation context
+        related_files = [dep.path for dep in dependencies]
+        enhanced_prompt = await generation_context_manager.enhance_prompt_with_context(
+            prompt=prompt,
+            file_path=file.path,
+            related_files=related_files
+        )
+        
+        # Set reasonable token limits based on file complexity
+        max_tokens = self._determine_max_tokens_for_file(file)
+        
+        # Call AI service to generate file content
+        api_request = GeminiRequest(
+            prompt=enhanced_prompt,
+            max_tokens=max_tokens,
+            temperature=0.2
+        )
+        
+        response = await gemini_client.generate_text(api_request)
+        
+        # Extract code from the response
+        content = self._extract_code_from_response(response.text, file.path)
+        
+        # Validate the generated code
+        is_valid, validation_message = validate_code(content, file.path)
+        
+        # If validation failed, try once more with the error message
+        if not is_valid:
+            self._logger.warning(f"Validation failed for {file.path}: {validation_message}")
+            
+            # Build a new prompt with the validation error
+            fix_prompt = f"""
+The code you generated has an issue that needs to be fixed:
+{validation_message}
+
+Here is the original code:
+{content}
+
+Please provide the corrected code for file '{file.path}'.
+Only respond with the corrected code, nothing else.
+"""
+            # Call AI service to fix the code
+            fix_request = GeminiRequest(
+                prompt=fix_prompt,
+                max_tokens=max_tokens,
+                temperature=0.1
+            )
+            
+            fix_response = await gemini_client.generate_text(fix_request)
+            
+            # Extract fixed code
+            fixed_content = self._extract_code_from_response(fix_response.text, file.path)
+            
+            # Validate again
+            is_valid, _ = validate_code(fixed_content, file.path)
+            if is_valid:
+                content = fixed_content
+        
+        return content
+    
+    def _build_complex_file_content_prompt(
+        self, 
+        file: CodeFile, 
+        project: CodeProject,
+        dependencies: List[CodeFile]
+    ) -> str:
+        """
+        Build a prompt for generating file content with enhanced context.
+        
+        Args:
+            file: CodeFile to generate content for
+            project: Parent CodeProject
+            dependencies: Files this file depends on
+            
+        Returns:
+            Prompt string for the AI service
+        """
+        # Get file extension and determine language
+        ext = Path(file.path).suffix.lower()
+        language = file.language or self._get_language_from_extension(ext)
+        
+        # Determine the file's role in the project
+        file_role = self._determine_file_role(file, project)
+        
+        # Project structure details
+        structure_details = f"Project follows {project.structure_explanation}" if project.structure_explanation else ""
+        
+        # List dependencies with their purposes
+        dependencies_context = ""
+        if dependencies:
+            dependencies_context = "This file depends on:\n"
+            for dep in dependencies:
+                dependencies_context += f"- {dep.path}: {dep.purpose}\n"
+                
+                # Include top sections of dependency content if available
+                if dep.content:
+                    # Show first 20 non-empty lines or 500 chars, whichever is less
+                    preview_lines = [line for line in dep.content.split('\n') if line.strip()][:20]
+                    preview = '\n'.join(preview_lines)
+                    if len(preview) > 500:
+                        preview = preview[:500] + "...(truncated)"
+                    
+                    dependencies_context += f"  Content preview:\n```\n{preview}\n```\n"
+        
+        prompt = f"""
+You are an expert software developer working on a {project.project_type} project named "{project.name}".
+
+PROJECT DESCRIPTION:
+{project.description}
+
+FILE DETAILS:
+Path: {file.path}
+Purpose: {file.purpose}
+Language: {language}
+Role: {file_role}
+
+PROJECT STRUCTURE:
+{structure_details}
+
+{dependencies_context}
+
+Your task is to generate high-quality, production-ready code for this file that:
+1. Fulfills the stated purpose
+2. Integrates properly with dependencies
+3. Follows best practices and conventions for {language}
+4. Is well-structured and commented appropriately
+5. Includes proper error handling
+6. Is efficient and maintainable
+
+Generate ONLY the content for this file, nothing else.
+"""
+        
+        # Add language-specific guidance
+        if language == "python":
+            prompt += """
+Python-specific guidance:
+- Follow PEP 8 style guidelines
+- Use proper type hints
+- Include docstrings for classes and functions
+- Use proper exception handling
+- Avoid circular imports
+"""
+        elif language in ["javascript", "typescript"]:
+            prompt += """
+JavaScript/TypeScript guidance:
+- Use modern ES6+ syntax
+- Handle async operations properly with async/await
+- Use proper error handling
+- Include JSDoc comments for functions
+- Use consistent naming conventions
+"""
+        elif language in ["java"]:
+            prompt += """
+Java guidance:
+- Follow standard Java conventions
+- Use proper exception handling
+- Include JavaDoc comments
+- Use appropriate access modifiers
+- Follow SOLID principles
+"""
+        
+        # Add role-specific guidance
+        if "model" in file_role.lower() or "entity" in file_role.lower():
+            prompt += """
+For data models/entities:
+- Define clear field types and validation
+- Include necessary relationships
+- Add appropriate methods for data access
+- Consider serialization needs
+- Include proper constraints and indexes if applicable
+"""
+        elif "controller" in file_role.lower() or "view" in file_role.lower():
+            prompt += """
+For controllers/views:
+- Focus on handling user input and presentation
+- Keep business logic separate
+- Include proper validation
+- Handle errors gracefully
+- Consider user experience
+"""
+        elif "service" in file_role.lower() or "util" in file_role.lower():
+            prompt += """
+For services/utilities:
+- Create reusable, focused components
+- Include comprehensive error handling
+- Ensure thread safety if applicable
+- Make functions pure when possible
+- Use dependency injection where appropriate
+"""
+        
+        return prompt
+    
+    def _determine_file_role(self, file: CodeFile, project: CodeProject) -> str:
+        """
+        Determine the role of a file in the project.
+        
+        Args:
+            file: The file to determine role for
+            project: The parent project
+            
+        Returns:
+            String describing the file's role
+        """
+        path = file.path.lower()
+        
+        # Check based on directory/path pattern
+        if "model" in path or "entity" in path or "schema" in path:
+            return "Data Model/Entity"
+        elif "controller" in path:
+            return "Controller"
+        elif "view" in path or "template" in path or "component" in path:
+            return "View/UI Component"
+        elif "service" in path:
+            return "Service"
+        elif "repository" in path or "dao" in path:
+            return "Data Access"
+        elif "util" in path or "helper" in path:
+            return "Utility"
+        elif "config" in path or "setting" in path:
+            return "Configuration"
+        elif "middleware" in path:
+            return "Middleware"
+        elif "test" in path:
+            return "Test"
+        elif "route" in path or "url" in path:
+            return "Routing"
+        elif "api" in path:
+            return "API Endpoint"
+        elif "__init__.py" in path:
+            return "Package Initialization"
+        elif any(path.endswith(ext) for ext in [".js", ".ts"]) and "index" in path:
+            return "Module Entry Point"
+        
+        # Check based on file purpose
+        purpose = file.purpose.lower()
+        if "model" in purpose or "entity" in purpose or "schema" in purpose:
+            return "Data Model/Entity"
+        elif "controller" in purpose:
+            return "Controller"
+        elif "view" in purpose or "template" in purpose or "component" in purpose or "ui" in purpose:
+            return "View/UI Component"
+        elif "service" in purpose:
+            return "Service"
+        elif "repository" in purpose or "dao" in purpose:
+            return "Data Access"
+        
+        # Default
+        return "General Component"
+    
+    def _determine_max_tokens_for_file(self, file: CodeFile) -> int:
+        """
+        Determine the maximum tokens to allocate for generating a file.
+        
+        Args:
+            file: The file to determine token limit for
+            
+        Returns:
+            Maximum token count
+        """
+        # Base token limit
+        base_limit = 4000
+        
+        # Adjust based on expected file complexity
+        path = file.path.lower()
+        
+        # Configuration files are typically smaller
+        if "config" in path or path.endswith((".json", ".yaml", ".yml", ".toml", ".ini")):
+            return base_limit // 2
+        
+        # Main application files often need more tokens
+        if "main" in path or "app" in path or "index" in path:
+            return base_limit * 2
+        
+        # Complex components like controllers, services might need more
+        if "controller" in path or "service" in path:
+            return int(base_limit * 1.5)
+        
+        # Test files may need more tokens to properly test functionality
+        if "test" in path:
+            return int(base_limit * 1.25)
+        
+        return base_limit
+    
+    def _get_language_from_extension(self, ext: str) -> str:
+        """
+        Get language from file extension.
+        
+        Args:
+            ext: File extension with dot
+            
+        Returns:
+            Language name
+        """
+        ext_map = {
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".jsx": "JavaScript (React)",
+            ".ts": "TypeScript",
+            ".tsx": "TypeScript (React)",
+            ".java": "Java",
+            ".html": "HTML",
+            ".css": "CSS",
+            ".scss": "SCSS",
+            ".json": "JSON",
+            ".xml": "XML",
+            ".yaml": ".yml": "YAML",
+            ".md": "Markdown",
+            ".sql": "SQL",
+            ".go": "Go",
+            ".rs": "Rust",
+            ".rb": "Ruby",
+            ".php": "PHP",
+            ".c": "C",
+            ".cpp": "C++",
+            ".h": "C/C++ Header",
+            ".cs": "C#",
+            ".swift": "Swift",
+            ".kt": "Kotlin",
+            ".vue": "Vue"
+        }
+        
+        return ext_map.get(ext, "Unknown")
+    
+    async def generate_file_summaries(self, project: CodeProject) -> Dict[str, str]:
+        """
+        Generate concise summaries for each file in the project.
+        
+        Args:
+            project: The CodeProject to summarize
+            
+        Returns:
+            Dictionary mapping file paths to summaries
+        """
+        self._logger.info(f"Generating summaries for {len(project.files)} files")
+        
+        summaries = {}
+        
+        # Process files in batches to avoid overwhelming the API
+        batch_size = 10
+        for i in range(0, len(project.files), batch_size):
+            batch = project.files[i:i+batch_size]
+            
+            # Generate summaries concurrently
+            tasks = [self._generate_file_summary(file) for file in batch]
+            batch_summaries = await asyncio.gather(*tasks)
+            
+            # Add to results
+            for file, summary in zip(batch, batch_summaries):
+                summaries[file.path] = summary
+        
+        return summaries
+    
+    async def _generate_file_summary(self, file: CodeFile) -> str:
+        """
+        Generate a concise summary for a file.
+        
+        Args:
+            file: The file to summarize
+            
+        Returns:
+            Summary string
+        """
+        # Skip if no content
+        if not file.content:
+            return "Empty file"
+        
+        # Build prompt
+        prompt = f"""
+Provide a concise 1-2 sentence summary of this {file.language if file.language else ''} file:
+{file.content[:4000] if len(file.content) > 4000 else file.content}
+
+{f"File content truncated due to length ({len(file.content)} chars)" if len(file.content) > 4000 else ""}
+
+Focus on what the file does rather than how it does it. Highlight its purpose, key functionality, and role in the system.
+Keep your response to 1-2 sentences maximum.
+"""
+        
+        # Call AI service
+        api_request = GeminiRequest(
+            prompt=prompt,
+            max_tokens=100,  # Very short summary
+            temperature=0.2
+        )
+        
+        response = await gemini_client.generate_text(api_request)
+        
+        # Return cleaned summary
+        return response.text.strip()
 
 
 async def _extract_dependencies_from_feature(

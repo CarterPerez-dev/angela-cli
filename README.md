@@ -63,6 +63,7 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
 3. Create code generation flow. it should be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
 # *********WHAT I WANT TO ACHEIVE (BRIEF OVERVIEW) - IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****
 **Phase 8: Seamless Shell Integration & Enhanced Interaction**
+
 *   **Goal:** Make Angela feel like an intrinsic part of the shell, blurring the lines between standard commands and AI interactions. Improve the core user experience for invoking and interacting with Angela.
 *   **Key Objectives:**
     *   **Advanced Shell Hooking:** Investigate and implement deeper shell integration beyond simple aliases. Explore options like:
@@ -88,9 +89,8 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
 *   **Goal:** Enable Angela to understand and interact with a wider range of essential developer tools beyond basic Git and package managers.
 *   **Key Objectives:**
     *   **Docker Integration:** Implement understanding and execution of common Docker commands (`build`, `run`, `ps`, `logs`, `stop`, `rm`). Allow requests like "Angela, show me the logs for the webserver container" or "Rebuild the backend Docker image". Requires specific command generation logic and potentially parsing Docker output.
-    *   **Cloud CLI Integration (Select Platforms):** Target one or two major cloud providers (e.g., AWS CLI, gcloud CLI). Implement understanding for common resource listing, status checks, and simple deployment commands (e.g., "List my S3 buckets", "What's the status of my EC2 instances?", "Deploy the app to App Engine"). This involves careful command generation and potentially parsing structured output (JSON/YAML).
-    *   **Database Interaction (Basic & Safe):** Configure safe, read-only interaction with common databases (e.g., PostgreSQL, MySQL). Allow requests like "Show the schema for the 'users' table" or "Count the number of records in the 'orders' table". Requires secure credential management and query generation/validation.
-    *   **Toolchain Module Enhancement:** Refactor and expand `angela/toolchain/` to include dedicated modules for Docker, Cloud CLIs, and Databases, abstracting the interaction logic.
+  
+    *   **Toolchain Module Enhancement:** Refactor and expand `angela/toolchain/` to include dedicated modules for Docker, abstracting the interaction logic.
 
 **Phase 11: Autonomous Multi-File Code Generation & Refinement**
 
@@ -111,6 +111,8 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
     *   **Automated CI/CD Pipeline Execution:** Integrate `toolchain/ci_cd.py` fully. Allow requests like "Set up a full CI/CD pipeline for this Node.js project on GitHub Actions, including build, test, lint, and deploy to staging". This involves generating complex configuration *and* potentially triggering initial pipeline runs or setup commands.
     *   **Self-Correction & Learning:** Implement mechanisms for Angela to learn from failed commands or workflows, potentially attempting self-correction or refining its understanding of specific tools based on error messages and successful outcomes.
     *   **Proactive Assistance V2:** Enhance `monitoring/background.py` to offer more complex suggestions based on combined context (e.g., "Your tests failed after the last commit, want me to try reverting and rerunning?", "Your cloud deployment seems to be unhealthy, want me to check the logs?").
+
+These 5 phases provide a structured approach to tackling the remaining challenges, moving from foundational UX improvements and deeper understanding towards complex actions and broad tool integration, culminating in the advanced orchestration required for the AGI-like vision.
 
 These 5 phases provide a structured approach to tackling the remaining challenges, moving from foundational UX improvements and deeper understanding towards complex actions and broad tool integration, culminating in the advanced orchestration required for the AGI-like vision.
 

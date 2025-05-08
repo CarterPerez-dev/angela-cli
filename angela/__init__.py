@@ -6,8 +6,8 @@ def init_application():
     from angela.safety import check_command_safety, validate_command_safety
     from angela.orchestrator import orchestrator
     from angela.toolchain.docker import docker_integration
-    
-    # Import enhanced planner integration
+    from angela.generation.context_manager import generation_context_manager
+    from angela.generation.refiner import interactive_refiner    
     from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
     
     # This import might be missing, let's check if it exists
@@ -27,7 +27,10 @@ def init_application():
     registry.register("orchestrator", orchestrator)
     registry.register("context_enhancer", context_enhancer)
     registry.register("docker_integration", docker_integration)
-
+    registry.register("generation_context_manager", generation_context_manager)
+    registry.register("interactive_refiner", interactive_refiner)
+    
+    
     # Apply integrations
     apply_enhanced_planner_integration()
     
