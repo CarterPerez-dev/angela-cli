@@ -8,7 +8,7 @@ import os
 import re
 import difflib
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Optional, Union
+from typing import Dict, Any, List, Tuple, Optional, Union, List
 
 from angela.review.diff_manager import diff_manager
 from angela.ai.client import gemini_client, GeminiRequest

@@ -9,13 +9,16 @@ import re
 from typing import Dict, Any, Optional, List, Tuple, Union
 from pathlib import Path
 from enum import Enum
+import uuid
+from rich.console import Console
+
 
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.ai.prompts import build_prompt
 from angela.ai.parser import parse_ai_response, CommandSuggestion
 from angela.ai.file_integration import extract_file_operation, execute_file_operation
 from angela.ai.content_analyzer import content_analyzer
-from angela.ai.content_analyzer_extensions EnhancedContentAnalyzer
+from angela.ai.content_analyzer_extensions import EnhancedContentAnalyzer
 from angela.context import context_manager
 from angela.context.session import session_manager
 from angela.context.history import history_manager
@@ -23,6 +26,7 @@ from angela.execution.engine import execution_engine
 from angela.execution.adaptive_engine import adaptive_engine
 from angela.ai.analyzer import error_analyzer
 from angela.ai.intent_analyzer import intent_analyzer
+from angela.intent.models import AdvancedTaskPlan, TaskPlan
 from angela.ai.confidence import confidence_scorer
 from angela.intent.planner import task_planner
 from angela.workflows.manager import workflow_manager
@@ -37,6 +41,10 @@ from angela.core.registry import registry
 from angela.shell import advanced_formatter
 from angela.monitoring.background import background_monitor
 from angela.monitoring.network_monitor import network_monitor
+from angela.execution.rollback import rollback_manager  
+from angela.safety.classifier import classify_command_risk, analyze_command_impact 
+from angela.context.preferences import preferences_manager  
+from angela.safety.adaptive_confirmation import get_adaptive_confirmation
 
 
 logger = get_logger(__name__)
@@ -169,7 +177,7 @@ class Orchestrator:
                 # Handle unknown request type
                 return await self._process_unknown_request(request, context)
             
-        except Exception as e:            
+         
         except Exception as e:
             self._logger.exception(f"Error processing request: {str(e)}")
             # Fallback behavior
@@ -840,7 +848,7 @@ class Orchestrator:
         )
         
         # If confidence is low, offer clarification
-        if confidence < 0.6 and not dry_run and not session_context.get("skip_clarification"):
+        if confidence < 0.6 and not dry_run and not context.get("session", {}).get("skip_clarification"):
             # Interactive clarification
             from prompt_toolkit.shortcuts import yes_no_dialog
             should_proceed = yes_no_dialog(

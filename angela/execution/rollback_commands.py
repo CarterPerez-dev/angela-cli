@@ -1,4 +1,4 @@
-v# angela/cli/rollback_commands.py
+# angela/cli/rollback_commands.py
 """
 CLI commands for enhanced rollback functionality.
 """

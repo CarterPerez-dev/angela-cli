@@ -45,208 +45,264 @@ class EnhancedContentAnalyzer(ContentAnalyzer):
         "Makefile": "_analyze_makefile",
     }
     
-    async def analyze_content(
-        self, 
-        file_path: Union[str, Path], 
-        request: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Enhanced analyze_content that routes to language-specific handlers.
-        """
-        path_obj = Path(file_path)
+   async def analyze_content(self, file_path, request=None):
+        """Override the base analyze_content method to use specialized analyzers."""
+        result = await super().analyze_content(file_path, request)
         
-        # Check if file exists
-        if not path_obj.exists():
-            return {"error": f"File not found: {path_obj}"}
+        # If we got an error, return it
+        if "error" in result:
+            return result
         
-        # Get file info for language-specific handling
-        file_info = self._get_file_info(path_obj)
-        language = file_info.get("language")
+        # Check if we have a specialized analyzer for this file type
+        file_type = result.get("type", "unknown")
+        language = result.get("language", "unknown").lower()
         
-        # Read file content
+        specialized_analyzer = self._specialized_analyzers.get(language)
+        if specialized_analyzer:
+            try:
+                enhanced_result = await specialized_analyzer(file_path, request)
+                if enhanced_result:
+                    # Merge the enhanced result with the base result
+                    result.update(enhanced_result)
+            except Exception as e:
+                self._logger.error(f"Error in specialized analyzer for {language}: {str(e)}")
+        
+        return result
+    
+    async def _analyze_python(self, file_path, request=None):
+        """Specialized analyzer for Python files."""
+        # Example implementation - you would expand this
+        import ast
+        
         try:
-            with open(path_obj, 'r', encoding='utf-8', errors='replace') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
+            
+            # Parse the AST
+            tree = ast.parse(content)
+            
+            # Extract classes and functions
+            classes = []
+            functions = []
+            
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    classes.append({
+                        "name": node.name,
+                        "line": node.lineno,
+                        "methods": [m.name for m in node.body if isinstance(m, ast.FunctionDef)]
+                    })
+                elif isinstance(node, ast.FunctionDef):
+                    if not any(isinstance(parent, ast.ClassDef) for parent in ast.iter_path(tree, node)):
+                        functions.append({
+                            "name": node.name,
+                            "line": node.lineno,
+                            "args": [a.arg for a in node.args.args]
+                        })
+            
+            return {
+                "classes": classes,
+                "functions": functions,
+                "imports": self._extract_python_imports(content)
+            }
         except Exception as e:
-            logger.error(f"Error reading file: {str(e)}")
-            return {"error": f"Error reading file: {str(e)}"}
+            self._logger.error(f"Error analyzing Python file: {str(e)}")
+            return None
+    
+    def _extract_python_imports(self, content):
+        """Extract import statements from Python code."""
+        import_pattern = r'^(?:from\s+(\S+)\s+)?import\s+(.+)$'
+        imports = []
         
-        # Use language-specific handler if available
-        handler_name = self.LANGUAGE_HANDLERS.get(language)
-        if handler_name and hasattr(self, handler_name):
-            handler = getattr(self, handler_name)
-            return await handler(path_obj, content, file_info, request)
+        for line in content.splitlines():
+            line = line.strip()
+            match = re.match(import_pattern, line)
+            if match:
+                from_module, imported = match.groups()
+                imports.append({
+                    "from_module": from_module,
+                    "imported": [name.strip() for name in imported.split(',')]
+                })
         
-        # Fall back to generic analysis
-        return await super().analyze_content(file_path, request)
+        return imports
     
-    # Language-specific analysis methods
+    async def _analyze_typescript(self, file_path, request=None):
+        """Specialized analyzer for TypeScript files."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Extract interfaces and types
+            types = self._extract_typescript_types(content)
+            
+            # For more complex analysis, we can use the AI
+            prompt = f"""
+                Analyze this TypeScript file and extract key information:
+                
+                ```typescript
+                {content[:20000]}  # Limit for large files
+                ```
+                
+                Identify and describe:
+                1. Interfaces and their properties
+                2. Type definitions
+                3. Classes and their methods
+                4. Key functions and their purposes
+                5. Design patterns used
+                6. Dependencies and imports
+                
+                Format your response as a structured analysis.
+                """
+                
+            # Call AI for analysis
+            response = await self._get_ai_analysis(prompt)
+            
+            return {
+                "types": types,
+                "ai_analysis": response
+            }
+        except Exception as e:
+            self._logger.error(f"Error analyzing TypeScript file: {str(e)}")
+            return None
     
-    async def _analyze_typescript(
-        self, 
-        path: Path, 
-        content: str, 
-        file_info: Dict[str, Any], 
-        request: Optional[str]
-    ) -> Dict[str, Any]:
-        """TypeScript-specific analysis."""
-        logger.debug(f"Analyzing TypeScript file: {path}")
+    def _extract_typescript_types(self, content: str) -> List[Dict[str, Any]]:
+        """Extract interface and type definitions from TypeScript code."""
+        interface_pattern = r'interface\s+(\w+)(?:\s+extends\s+(\w+))?\s*\{([^}]*)\}'
+        type_pattern = r'type\s+(\w+)\s*=\s*(.+?);'
         
-        # TypeScript-specific analysis prompt
-        prompt = f"""
-Analyze the following TypeScript code with a focus on:
-- Types and interfaces defined
-- Function signatures and return types
-- React component structure (if present)
-- Type safety issues
-- Potential type improvements
-
-```typescript
-{content[:50000]}
-Analysis:
-"""
-# Call AI for analysis
-response = await self._get_ai_analysis(prompt)
-    # Extract important types and interfaces
-    types_and_interfaces = self._extract_typescript_types(content)
-    
-    # Structure the analysis results
-    result = {
-        "path": str(path),
-        "type": file_info.get("type", "unknown"),
-        "language": "TypeScript",
-        "analysis": response,
-        "types_and_interfaces": types_and_interfaces,
-        "request": request
-    }
-    
-    return result
-
-def _extract_typescript_types(self, content: str) -> List[Dict[str, Any]]:
-    """Extract TypeScript types and interfaces from content."""
-    types_and_interfaces = []
-    
-    # Simple regex to find interface and type definitions
-    interface_pattern = r'interface\s+(\w+)(?:<[\w\s,]+>)?\s*{([^}]*)}'
-    type_pattern = r'type\s+(\w+)(?:<[\w\s,]+>)?\s*=\s*([^;]*);'
-    
-    # Find interfaces
-    for match in re.finditer(interface_pattern, content):
-        name = match.group(1)
-        body = match.group(2).strip()
-        types_and_interfaces.append({
-            "kind": "interface",
-            "name": name,
-            "definition": body
-        })
-    
-    # Find types
-    for match in re.finditer(type_pattern, content):
-        name = match.group(1)
-        definition = match.group(2).strip()
-        types_and_interfaces.append({
-            "kind": "type",
-            "name": name,
-            "definition": definition
-        })
-    
-    return types_and_interfaces
-
-# Add more language-specific methods as needed... IMPORTANT
-
-async def _analyze_json(
-    self, 
-    path: Path, 
-    content: str, 
-    file_info: Dict[str, Any], 
-    request: Optional[str]
-) -> Dict[str, Any]:
-    """JSON-specific analysis."""
-    logger.debug(f"Analyzing JSON file: {path}")
-    
-    # Validate JSON and extract schema information
-    try:
-        json_data = json.loads(content)
-        # Infer schema structure
-        schema = self._infer_json_schema(json_data)
+        interfaces = []
+        for match in re.finditer(interface_pattern, content, re.DOTALL):
+            name, extends, body = match.groups()
+            properties = {}
+            
+            # Parse properties
+            prop_pattern = r'(\w+)(?:\?)?:\s*([^;]+);'
+            for prop_match in re.finditer(prop_pattern, body):
+                prop_name, prop_type = prop_match.groups()
+                properties[prop_name] = prop_type.strip()
+            
+            interfaces.append({
+                "name": name,
+                "extends": extends,
+                "properties": properties
+            })
         
-        # Generate human-readable analysis
-        prompt = f"""
-Analyze the following JSON data structure:
-{content[:5000]}
-Focus on:
-
-The overall structure and purpose
-Key fields and their meaning
-Potential issues or inconsistencies
-Schema validation suggestions
-
-Analysis:
-"""
-response = await self._get_ai_analysis(prompt)
-        return {
-            "path": str(path),
-            "type": "JSON",
-            "language": "JSON",
-            "valid": True,
-            "schema": schema,
-            "analysis": response,
-            "request": request
-        }
+        types = []
+        for match in re.finditer(type_pattern, content, re.DOTALL):
+            name, definition = match.groups()
+            types.append({
+                "name": name,
+                "definition": definition.strip()
+            })
         
-    except json.JSONDecodeError as e:
-        # Invalid JSON
-        return {
-            "path": str(path),
-            "type": "JSON",
-            "language": "JSON",
-            "valid": False,
-            "error": f"Invalid JSON: {str(e)}",
-            "error_position": {"line": e.lineno, "column": e.colno},
-            "request": request
-        }
-
-def _infer_json_schema(self, data: Any, depth: int = 0) -> Dict[str, Any]:
-    """Infer a basic JSON schema from data."""
-    if depth > 5:  # Prevent infinite recursion
-        return {"type": "unknown"}
+        return interfaces + types
+    
+    async def _analyze_javascript(self, file_path, request=None):
+        """Specialized analyzer for JavaScript files."""
+        # Similar implementation to TypeScript but without type information
+        pass
+    
+    async def _analyze_json(self, file_path, request=None):
+        """Specialized analyzer for JSON files."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Parse the JSON
+            data = json.loads(content)
+            
+            # Infer schema
+            schema = self._infer_json_schema(data)
+            
+            return {
+                "schema": schema,
+                "keys": list(data.keys()) if isinstance(data, dict) else [],
+                "array_length": len(data) if isinstance(data, list) else None,
+                "data_preview": str(data)[:1000] + "..." if len(str(data)) > 1000 else str(data)
+            }
+        except Exception as e:
+            self._logger.error(f"Error analyzing JSON file: {str(e)}")
+            return None
+    
+    def _infer_json_schema(self, data):
+        """Infer a simple schema from JSON data."""
+        if isinstance(data, dict):
+            schema = {}
+            for key, value in data.items():
+                schema[key] = self._get_type(value)
+            return {"type": "object", "properties": schema}
+        elif isinstance(data, list):
+            if not data:
+                return {"type": "array", "items": {"type": "unknown"}}
+            
+            # Get the type of the first item
+            first_item_type = self._get_type(data[0])
+            
+            # Check if all items have the same type
+            same_type = all(self._get_type(item) == first_item_type for item in data)
+            
+            if same_type:
+                return {"type": "array", "items": first_item_type}
+            else:
+                return {"type": "array", "items": {"type": "mixed"}}
+        else:
+            return self._get_type(data)
+    
+    def _get_type(self, value):
+        """Get the type of a JSON value."""
+        if value is None:
+            return {"type": "null"}
+        elif isinstance(value, bool):
+            return {"type": "boolean"}
+        elif isinstance(value, int):
+            return {"type": "integer"}
+        elif isinstance(value, float):
+            return {"type": "number"}
+        elif isinstance(value, str):
+            return {"type": "string"}
+        elif isinstance(value, dict):
+            schema = {}
+            for key, val in value.items():
+                schema[key] = self._get_type(val)
+            return {"type": "object", "properties": schema}
+        elif isinstance(value, list):
+            if not value:
+                return {"type": "array", "items": {"type": "unknown"}}
+            return {"type": "array", "items": self._get_type(value[0])}
+        else:
+            return {"type": "unknown"}
+    
+    async def _analyze_yaml(self, file_path, request=None):
+        """Specialized analyzer for YAML files."""
+        # Implementation similar to JSON
+        pass
+    
+    async def _analyze_markdown(self, file_path, request=None):
+        """Specialized analyzer for Markdown files."""
+        # Extract headings, links, etc.
+        pass
+    
+    async def _analyze_html(self, file_path, request=None):
+        """Specialized analyzer for HTML files."""
+        # Extract elements, links, scripts, etc.
+        pass
+    
+    async def _analyze_css(self, file_path, request=None):
+        """Specialized analyzer for CSS files."""
+        # Extract selectors, properties, etc.
+        pass
+    
+    async def _analyze_sql(self, file_path, request=None):
+        """Specialized analyzer for SQL files."""
+        # Extract tables, queries, etc.
+        pass
+    
+    async def _get_ai_analysis(self, prompt):
+        """Get analysis from the AI service."""
+        api_request = GeminiRequest(
+            prompt=prompt,
+            max_tokens=4000
+        )
         
-    if data is None:
-        return {"type": "null"}
-    elif isinstance(data, bool):
-        return {"type": "boolean"}
-    elif isinstance(data, int):
-        return {"type": "integer"}
-    elif isinstance(data, float):
-        return {"type": "number"}
-    elif isinstance(data, str):
-        return {"type": "string"}
-    elif isinstance(data, list):
-        if not data:
-            return {"type": "array", "items": {}}
-        # Sample the first few items to infer element type
-        sample_items = data[:min(5, len(data))]
-        item_schemas = [self._infer_json_schema(item, depth + 1) for item in sample_items]
-        return {"type": "array", "items": item_schemas[0]}  # Simplification: use first item's schema
-    elif isinstance(data, dict):
-        properties = {}
-        for key, value in data.items():
-            properties[key] = self._infer_json_schema(value, depth + 1)
-        return {"type": "object", "properties": properties}
-    else:
-        return {"type": "unknown"}
-
-# Helper methods for AI analysis
-
-async def _get_ai_analysis(self, prompt: str) -> str:
-    """Get AI analysis using the Gemini API."""
-    from angela.ai.client import gemini_client, GeminiRequest
-    
-    # Call AI service
-    api_request = GeminiRequest(
-        prompt=prompt,
-        max_tokens=4000
-    )
-    
-    response = await gemini_client.generate_text(api_request)
-    return response.text
+        response = await gemini_client.generate_text(api_request)
+        return response.text
