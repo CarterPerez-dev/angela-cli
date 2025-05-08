@@ -44,8 +44,7 @@
 *   **Key Objectives:**
     *   **Universal CLI Translator:** Develop a robust mechanism (likely LLM-driven with sophisticated prompting and validation) to translate natural language requests into commands for *arbitrary* CLI tools, leveraging `--help` output, man pages, or general knowledge. This requires strong safety validation (`safety/validator.py`).
     *   **Complex Workflow Orchestration:** Enhance the `Orchestrator` and `EnhancedTaskPlanner` to handle workflows involving sequences of commands across different tools (e.g., Git -> Docker -> Cloud CLI -> kubectl).
-    *   **Automated CI/CD Pipeline Execution:** Integrate `toolchain/ci_cd.py` fully. Allow requests like "Set up a full CI/CD pipeline for this Node.js project on GitHub Actions, including build, test, lint, and deploy to staging". This involves generating complex configuration *and* potentially triggering initial pipeline runs or setup commands.
-    *   **Self-Correction & Learning:** Implement mechanisms for Angela to learn from failed commands or workflows, potentially attempting self-correction or refining its understanding of specific tools based on error messages and successful outcomes.
+    *   **Automated CI/CD Pipeline Execution:** Integrate `toolchain/ci_cd.py` fully. Allow requests like "Set up a full CI/CD pipeline for this Node.js project on GitHub Actions, including 
     *   **Proactive Assistance V2:** Enhance `monitoring/background.py` to offer more complex suggestions based on combined context (e.g., "Your tests failed after the last commit, want me to try reverting and rerunning?", "Your cloud deployment seems to be unhealthy, want me to check the logs?").
 
 These 5 phases provide a structured approach to tackling the remaining challenges, moving from foundational UX improvements and deeper understanding towards complex actions and broad tool integration, culminating in the advanced orchestration required for the AGI-like vision.
