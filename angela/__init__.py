@@ -1,8 +1,3 @@
-"""
-Angela CLI - AI-powered command-line assistant integrated into your terminal shell.
-"""
-from angela.core.registry import registry
-
 def init_application():
     """Initialize all application components."""
     # Import components here to avoid early imports during module loading
@@ -10,6 +5,7 @@ def init_application():
     from angela.execution.adaptive_engine import adaptive_engine
     from angela.safety import check_command_safety, validate_command_safety
     from angela.orchestrator import orchestrator
+    from angela.toolchain.docker import docker_integration
     
     # Import enhanced planner integration
     from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
@@ -30,6 +26,7 @@ def init_application():
     registry.register("validate_command_safety", validate_command_safety)
     registry.register("orchestrator", orchestrator)
     registry.register("context_enhancer", context_enhancer)
+    registry.register("docker_integration", docker_integration)
 
     # Apply integrations
     apply_enhanced_planner_integration()

@@ -63,6 +63,7 @@ class RequestType(Enum):
     CODE_REFINEMENT = "code_refinement" # Refine/improve existing code
     CODE_ARCHITECTURE = "code_architecture" # Analyze or enhance architecture
     UNKNOWN = "unknown"                # Unknown request type
+    
 class Orchestrator:
     """Main orchestration service for Angela CLI."""
     
@@ -189,94 +190,110 @@ class Orchestrator:
             }
     
     async def _determine_request_type(
-        self, 
-        request: str, 
-        context: Dict[str, Any]
-    ) -> RequestType:
-        """
-        Determine the type of request.
-        
-        Args:
-            request: The user request
-            context: Context information
+            self, 
+            request: str, 
+            context: Dict[str, Any]
+        ) -> RequestType:
+            """
+            Determine the type of request.
             
-        Returns:
-            RequestType enum value
-        """
-        # Check for keywords and patterns indicating different request types
-        
-        # Workflow definition patterns
-        workflow_def_patterns = [
-            r'\b(?:define|create|make|add)\s+(?:a\s+)?(?:new\s+)?workflow\b',
-            r'\bworkflow\s+(?:called|named)\b',
-            r'\bsave\s+(?:this|these)\s+(?:as\s+(?:a\s+)?)?workflow\b',
-        ]
-        
-        # Workflow execution patterns
-        workflow_exec_patterns = [
-            r'\brun\s+(?:the\s+)?workflow\b',
-            r'\bexecute\s+(?:the\s+)?workflow\b',
-            r'\bstart\s+(?:the\s+)?workflow\b',
-        ]
-        
-        # File content patterns
-        file_content_patterns = [
-            r'\b(?:analyze|understand|summarize|examine)\s+(?:the\s+)?(?:content|code|text)\b',
-            r'\b(?:modify|change|update|edit|refactor)\s+(?:the\s+)?(?:content|code|text|file)\b',
-            r'\bfind\s+(?:in|inside|within)\s+(?:the\s+)?file\b',
-        ]
-        
-        # Multi-step operation patterns
-        multi_step_patterns = [
-            r'\b(?:multiple steps|sequence|series|several|many)\b',
-            r'\band then\b',
-            r'\bafter that\b',
-            r'\bone by one\b',
-            r'\bstep by step\b',
-            r'\bautomatically\b',
-        ]
- 
-         code_generation_patterns = [
-            r'\bcreate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
-            r'\bgenerate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
-            r'\bmake\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
-            r'\bbuild\s+(?:a\s+)?(?:whole|complete|full|entire)\b',
-        ]
-        
-        # Feature addition patterns
-        feature_addition_patterns = [
-            r'\badd\s+(?:a\s+)?(?:new\s+)?feature\b',
-            r'\bimplement\s+(?:a\s+)?(?:new\s+)?feature\b',
-            r'\bcreate\s+(?:a\s+)?(?:new\s+)?feature\b',
-            r'\bextend\s+(?:the\s+)?(?:project|app|code|application)\b',
-        ]
-        
-        # Toolchain operation patterns
-        toolchain_patterns = [
-            r'\bsetup\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment)\b',
-            r'\bconfigure\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment|git|docker)\b',
-            r'\bgenerate\s+(?:ci|cd|docker|dockerfile|jenkins|gitlab|github)\b',
-            r'\binstall\s+dependencies\b',
-            r'\binitialize\s+(?:git|repo|repository)\b',
-        ]
-        
-        # Code refinement patterns
-        refinement_patterns = [
-            r'\brefine\s+(?:the\s+)?code\b',
-            r'\bimprove\s+(?:the\s+)?code\b',
-            r'\boptimize\s+(?:the\s+)?code\b',
-            r'\brefactor\s+(?:the\s+)?code\b',
-            r'\bupdate\s+(?:the\s+)?code\b',
-            r'\benhance\s+(?:the\s+)?code\b',
-        ]
-        
-        # Architecture patterns
-        architecture_patterns = [
-            r'\banalyze\s+(?:the\s+)?(?:architecture|structure)\b',
-            r'\bimprove\s+(?:the\s+)?(?:architecture|structure)\b',
-            r'\bredesign\s+(?:the\s+)?(?:architecture|structure)\b',
-            r'\bproject\s+structure\b',
-        ]
+            Args:
+                request: The user request
+                context: Context information
+                
+            Returns:
+                RequestType enum value
+            """
+            # Check for keywords and patterns indicating different request types
+            
+            # Workflow definition patterns
+            workflow_def_patterns = [
+                r'\b(?:define|create|make|add)\s+(?:a\s+)?(?:new\s+)?workflow\b',
+                r'\bworkflow\s+(?:called|named)\b',
+                r'\bsave\s+(?:this|these)\s+(?:as\s+(?:a\s+)?)?workflow\b',
+            ]
+            
+            # Workflow execution patterns
+            workflow_exec_patterns = [
+                r'\brun\s+(?:the\s+)?workflow\b',
+                r'\bexecute\s+(?:the\s+)?workflow\b',
+                r'\bstart\s+(?:the\s+)?workflow\b',
+            ]
+            
+            # File content patterns
+            file_content_patterns = [
+                r'\b(?:analyze|understand|summarize|examine)\s+(?:the\s+)?(?:content|code|text)\b',
+                r'\b(?:modify|change|update|edit|refactor)\s+(?:the\s+)?(?:content|code|text|file)\b',
+                r'\bfind\s+(?:in|inside|within)\s+(?:the\s+)?file\b',
+            ]
+            
+            # Multi-step operation patterns
+            multi_step_patterns = [
+                r'\b(?:multiple steps|sequence|series|several|many)\b',
+                r'\band then\b',
+                r'\bafter that\b',
+                r'\bone by one\b',
+                r'\bstep by step\b',
+                r'\bautomatically\b',
+            ]
+     
+            # Docker operation patterns
+            docker_patterns = [
+                r'\bdocker\b',
+                r'\bcontainer\b',
+                r'\bdockerfile\b',
+                r'\bdocker-compose\b',
+                r'\bdocker\s+compose\b',
+                r'\bimage\b.+\b(?:build|run|pull|push)\b',
+                r'\b(?:build|run|pull|push)\b.+\bimage\b',
+                r'\b(?:start|stop|restart|remove)\b.+\bcontainer\b',
+                r'\bcontainer\b.+\b(?:start|stop|restart|remove)\b',
+                r'\bgenerate\b.+\b(?:dockerfile|docker-compose)\b',
+                r'\bsetup\s+docker\b',
+                r'\bdocker\s+(?:ps|logs|images|rmi|exec)\b',
+            ]
+    
+            code_generation_patterns = [
+                r'\bcreate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+                r'\bgenerate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+                r'\bmake\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+                r'\bbuild\s+(?:a\s+)?(?:whole|complete|full|entire)\b',
+            ]
+            
+            # Feature addition patterns
+            feature_addition_patterns = [
+                r'\badd\s+(?:a\s+)?(?:new\s+)?feature\b',
+                r'\bimplement\s+(?:a\s+)?(?:new\s+)?feature\b',
+                r'\bcreate\s+(?:a\s+)?(?:new\s+)?feature\b',
+                r'\bextend\s+(?:the\s+)?(?:project|app|code|application)\b',
+            ]
+            
+            # Toolchain operation patterns
+            toolchain_patterns = [
+                r'\bsetup\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment)\b',
+                r'\bconfigure\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment|git)\b',
+                r'\bgenerate\s+(?:ci|cd|jenkins|gitlab|github)\b',
+                r'\binstall\s+dependencies\b',
+                r'\binitialize\s+(?:git|repo|repository)\b',
+            ]
+            
+            # Code refinement patterns
+            refinement_patterns = [
+                r'\brefine\s+(?:the\s+)?code\b',
+                r'\bimprove\s+(?:the\s+)?code\b',
+                r'\boptimize\s+(?:the\s+)?code\b',
+                r'\brefactor\s+(?:the\s+)?code\b',
+                r'\bupdate\s+(?:the\s+)?code\b',
+                r'\benhance\s+(?:the\s+)?code\b',
+            ]
+            
+            # Architecture patterns
+            architecture_patterns = [
+                r'\banalyze\s+(?:the\s+)?(?:architecture|structure)\b',
+                r'\bimprove\s+(?:the\s+)?(?:architecture|structure)\b',
+                r'\bredesign\s+(?:the\s+)?(?:architecture|structure)\b',
+                r'\bproject\s+structure\b',
+            ]
         
         # Check for code generation first (highest priority)
         for pattern in code_generation_patterns:
@@ -313,6 +330,37 @@ class Orchestrator:
         for pattern in workflow_exec_patterns:
             if re.search(pattern, request, re.IGNORECASE):
                 return RequestType.WORKFLOW_EXECUTION
+
+        # Check for Docker operations first
+        for pattern in docker_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.TOOLCHAIN_OPERATION
+
+        # Check for code generation (high priority)
+        for pattern in code_generation_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_GENERATION
+        
+        # Check for feature addition
+        for pattern in feature_addition_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.FEATURE_ADDITION
+        
+        # Check for toolchain operations
+        for pattern in toolchain_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.TOOLCHAIN_OPERATION
+        
+        # Check for code refinement
+        for pattern in refinement_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_REFINEMENT
+        
+        # Check for architecture analysis
+        for pattern in architecture_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_ARCHITECTURE
+
         
         # Check for file content analysis/manipulation
         file_mentions = re.search(r'\b(?:file|code|script|document)\b', request, re.IGNORECASE)
@@ -526,7 +574,9 @@ class Orchestrator:
             return result
         
         # Process based on operation type
-        if operation_type == "ci_cd":
+        if operation_type == "docker":
+            result.update(await self._process_docker_operation(request, operation_details, context, dry_run))
+        elif operation_type == "ci_cd":
             result.update(await self._process_ci_cd_operation(operation_details, context, dry_run))
         elif operation_type == "package_management":
             result.update(await self._process_package_operation(operation_details, context, dry_run))
@@ -538,6 +588,187 @@ class Orchestrator:
             result["error"] = f"Unknown toolchain operation type: {operation_type}"
         
         return result
+        
+    async def _process_docker_operation(
+        self,
+        request: str,
+        operation_details: Dict[str, Any],
+        context: Dict[str, Any],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a Docker operation request.
+        
+        Args:
+            request: The user request
+            operation_details: Details about the operation
+            context: Context information
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing Docker operation: {request}")
+        
+        # Get docker_integration from registry
+        docker_integration = registry.get("docker_integration")
+        if not docker_integration:
+            return {
+                "success": False,
+                "error": "Docker integration not available in the system."
+            }
+            
+        # Check Docker availability
+        docker_available = await docker_integration.is_docker_available()
+        if not docker_available:
+            return {
+                "success": False,
+                "error": "Docker is not available on this system. Please install Docker to use this feature."
+            }
+            
+        # Determine specific Docker operation
+        docker_action = operation_details.get("docker_action", "")
+        
+        # Handle different Docker operations
+        if "setup" in request.lower() or "generate" in request.lower() or "dockerfile" in request.lower() or "docker-compose" in request.lower():
+            # Generate Docker configuration files
+            project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+            
+            result = await docker_integration.setup_docker_project(
+                project_directory=project_dir,
+                generate_dockerfile="dockerfile" in request.lower() or "setup" in request.lower(),
+                generate_compose="compose" in request.lower() or "setup" in request.lower(),
+                generate_dockerignore="dockerignore" in request.lower() or "setup" in request.lower(),
+                overwrite=False,  # Default to safe operation
+                include_databases="database" in request.lower() or "db" in request.lower(),
+                build_image="build" in request.lower() and dry_run is False
+            )
+            
+            # Format the result
+            formatted_result = {
+                "success": result.get("success", False),
+                "message": "Docker setup completed",
+                "files_generated": result.get("files_generated", []),
+                "docker_details": result
+            }
+            
+            return formatted_result
+            
+        elif "build" in request.lower() or "image" in request.lower():
+            # Build Docker image
+            project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+            image_tag = operation_details.get("image_tag", "app:latest")
+            
+            result = await docker_integration.build_image(
+                context_path=project_dir,
+                tag=image_tag,
+                no_cache="no cache" in request.lower()
+            )
+            
+            return {
+                "success": result.get("success", False),
+                "message": f"Docker image build {'completed' if result.get('success', False) else 'failed'}",
+                "image_details": result
+            }
+            
+        elif "run" in request.lower() or "start" in request.lower() or "launch" in request.lower():
+            # Run Docker container
+            image = operation_details.get("image", "")
+            if not image:
+                # Try to extract image from request
+                image_match = re.search(r'(?:run|start|launch)\s+(?:container\s+)?(?:from\s+)?(\S+)(?:\s+image)?', request, re.IGNORECASE)
+                if image_match:
+                    image = image_match.group(1)
+                else:
+                    image = "app:latest"  # Default
+            
+            # Extract ports if mentioned
+            ports = []
+            ports_match = re.search(r'port[s]?\s+(\d+(?::\d+)?(?:,\s*\d+(?::\d+)?)*)', request, re.IGNORECASE)
+            if ports_match:
+                ports_str = ports_match.group(1)
+                ports = [p.strip() for p in ports_str.split(',')]
+            
+            # Run container
+            result = await docker_integration.run_container(
+                image=image,
+                ports=ports,
+                detach=True,
+                remove="remove" in request.lower() or "rm" in request.lower()
+            )
+            
+            return {
+                "success": result.get("success", False),
+                "message": f"Docker container {'started' if result.get('success', False) else 'failed to start'}",
+                "container_details": result
+            }
+            
+        elif "compose" in request.lower() or "up" in request.lower():
+            # Docker Compose operation
+            project_dir = operation_details.get("project_dir", context.get("cwd", "."))
+            
+            # Check Docker Compose availability
+            compose_available = await docker_integration.is_docker_compose_available()
+            if not compose_available:
+                return {
+                    "success": False,
+                    "error": "Docker Compose is not available on this system. Please install Docker Compose to use this feature."
+                }
+            
+            # Determine if it's compose up or down
+            if "down" in request.lower() or "stop" in request.lower():
+                result = await docker_integration.compose_down(
+                    project_directory=project_dir,
+                    remove_volumes="volumes" in request.lower(),
+                    remove_images="images" in request.lower() or "rmi" in request.lower()
+                )
+            else:
+                # Default to compose up
+                result = await docker_integration.compose_up(
+                    project_directory=project_dir,
+                    detach=True,
+                    build="build" in request.lower()
+                )
+            
+            return {
+                "success": result.get("success", False),
+                "message": f"Docker Compose operation {'completed' if result.get('success', False) else 'failed'}",
+                "compose_details": result
+            }
+            
+        else:
+            # Generate and execute appropriate Docker command
+            suggestion = await self._get_ai_suggestion(request, context)
+            
+            if not suggestion.command or not suggestion.command.startswith("docker"):
+                return {
+                    "success": False,
+                    "error": "Unable to generate appropriate Docker command for this request.",
+                    "suggestion": suggestion
+                }
+                
+            # Execute the command using the engine
+            if dry_run:
+                return {
+                    "success": True,
+                    "dry_run": True,
+                    "command": suggestion.command,
+                    "explanation": suggestion.explanation
+                }
+                
+            stdout, stderr, exit_code = await execution_engine.execute_command(
+                suggestion.command,
+                check_safety=True
+            )
+            
+            return {
+                "success": exit_code == 0,
+                "command": suggestion.command,
+                "stdout": stdout,
+                "stderr": stderr,
+                "return_code": exit_code,
+                "explanation": suggestion.explanation
+            }
     
     async def _extract_toolchain_operation(
         self, 
@@ -554,17 +785,26 @@ class Orchestrator:
         Returns:
             Dictionary with operation details
         """
-        # Use AI to extract operation details
+        # First check if this is a Docker request
+        for pattern in [r'\bdocker\b', r'\bcontainer\b', r'\bdockerfile\b', r'\bdocker-compose\b']:
+            if re.search(pattern, request, re.IGNORECASE):
+                docker_details = await self._extract_docker_operation_details(request, context)
+                if docker_details:
+                    return docker_details
+        
+        # Use AI to extract operation details for other toolchain operations
         prompt = f"""
     Extract toolchain operation details from this request:
     "{request}"
     
     Return a JSON object with:
-    1. operation_type: One of "ci_cd", "package_management", "git", "testing"
+    1. operation_type: One of "ci_cd", "package_management", "git", "testing", "docker"
     2. platform: For CI/CD, the platform (e.g., "github_actions", "gitlab_ci")
     3. project_dir: The project directory (default to ".")
     4. dependencies: For package management, list of dependencies
     5. test_framework: For testing, the test framework
+    6. docker_action: For Docker, the specific action (e.g., "build", "run", "compose")
+    7. image: For Docker run, the image name
     
     Format:
     {{
@@ -577,7 +817,7 @@ class Orchestrator:
     
     Only include keys relevant to the operation type.
     """
-        
+
         try:
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
@@ -611,6 +851,143 @@ class Orchestrator:
                 "operation_type": "unknown",
                 "project_dir": context.get("project_root", ".")
             }
+            
+    async def _extract_docker_operation_details(
+        self,
+        request: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Extract Docker operation details from a request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            
+        Returns:
+            Dictionary with Docker operation details
+        """
+        details = {
+            "operation_type": "docker",
+            "project_dir": context.get("project_root", context.get("cwd", "."))
+        }
+        
+        # Extract Docker action based on keywords
+        if re.search(r'\b(build|create)\b.+\b(image|dockerfile)\b', request, re.IGNORECASE) or re.search(r'\bimage.+\b(build|create)\b', request, re.IGNORECASE):
+            details["docker_action"] = "build"
+            
+            # Try to extract image tag if present
+            tag_match = re.search(r'tag\s+(\S+)', request, re.IGNORECASE)
+            if tag_match:
+                details["image_tag"] = tag_match.group(1)
+            else:
+                details["image_tag"] = "app:latest"
+                
+        elif re.search(r'\b(run|start|launch)\b.+\b(container|image)\b', request, re.IGNORECASE) or re.search(r'\b(container|image).+\b(run|start|launch)\b', request, re.IGNORECASE):
+            details["docker_action"] = "run"
+            
+            # Try to extract image if present
+            image_match = re.search(r'(image|container)\s+(\S+)', request, re.IGNORECASE)
+            if image_match:
+                details["image"] = image_match.group(2)
+            else:
+                # Look for any word that might be an image name
+                words = request.split()
+                for i, word in enumerate(words):
+                    if word.lower() in ["image", "from"] and i < len(words) - 1:
+                        details["image"] = words[i+1].strip(",:;")
+                        break
+            
+            # Extract ports if present
+            port_match = re.search(r'port\s+(\d+)', request, re.IGNORECASE)
+            if port_match:
+                port = port_match.group(1)
+                details["ports"] = [f"{port}:{port}"]
+                
+        elif re.search(r'\b(setup|generate|create)\b.+\b(docker|dockerfile|compose)\b', request, re.IGNORECASE):
+            details["docker_action"] = "setup"
+            
+            # Determine which files to generate
+            details["generate_dockerfile"] = "dockerfile" in request.lower()
+            details["generate_compose"] = "compose" in request.lower()
+            details["generate_dockerignore"] = "ignore" in request.lower()
+            
+            # If not specified, generate all
+            if not any([details["generate_dockerfile"], details["generate_compose"], details["generate_dockerignore"]]):
+                details["generate_dockerfile"] = True
+                details["generate_compose"] = True
+                details["generate_dockerignore"] = True
+                
+        elif re.search(r'\b(compose|docker-compose)\b.+\b(up|start|run)\b', request, re.IGNORECASE):
+            details["docker_action"] = "compose_up"
+            
+            # Extract services if mentioned
+            services_match = re.search(r'service[s]?\s+(\w+(?:,\s*\w+)*)', request, re.IGNORECASE)
+            if services_match:
+                services_str = services_match.group(1)
+                details["services"] = [s.strip() for s in services_str.split(',')]
+                
+        elif re.search(r'\b(compose|docker-compose)\b.+\b(down|stop)\b', request, re.IGNORECASE):
+            details["docker_action"] = "compose_down"
+            
+            # Check for additional options
+            details["remove_volumes"] = "volume" in request.lower()
+            details["remove_images"] = "image" in request.lower() or "rmi" in request.lower()
+            
+        elif re.search(r'\b(stop|kill)\b.+\b(container)\b', request, re.IGNORECASE):
+            details["docker_action"] = "stop"
+            
+            # Try to extract container ID or name
+            container_match = re.search(r'(container|id|name)\s+(\S+)', request, re.IGNORECASE)
+            if container_match:
+                details["container"] = container_match.group(2)
+                
+        elif re.search(r'\b(rm|remove)\b.+\b(container)\b', request, re.IGNORECASE):
+            details["docker_action"] = "rm"
+            
+            # Try to extract container ID or name
+            container_match = re.search(r'(container|id|name)\s+(\S+)', request, re.IGNORECASE)
+            if container_match:
+                details["container"] = container_match.group(2)
+                
+            # Check for force flag
+            details["force"] = "force" in request.lower()
+            
+        elif re.search(r'\b(ps|list)\b.+\b(container)', request, re.IGNORECASE):
+            details["docker_action"] = "ps"
+            
+            # Check for all flag
+            details["all"] = "all" in request.lower()
+            
+        elif re.search(r'\b(logs|log)\b', request, re.IGNORECASE):
+            details["docker_action"] = "logs"
+            
+            # Try to extract container ID or name
+            container_match = re.search(r'(container|id|name)\s+(\S+)', request, re.IGNORECASE)
+            if container_match:
+                details["container"] = container_match.group(2)
+                
+            # Check for follow flag
+            details["follow"] = "follow" in request.lower() or "tail" in request.lower()
+            
+        elif re.search(r'\b(exec|execute|run)\b.+\b(command|in)\b', request, re.IGNORECASE):
+            details["docker_action"] = "exec"
+            
+            # Try to extract container ID or name
+            container_match = re.search(r'(container|id|name)\s+(\S+)', request, re.IGNORECASE)
+            if container_match:
+                details["container"] = container_match.group(2)
+                
+            # Try to extract command
+            command_match = re.search(r'command\s+(.+?)$', request, re.IGNORECASE)
+            if command_match:
+                details["command"] = command_match.group(1)
+                
+        else:
+            # Default to general docker action
+            details["docker_action"] = "general"
+            
+        return details
     
     async def _process_ci_cd_operation(
         self, 
