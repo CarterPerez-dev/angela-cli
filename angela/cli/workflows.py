@@ -27,6 +27,22 @@ console = Console()
 app = typer.Typer(help="Manage Angela workflows")
 
 
+# Define this at module level to replace await_func
+def run_async(coro):
+    """Run an async function from a synchronous context.
+    
+    This function handles getting the appropriate event loop
+    rather than creating a new one with asyncio.run(), which causes
+    problems when called from an async context.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
+
+
 @app.command("list")
 def list_workflows(
     tag: Optional[str] = typer.Option(
@@ -86,9 +102,6 @@ def list_workflows(
         sys.exit(1)
 
 
-# angela/cli/workflows.py
-# Add new commands to the existing workflows app
-
 @app.command("export")
 def export_workflow(
     name: str = typer.Argument(
@@ -103,8 +116,8 @@ def export_workflow(
         # Get the workflow sharing manager
         from angela.workflows.sharing import workflow_sharing_manager
         
-        # Export the workflow
-        result = asyncio.run(workflow_sharing_manager.export_workflow(
+        # Export the workflow using run_async instead of asyncio.run()
+        result = run_async(workflow_sharing_manager.export_workflow(
             workflow_name=name,
             output_path=output
         ))
@@ -139,8 +152,8 @@ def import_workflow(
         # Get the workflow sharing manager
         from angela.workflows.sharing import workflow_sharing_manager
         
-        # Import the workflow
-        result = asyncio.run(workflow_sharing_manager.import_workflow(
+        # Import the workflow using run_async instead of asyncio.run()
+        result = run_async(workflow_sharing_manager.import_workflow(
             workflow_path=path,
             rename=rename,
             replace_existing=replace
@@ -156,7 +169,6 @@ def import_workflow(
         logger.exception(f"Error importing workflow: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
-
 
 
 @app.command("create")
@@ -190,8 +202,8 @@ def create_workflow(
             # Get context
             context = context_manager.get_context_dict()
             
-            # Define workflow from file content
-            workflow = asyncio.run(workflow_manager.define_workflow_from_natural_language(
+            # Define workflow from file content using run_async instead of asyncio.run()
+            workflow = run_async(workflow_manager.define_workflow_from_natural_language(
                 name=name,
                 description=description,
                 natural_language=workflow_text,
@@ -226,15 +238,15 @@ def create_workflow(
                 console.print("[bold red]Error:[/bold red] Workflow must have at least one step.")
                 sys.exit(1)
             
-            # Define the workflow
-            workflow = asyncio.run(workflow_manager.define_workflow(
+            # Define the workflow using run_async instead of asyncio.run()
+            workflow = run_async(workflow_manager.define_workflow(
                 name=name,
                 description=description,
                 steps=steps
             ))
         
-        # Display the created workflow
-        await_func(terminal_formatter.display_workflow(workflow))
+        # Display the created workflow using run_async instead of await_func
+        run_async(terminal_formatter.display_workflow(workflow))
         
         console.print(f"[bold green]Workflow '{name}' created successfully![/bold green]")
         console.print(f"Run it with: [bold cyan]angela workflows run {name}[/bold cyan]")
@@ -285,8 +297,8 @@ def run_workflow(
         # Get context
         context = context_manager.get_context_dict()
         
-        # Display the workflow
-        await_func(terminal_formatter.display_workflow(workflow, variables))
+        # Display the workflow using run_async instead of await_func
+        run_async(terminal_formatter.display_workflow(workflow, variables))
         
         # Confirm execution
         if not dry_run:
@@ -294,8 +306,8 @@ def run_workflow(
                 console.print("Workflow execution cancelled.")
                 return
         
-        # Execute the workflow
-        result = asyncio.run(workflow_manager.execute_workflow(
+        # Execute the workflow using run_async instead of asyncio.run()
+        result = run_async(workflow_manager.execute_workflow(
             workflow_name=name,
             variables=variables,
             context=context,
@@ -367,8 +379,8 @@ def show_workflow(
             console.print(f"[bold red]Error:[/bold red] Workflow '{name}' not found.")
             sys.exit(1)
         
-        # Display the workflow
-        await_func(terminal_formatter.display_workflow(workflow))
+        # Display the workflow using run_async instead of await_func
+        run_async(terminal_formatter.display_workflow(workflow))
         
         # Show additional details if verbose
         if verbose:
@@ -392,7 +404,3 @@ def show_workflow(
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
 
-
-def await_func(coro):
-    """Helper to run a coroutine in a synchronous context."""
-    return asyncio.run(coro)

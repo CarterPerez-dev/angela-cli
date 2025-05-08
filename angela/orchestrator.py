@@ -35,6 +35,9 @@ from angela.context.file_activity import file_activity_tracker, ActivityType
 from angela.execution.hooks import execution_hooks
 from angela.core.registry import registry
 from angela.shell import advanced_formatter
+from angela.monitoring.background import background_monitor
+from angela.monitoring.network_monitor import network_monitor
+
 
 logger = get_logger(__name__)
 
@@ -46,8 +49,12 @@ class RequestType(Enum):
     WORKFLOW_DEFINITION = "workflow"   # Define a new workflow
     WORKFLOW_EXECUTION = "run_workflow" # Execute a workflow
     CLARIFICATION = "clarification"    # Request for clarification
+    CODE_GENERATION = "code_generation" # Generate a complete project
+    FEATURE_ADDITION = "feature_addition" # Add feature to existing project
+    TOOLCHAIN_OPERATION = "toolchain_operation" # DevOps operations (CI/CD, etc.)
+    CODE_REFINEMENT = "code_refinement" # Refine/improve existing code
+    CODE_ARCHITECTURE = "code_architecture" # Analyze or enhance architecture
     UNKNOWN = "unknown"                # Unknown request type
-
 class Orchestrator:
     """Main orchestration service for Angela CLI."""
     
@@ -56,7 +63,12 @@ class Orchestrator:
         self._logger = logger
         self._background_tasks = set()
         self._error_recovery_manager = ErrorRecoveryManager()
-    
+        self._background_monitor = background_monitor
+        self._network_monitor = network_monitor
+        
+        
+        self._background_monitor.register_insight_callback(self._handle_monitoring_insight)
+        
     async def process_request(
         self, 
         request: str, 
@@ -133,11 +145,31 @@ class Orchestrator:
             elif request_type == RequestType.CLARIFICATION:
                 # Handle request for clarification
                 return await self._process_clarification_request(request, context)
+                               
+            # Phase 7 integration points
+            elif request_type == RequestType.CODE_GENERATION:
+                return await self._process_code_generation_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.FEATURE_ADDITION:
+                return await self._process_feature_addition_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.TOOLCHAIN_OPERATION:
+                return await self._process_toolchain_operation(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.CODE_REFINEMENT:
+                return await self._process_code_refinement_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.CODE_ARCHITECTURE:
+                return await self._process_code_architecture_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.CLARIFICATION:
+                return await self._process_clarification_request(request, context)
                 
             else:
                 # Handle unknown request type
                 return await self._process_unknown_request(request, context)
             
+        except Exception as e:            
         except Exception as e:
             self._logger.exception(f"Error processing request: {str(e)}")
             # Fallback behavior
@@ -195,6 +227,74 @@ class Orchestrator:
             r'\bstep by step\b',
             r'\bautomatically\b',
         ]
+ 
+         code_generation_patterns = [
+            r'\bcreate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+            r'\bgenerate\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+            r'\bmake\s+(?:a\s+)?(?:new\s+)?(?:project|app|website|application)\b',
+            r'\bbuild\s+(?:a\s+)?(?:whole|complete|full|entire)\b',
+        ]
+        
+        # Feature addition patterns
+        feature_addition_patterns = [
+            r'\badd\s+(?:a\s+)?(?:new\s+)?feature\b',
+            r'\bimplement\s+(?:a\s+)?(?:new\s+)?feature\b',
+            r'\bcreate\s+(?:a\s+)?(?:new\s+)?feature\b',
+            r'\bextend\s+(?:the\s+)?(?:project|app|code|application)\b',
+        ]
+        
+        # Toolchain operation patterns
+        toolchain_patterns = [
+            r'\bsetup\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment)\b',
+            r'\bconfigure\s+(?:ci|cd|ci/cd|cicd|continuous integration|deployment|git|docker)\b',
+            r'\bgenerate\s+(?:ci|cd|docker|dockerfile|jenkins|gitlab|github)\b',
+            r'\binstall\s+dependencies\b',
+            r'\binitialize\s+(?:git|repo|repository)\b',
+        ]
+        
+        # Code refinement patterns
+        refinement_patterns = [
+            r'\brefine\s+(?:the\s+)?code\b',
+            r'\bimprove\s+(?:the\s+)?code\b',
+            r'\boptimize\s+(?:the\s+)?code\b',
+            r'\brefactor\s+(?:the\s+)?code\b',
+            r'\bupdate\s+(?:the\s+)?code\b',
+            r'\benhance\s+(?:the\s+)?code\b',
+        ]
+        
+        # Architecture patterns
+        architecture_patterns = [
+            r'\banalyze\s+(?:the\s+)?(?:architecture|structure)\b',
+            r'\bimprove\s+(?:the\s+)?(?:architecture|structure)\b',
+            r'\bredesign\s+(?:the\s+)?(?:architecture|structure)\b',
+            r'\bproject\s+structure\b',
+        ]
+        
+        # Check for code generation first (highest priority)
+        for pattern in code_generation_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_GENERATION
+        
+        # Check for feature addition
+        for pattern in feature_addition_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.FEATURE_ADDITION
+        
+        # Check for toolchain operations
+        for pattern in toolchain_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.TOOLCHAIN_OPERATION
+        
+        # Check for code refinement
+        for pattern in refinement_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_REFINEMENT
+        
+        # Check for architecture analysis
+        for pattern in architecture_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CODE_ARCHITECTURE
+ 
         
         # Check for workflow definition
         for pattern in workflow_def_patterns:
@@ -221,6 +321,483 @@ class Orchestrator:
         
         # Default to single command
         return RequestType.COMMAND
+
+
+    async def _process_code_generation_request(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a code generation request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the generation
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing code generation request: {request}")
+        
+        # Import here to avoid circular imports
+        from angela.generation.engine import code_generation_engine
+        
+        # Project details extraction
+        project_details = await self._extract_project_details(request)
+        
+        # Get output directory (default to current dir)
+        output_dir = project_details.get("output_dir", context.get("cwd", "."))
+        
+        # Get project type if specified
+        project_type = project_details.get("project_type")
+        
+        # Create result structure
+        result = {
+            "request": request,
+            "type": "code_generation",
+            "context": context,
+            "project_details": project_details
+        }
+        
+        # Skip execution if not requested
+        if not execute and not dry_run:
+            return result
+        
+        # Generate the project using the generation engine
+        with console.status(f"[bold green]Generating project based on: {request}[/bold green]"):
+            project_plan = await code_generation_engine.generate_project(
+                description=request,  # Use full request as description
+                output_dir=output_dir,
+                project_type=project_type,
+                context=context
+            )
+        
+        # Add project plan to result
+        result["project_plan"] = {
+            "name": project_plan.name,
+            "description": project_plan.description,
+            "project_type": project_plan.project_type,
+            "file_count": len(project_plan.files),
+            "structure_explanation": project_plan.structure_explanation
+        }
+        
+        # Create files if not in dry run mode
+        if not dry_run:
+            with console.status("[bold green]Creating project files...[/bold green]"):
+                creation_result = await code_generation_engine.create_project_files(project_plan)
+                result["creation_result"] = creation_result
+        else:
+            result["dry_run"] = True
+            
+        # Add Git initialization if appropriate
+        if not dry_run and project_details.get("git_init", True):
+            from angela.toolchain.git import git_integration
+            
+            with console.status("[bold green]Initializing Git repository...[/bold green]"):
+                git_result = await git_integration.init_repository(
+                    path=output_dir,
+                    initial_branch="main",
+                    gitignore_template=project_plan.project_type
+                )
+                result["git_result"] = git_result
+        
+        return result
+
+    async def _process_feature_addition_request(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a feature addition request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the feature addition
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing feature addition request: {request}")
+        
+        # Import here to avoid circular imports
+        from angela.generation.engine import code_generation_engine
+        
+        # Extract feature details
+        feature_details = await self._extract_feature_details(request, context)
+        
+        # Get project directory (default to current dir)
+        project_dir = feature_details.get("project_dir", context.get("cwd", "."))
+        
+        # Create result structure
+        result = {
+            "request": request,
+            "type": "feature_addition",
+            "context": context,
+            "feature_details": feature_details
+        }
+        
+        # Skip execution if not requested
+        if not execute and not dry_run:
+            return result
+        
+        # Add the feature to the project
+        with console.status(f"[bold green]Adding feature to project: {request}[/bold green]"):
+            addition_result = await code_generation_engine.add_feature_to_project(
+                description=feature_details.get("description", request),
+                project_dir=project_dir,
+                context=context
+            )
+        
+        result["addition_result"] = addition_result
+        
+        # Create branch if specified and not in dry run mode
+        if not dry_run and feature_details.get("branch"):
+            from angela.toolchain.git import git_integration
+            
+            branch_name = feature_details.get("branch")
+            with console.status(f"[bold green]Creating branch: {branch_name}[/bold green]"):
+                branch_result = await git_integration.create_branch(
+                    path=project_dir,
+                    branch_name=branch_name,
+                    checkout=True
+                )
+                result["branch_result"] = branch_result
+        
+        return result
+
+
+
+    async def _process_toolchain_operation(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a toolchain operation request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the operation
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing toolchain operation request: {request}")
+        
+        # Extract operation details
+        operation_details = await self._extract_toolchain_operation(request, context)
+        
+        # Get operation type
+        operation_type = operation_details.get("operation_type", "unknown")
+        
+        # Create result structure
+        result = {
+            "request": request,
+            "type": "toolchain_operation",
+            "context": context,
+            "operation_details": operation_details,
+            "operation_type": operation_type
+        }
+        
+        # Skip execution if not requested
+        if not execute and not dry_run:
+            return result
+        
+        # Process based on operation type
+        if operation_type == "ci_cd":
+            result.update(await self._process_ci_cd_operation(operation_details, context, dry_run))
+        elif operation_type == "package_management":
+            result.update(await self._process_package_operation(operation_details, context, dry_run))
+        elif operation_type == "git":
+            result.update(await self._process_git_operation(operation_details, context, dry_run))
+        elif operation_type == "testing":
+            result.update(await self._process_testing_operation(operation_details, context, dry_run))
+        else:
+            result["error"] = f"Unknown toolchain operation type: {operation_type}"
+        
+        return result
+    
+    async def _extract_toolchain_operation(
+        self, 
+        request: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Extract toolchain operation details from a request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            
+        Returns:
+            Dictionary with operation details
+        """
+        # Use AI to extract operation details
+        prompt = f"""
+    Extract toolchain operation details from this request:
+    "{request}"
+    
+    Return a JSON object with:
+    1. operation_type: One of "ci_cd", "package_management", "git", "testing"
+    2. platform: For CI/CD, the platform (e.g., "github_actions", "gitlab_ci")
+    3. project_dir: The project directory (default to ".")
+    4. dependencies: For package management, list of dependencies
+    5. test_framework: For testing, the test framework
+    
+    Format:
+    {{
+      "operation_type": "type",
+      "platform": "platform",
+      "project_dir": "directory",
+      "dependencies": ["dep1", "dep2"],
+      "test_framework": "framework"
+    }}
+    
+    Only include keys relevant to the operation type.
+    """
+        
+        try:
+            # Call AI service
+            api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
+            response = await gemini_client.generate_text(api_request)
+            
+            # Parse the response
+            import json
+            import re
+            
+            # Try to find JSON in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Assume the entire response is JSON
+                json_str = response.text
+            
+            # Parse JSON
+            details = json.loads(json_str)
+            
+            # Default project directory to context's project_root if available
+            if "project_dir" not in details and context.get("project_root"):
+                details["project_dir"] = context.get("project_root")
+            
+            return details
+            
+        except Exception as e:
+            self._logger.error(f"Error extracting toolchain operation details: {str(e)}")
+            # Return minimal details on failure
+            return {
+                "operation_type": "unknown",
+                "project_dir": context.get("project_root", ".")
+            }
+    
+    async def _process_ci_cd_operation(
+        self, 
+        operation_details: Dict[str, Any],
+        context: Dict[str, Any],
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a CI/CD operation.
+        
+        Args:
+            operation_details: Details of the operation
+            context: Context information
+            dry_run: Whether to simulate without making changes
+            
+        Returns:
+            Dictionary with operation results
+        """
+        from angela.toolchain.ci_cd import ci_cd_integration
+        
+        # Get platform and project directory
+        platform = operation_details.get("platform", "github_actions")
+        project_dir = operation_details.get("project_dir", ".")
+        
+        # Generate CI configuration
+        with console.status(f"[bold green]Generating CI configuration for {platform}...[/bold green]"):
+            if not dry_run:
+                result = await ci_cd_integration.generate_ci_configuration(
+                    path=project_dir,
+                    platform=platform
+                )
+            else:
+                # For dry run, just return what would be done
+                result = {
+                    "success": True,
+                    "dry_run": True,
+                    "platform": platform,
+                    "project_dir": project_dir,
+                    "message": f"Would generate {platform} CI configuration in {project_dir}"
+                }
+        
+        return {
+            "ci_cd_result": result
+        }
+        
+            
+    async def _extract_feature_details(
+        self, 
+        request: str,
+        context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Extract feature details from a feature addition request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            
+        Returns:
+            Dictionary with feature details
+        """
+        # Use AI to extract feature details
+        prompt = f"""
+    Extract feature details from this feature addition request:
+    "{request}"
+    
+    Return a JSON object with:
+    1. description: A clear description of the feature to add
+    2. project_dir: The project directory (default to ".")
+    3. branch: A branch name if specified
+    
+    Format:
+    {{
+      "description": "feature description",
+      "project_dir": "directory",
+      "branch": "branch-name"
+    }}
+    
+    Only include keys where you have clear information from the request.
+    """
+        
+        try:
+            # Call AI service
+            api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
+            response = await gemini_client.generate_text(api_request)
+            
+            # Parse the response
+            import json
+            import re
+            
+            # Try to find JSON in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Assume the entire response is JSON
+                json_str = response.text
+            
+            # Parse JSON
+            details = json.loads(json_str)
+            
+            # Default project directory to context's project_root if available
+            if "project_dir" not in details and context.get("project_root"):
+                details["project_dir"] = context.get("project_root")
+            
+            return details
+            
+        except Exception as e:
+            self._logger.error(f"Error extracting feature details: {str(e)}")
+            # Return minimal details on failure
+            return {
+                "project_dir": context.get("project_root", "."),
+                "description": request
+            }
+
+
+    
+    async def _extract_project_details(
+        self, 
+        request: str
+    ) -> Dict[str, Any]:
+        """
+        Extract project details from a code generation request.
+        
+        Args:
+            request: The user request
+            
+        Returns:
+            Dictionary with project details
+        """
+        # Use AI to extract project details
+        prompt = f"""
+    Extract project details from this code generation request:
+    "{request}"
+    
+    Return a JSON object with:
+    1. project_type: The type of project (e.g., "python", "node", "java", etc.)
+    2. framework: Any specific framework mentioned (e.g., "django", "react", "spring")
+    3. output_dir: Where the project should be created (default to ".")
+    4. git_init: Whether to initialize a Git repo (default to true)
+    5. description: A clear description of what the project should do/be
+    
+    Format:
+    {{
+      "project_type": "type",
+      "framework": "framework",
+      "output_dir": "directory",
+      "git_init": true/false,
+      "description": "description"
+    }}
+    
+    Only include keys where you have clear information from the request.
+    If something is ambiguous, omit the key rather than guessing.
+    """
+        
+        try:
+            # Call AI service
+            api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
+            response = await gemini_client.generate_text(api_request)
+            
+            # Parse the response
+            import json
+            import re
+            
+            # Try to find JSON in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Assume the entire response is JSON
+                json_str = response.text
+            
+            # Parse JSON
+            details = json.loads(json_str)
+            return details
+            
+        except Exception as e:
+            self._logger.error(f"Error extracting project details: {str(e)}")
+            # Return minimal details on failure
+            return {
+                "output_dir": ".",
+                "git_init": True,
+                "description": request
+            }
+
+
+
+
+
+
+
+
+
+
+
     
     async def _process_command_request(
         self, 
@@ -1657,9 +2234,24 @@ Include only the JSON object with no additional text.
             from angela.safety.adaptive_confirmation import offer_command_learning
             await offer_command_learning(command)
         
-        return resul
+        return result
 
 
+    async def _handle_monitoring_insight(self, insight_type: str, insight_data: Dict[str, Any]):
+        """Handle insights from monitoring systems."""
+        self._logger.info(f"Received monitoring insight: {insight_type}")
+        
+        # Store insight in context for future decision making
+        session_manager.add_entity(
+            f"monitoring_{insight_type}",
+            "monitoring_insight", 
+            insight_data
+        )
+        
+        # Potentially trigger actions based on insights
+        if insight_type == "critical_resource_warning" and insight_data.get("severity") == "high":
+            # Take immediate action
+            await self._handle_critical_resource_warning(insight_data)
 
 # Global orchestrator instance
 orchestrator = Orchestrator()

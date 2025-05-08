@@ -19,6 +19,7 @@ from angela.ai.client import GeminiRequest
 from angela.context import context_manager
 from angela.utils.logging import get_logger
 from angela.shell.formatter import terminal_formatter
+from angela.core.events import event_bus
 
 logger = get_logger(__name__)
 
@@ -160,6 +161,16 @@ class BackgroundMonitor:
                                 terminal_formatter.print_proactive_suggestion(suggestion, "Git Monitor")
                                 self._suggestions.add(suggestion_key)
                                 self._last_suggestion_time = datetime.now()
+                                
+                                await event_bus.publish("monitoring:git_status", {
+                                    "suggestion": suggestion,
+                                    "modified_count": modified_count,
+                                    "untracked_count": untracked_count,
+                                    "deleted_count": deleted_count,
+                                    "timestamp": datetime.now().isoformat()
+                                })                               
+                                
+                                
                 
                 # Wait before checking again
                 await asyncio.sleep(60)
@@ -246,6 +257,14 @@ class BackgroundMonitor:
                         suggestion = f"Your disk space is running low ({disk_usage}% used). Consider cleaning up unused files or moving data to free up space."
                         terminal_formatter.print_proactive_suggestion(suggestion, "System Monitor")
                         self._last_suggestion_time = datetime.now()
+                        
+                        # Publish as an event
+                        await event_bus.publish("monitoring:disk_space_low", {
+                            "suggestion": suggestion,
+                            "disk_usage": disk_usage,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        
                 last_values["disk_usage"] = disk_usage
                 
                 # Wait before checking again
@@ -355,6 +374,14 @@ class BackgroundMonitor:
                 terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
+                
+                # Publish as an event
+                await event_bus.publish("monitoring:python_syntax_error", {
+                    "suggestion": suggestion,
+                    "file_path": str(file_path),
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
         
         # Check with flake8 if available
         flake8_result = await self._run_command(f"flake8 {file_path}")
@@ -369,6 +396,14 @@ class BackgroundMonitor:
                 terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
+                
+                # Publish as an event
+                await event_bus.publish("monitoring:python_lint_issue", {
+                    "suggestion": suggestion,
+                    "file_path": str(file_path),
+                    "lint_issues": lint_issues,
+                    "timestamp": datetime.now().isoformat()
+                })
     
     async def _check_javascript_file(self, file_path: Path) -> None:
         """
@@ -390,6 +425,14 @@ class BackgroundMonitor:
                 terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
+                
+                # Publish as an event
+                await event_bus.publish("monitoring:javascript_syntax_error", {
+                    "suggestion": suggestion,
+                    "file_path": str(file_path),
+                    "error_text": error_text,
+                    "timestamp": datetime.now().isoformat()
+                })
         
         # Check with ESLint if available
         eslint_result = await self._run_command(f"eslint {file_path}")
@@ -404,6 +447,14 @@ class BackgroundMonitor:
                 terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
+                
+                # Publish as an event
+                await event_bus.publish("monitoring:javascript_lint_issue", {
+                    "suggestion": suggestion,
+                    "file_path": str(file_path),
+                    "lint_issues": lint_issues,
+                    "timestamp": datetime.now().isoformat()
+                })
     
     async def _get_disk_usage(self) -> float:
         """

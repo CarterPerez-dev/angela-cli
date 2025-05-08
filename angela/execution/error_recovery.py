@@ -40,8 +40,10 @@ class ErrorRecoveryManager:
     def __init__(self):
         """Initialize the error recovery manager."""
         self._logger = logger
-        self._recovery_history = {}  # Track successful recoveries
-    
+        self._recovery_history = {}  
+        self._success_patterns = {}
+        
+            
     async def handle_error(
         self, 
         step: Any, 
@@ -49,7 +51,7 @@ class ErrorRecoveryManager:
         context: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Handle an error during step execution.
+        Handle an error during step execution with enhanced recovery learning.
         
         Args:
             step: The step that failed
@@ -74,25 +76,51 @@ class ErrorRecoveryManager:
         # Analyze the error
         analysis = await self._analyze_error(command, stderr or error_msg)
         
+        # Get error pattern for historical matching
+        error_pattern = self._extract_error_pattern(error_result)
+        
         # Generate recovery strategies
-        strategies = await self._generate_recovery_strategies(command, analysis, context)
+        recovery_strategies = await self._generate_recovery_strategies(command, analysis, context)
+        
+        # Check if we have historical successes for this error pattern
+        if error_pattern in self._success_patterns:
+            self._logger.info(f"Found historical recovery strategies for error pattern: {error_pattern}")
+            # Add strategies from successful historical recoveries
+            for strategy_record in self._success_patterns[error_pattern]:
+                historical_strategy = {
+                    "type": strategy_record["type"],
+                    "command": strategy_record["command"],
+                    "description": f"Previously successful strategy (used {strategy_record['success_count']} times)",
+                    "confidence": min(0.5 + (strategy_record["success_count"] * 0.1), 0.9),
+                    "source": "history"
+                }
+                # Add to beginning of strategies list if not already present
+                if not any(s["type"] == historical_strategy["type"] and s["command"] == historical_strategy["command"] 
+                        for s in recovery_strategies):
+                    recovery_strategies.insert(0, historical_strategy)
+        
+        # Prioritize strategies based on historical success
+        prioritized_strategies = self._prioritize_strategies_by_history(recovery_strategies)
         
         # Record error analysis and strategies
         result = dict(error_result)
         result["error_analysis"] = analysis
-        result["recovery_strategies"] = strategies
+        result["recovery_strategies"] = prioritized_strategies
         
         # Check if we can auto-recover
-        if strategies and self._can_auto_recover(strategies[0]):
+        if prioritized_strategies and self._can_auto_recover(prioritized_strategies[0]):
             # Attempt automatic recovery
             recovery_result = await self._execute_recovery_strategy(
-                strategies[0], step, error_result, context
+                prioritized_strategies[0], step, error_result, context
             )
             
             # Update the result
             result["recovery_attempted"] = True
-            result["recovery_strategy"] = strategies[0]["type"]
+            result["recovery_strategy"] = prioritized_strategies[0]
             result["recovery_success"] = recovery_result.get("success", False)
+            
+            # Learn from this recovery attempt
+            await self._learn_from_recovery_result(recovery_result, step, error_result, context)
             
             # If recovery succeeded, replace the result
             if recovery_result.get("success", False):
@@ -100,13 +128,16 @@ class ErrorRecoveryManager:
                 result.update(recovery_result)
         else:
             # Guided recovery with user input
-            recovery_result = await self._guided_recovery(strategies, step, error_result, context)
+            recovery_result = await self._guided_recovery(prioritized_strategies, step, error_result, context)
             
             # Update the result
             result["recovery_attempted"] = recovery_result is not None
             if recovery_result:
-                result["recovery_strategy"] = recovery_result.get("strategy", {}).get("type")
+                result["recovery_strategy"] = recovery_result.get("strategy", {})
                 result["recovery_success"] = recovery_result.get("success", False)
+                
+                # Learn from this recovery attempt
+                await self._learn_from_recovery_result(recovery_result, step, error_result, context)
                 
                 # If recovery succeeded, replace the result
                 if recovery_result.get("success", False):
@@ -114,6 +145,156 @@ class ErrorRecoveryManager:
                     result.update(recovery_result)
         
         return result
+    
+    async def _learn_from_recovery_result(
+        self, 
+        recovery_result: Dict[str, Any], 
+        step: Any, 
+        error_result: Dict[str, Any], 
+        context: Dict[str, Any]
+    ) -> None:
+        """
+        Learn from recovery attempts to improve future strategies.
+        
+        Args:
+            recovery_result: Result from the recovery attempt
+            step: The step that failed
+            error_result: Original error information
+            context: Context information
+        """
+        if recovery_result.get("success", False):
+            strategy = recovery_result.get("strategy", recovery_result.get("recovery_strategy", {}))
+            strategy_type = strategy.get("type")
+            error_pattern = self._extract_error_pattern(error_result)
+            
+            self._logger.debug(f"Learning from successful recovery of type {strategy_type} for pattern {error_pattern}")
+            
+            if strategy_type and error_pattern:
+                # Update recovery history
+                strategy_key = f"{strategy_type}:{strategy.get('command', '')}"
+                if strategy_key not in self._recovery_history:
+                    self._recovery_history[strategy_key] = {"success_count": 0}
+                
+                self._recovery_history[strategy_key]["success_count"] += 1
+                self._recovery_history[strategy_key]["last_success"] = datetime.now().isoformat()
+                
+                # Record successful strategy for this error pattern
+                if error_pattern not in self._success_patterns:
+                    self._success_patterns[error_pattern] = []
+                
+                # Check if strategy already exists for this pattern
+                existing_strategy = next(
+                    (s for s in self._success_patterns[error_pattern] 
+                     if s["type"] == strategy_type and s["command"] == strategy.get("command", "")),
+                    None
+                )
+                
+                if existing_strategy:
+                    # Update existing strategy
+                    existing_strategy["success_count"] += 1
+                    existing_strategy["last_success"] = datetime.now().isoformat()
+                else:
+                    # Add new strategy record
+                    strategy_record = {
+                        "type": strategy_type,
+                        "command": strategy.get("command", ""),
+                        "success_count": 1,
+                        "last_success": datetime.now().isoformat()
+                    }
+                    self._success_patterns[error_pattern].append(strategy_record)
+                
+                # Publish learning event if event_bus is available
+                try:
+                    if 'event_bus' in globals() or hasattr(self, 'event_bus'):
+                        event_bus_obj = globals().get('event_bus', getattr(self, 'event_bus', None))
+                        if event_bus_obj and hasattr(event_bus_obj, 'publish'):
+                            await event_bus_obj.publish("recovery:learning", {
+                                "error_pattern": error_pattern,
+                                "successful_strategy": strategy_type,
+                                "timestamp": datetime.now().isoformat()
+                            })
+                except Exception as e:
+                    self._logger.error(f"Error publishing learning event: {str(e)}")
+    
+    def _extract_error_pattern(
+        self, 
+        error_result: Dict[str, Any]
+    ) -> str:
+        """
+        Extract a pattern that identifies the type of error.
+        
+        Args:
+            error_result: Error information
+            
+        Returns:
+            String pattern identifying the error type
+        """
+        stderr = error_result.get("stderr", "")
+        error_msg = error_result.get("error", "")
+        
+        # Use stderr or error message
+        error_text = stderr or error_msg
+        
+        # Try to extract the most specific part of the error
+        # This is a simplified approach - can be made more sophisticated
+        
+        # Check for common error patterns
+        patterns = self._get_common_error_patterns()
+        
+        for pattern, pattern_name in patterns:
+            if re.search(pattern, error_text, re.IGNORECASE):
+                return pattern_name
+        
+        # If no specific pattern matches, return a more generic one
+        # based on the first line of the error
+        first_line = error_text.split('\n')[0][:50]
+        if first_line:
+            return f"generic:{first_line}"
+        
+        return "unknown_error"
+    
+    def _prioritize_strategies_by_history(
+        self, 
+        strategies: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Prioritize recovery strategies based on historical success.
+        
+        Args:
+            strategies: List of recovery strategies
+            
+        Returns:
+            Prioritized list of strategies
+        """
+        # Create a copy of the strategies to avoid modifying the original
+        prioritized = list(strategies)
+        
+        # Adjust confidence based on historical success
+        for strategy in prioritized:
+            strategy_key = f"{strategy.get('type')}:{strategy.get('command', '')}"
+            
+            # Check history for this strategy
+            if strategy_key in self._recovery_history:
+                history = self._recovery_history[strategy_key]
+                success_count = history.get("success_count", 0)
+                
+                # Boost confidence based on success count
+                # Original confidence is weighted at 60%, historical at 40%
+                original_confidence = strategy.get("confidence", 0.5)
+                history_confidence = min(0.3 + (success_count * 0.1), 0.9)
+                
+                # Combine confidences
+                adjusted_confidence = (original_confidence * 0.6) + (history_confidence * 0.4)
+                strategy["confidence"] = min(adjusted_confidence, 0.95)
+                
+                # Add metadata about historical success
+                strategy["history"] = {
+                    "success_count": success_count,
+                    "last_success": history.get("last_success", "unknown")
+                }
+        
+        # Sort by confidence (highest first)
+        return sorted(prioritized, key=lambda s: s.get("confidence", 0), reverse=True)
     
     async def _analyze_error(self, command: str, error: str) -> Dict[str, Any]:
         """
