@@ -1,5 +1,4 @@
 # I couldnt give you all teh files i have currently in repository so i haev thsi file to provide you some conetxxt regaridng teh files you may not be able to directly see. Aswell as a directopry tree/structure/hiererechy
-
 ## heres a breif description of each .py file you cannot directly see / see the code in them
 ---
 **File: `angela/workflows/sharing.py`**
@@ -32,8 +31,6 @@ This file, `angela/cli/workflows.py`, implements a Typer-based command-line inte
 **File: `angela/execution/rollback.py`**
 This file, `angela/execution/rollback.py`, implements a `RollbackManager` to provide undo functionality for file and directory operations performed by the Angela CLI, storing its state in `operation_history.json`. It defines an `OperationRecord` class to store details of each recorded action, including its type (e.g., "create_file", "delete_directory"), parameters, ISO-formatted timestamp, and the path to any created backup within the `BACKUP_DIR`. The manager loads this history on initialization and saves updates when `record_operation` is called after a filesystem action. The `rollback_operation` async method is central to the undo logic: based on the `operation_type` and `backup_path` from the selected `OperationRecord`, it reverses the original action, such as deleting a created file or restoring a deleted file/directory from its backup using `shutil` functions like `copy2` or `copytree`. Users can view recent undoable operations (formatted by `_get_operation_description`) via `get_recent_operations`, and upon successful rollback, the manager truncates the history to reflect the undone state.
 ---
-**File: `angela/monitoring/network_monitor.py`**
-`angela/monitoring/network_monitor.py` defines the `NetworkMonitor` class, responsible for proactively overseeing various network-related aspects such as local service availability, project dependency updates, and general internet connectivity. It utilizes `asyncio` to run concurrent monitoring tasks: `_monitor_local_services` periodically checks common service ports (e.g., 8000, 5432 using `socket.connect_ex` and `aiohttp` for HTTP checks), tailored by project type from `context_manager`. The `_monitor_dependency_updates` task checks for new versions of Python packages (via `pip list --outdated --format=json`) and Node.js packages (via `npm outdated --json`) relevant to the current project by running these as shell commands using the `_run_command` async helper. General network health is assessed by `_monitor_network_connectivity`, which attempts to resolve well-known domains using `asyncio.get_event_loop().getaddrinfo`. When issues or updates are detected, and a suggestion cooldown period managed by `_can_show_suggestion` and `_last_suggestion_time` has passed, the monitor uses `terminal_formatter.print_proactive_suggestion` to inform the user, enhancing Angela's proactive assistance capabilities.
 ---
 **File: `angela/safety/adaptive_confirmation.py`**
 `angela/safety/adaptive_confirmation.py` implements an intelligent user confirmation system that adapts its prompting behavior based on command risk, execution history, and user preferences. It leverages `prompt_toolkit`'s `yes_no_dialog` for interactive user consent and `rich` library components (`Console`, `Panel`, `Syntax`, `Table`) for presenting detailed, styled information, including command syntax, risk levels (using `CONFIRMATION_STYLES`), impact analysis, and previews. The core async function `get_adaptive_confirmation` determines whether to auto-execute a command by consulting `preferences_manager` (for trusted commands) and `history_manager` (for frequency/success rate), or to proceed with explicit user prompting. It tailors the confirmation UI: `_get_detailed_confirmation` is used for high/critical risk operations showing comprehensive details and impact tables, while `_get_simple_confirmation` provides a more concise prompt for lower risks; dry runs (`_show_dry_run_preview`) bypass confirmation entirely. After a successful execution of certain commands, `offer_command_learning` may prompt the user to add the command to their trusted list, further personalizing the safety behavior.
@@ -70,7 +67,7 @@ This module, `angela/context/file_activity.py`, implements the `FileActivityTrac
 **`angela/context/preferences.py`**
 This module provides a `PreferencesManager` class to handle user-configurable settings for the Angela application, influencing behavior related to command trust, UI presentation, and context management. It utilizes Pydantic `BaseModel`s (`TrustPreferences`, `UIPreferences`, `ContextPreferences`, nested under `UserPreferences`) to define a structured, validated schema for all preferences, which are persistently stored and retrieved from a `preferences.json` file located via `config_manager`. The `PreferencesManager` loads these settings upon initialization, creates a default file if one doesn't exist, and provides methods to update and save any changes back to the JSON file. Key functionalities include the `should_auto_execute` method, which determines if a command requires user confirmation based on its risk level (from `angela.constants.RISK_LEVELS`) and the user's `TrustPreferences`, including lists of explicitly trusted or untrusted commands. Users can dynamically modify these trusted/untrusted command lists through dedicated methods like `add_trusted_command`. A global instance, `preferences_manager`, makes these settings readily accessible throughout the Angela application, allowing other components to adapt their behavior accordingly.
 ---
-**1. `angela/ai/analyzer.py` (ErrorAnalyzer)**
+**1. `angela/ai/analyzer.py`**
 This module implements an `ErrorAnalyzer` class within Angela's AI capabilities, tasked with diagnosing command-line execution errors to offer users insightful feedback and potential solutions. It operates by matching error messages against a predefined list of `ERROR_PATTERNS` (regex, explanations, suggestions), analyzing command syntax with `shlex`, and checking for issues related to file references like non-existence or permission problems. The analyzer also consults the `history_manager` to find previously successful fixes for similar errors, enabling a degree of learning. Key methods like `_extract_key_error` simplify verbose errors, while `_check_file_references` intelligently suggests corrections for mistyped paths by looking for similar filenames in the parent directory. The `_analyze_command_structure` method identifies common syntactic pitfalls, such as missing arguments or malformed flags. Finally, `generate_fix_suggestions` consolidates all findings into a de-duplicated list of actionable advice for the user.
 -----
 **`angela/ai/content_analyzer.py` (ContentAnalyzer)**
@@ -116,25 +113,6 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 # Current Project Tree/Structure
 ```bash
 .
-├── MD
-│   ├── ImplemenationsMD
-│   │   ├── Phase_5_implementation.md
-│   │   ├── Phase_6_implementation.md
-│   │   ├── planner_implementation.md
-│   │   └── rollback_implementation.md
-│   ├── MDHelpers
-│   │   ├── Info.md
-│   │   ├── context.md
-│   │   └── tree.md
-│   ├── Next-Steps.md
-│   └── PhasesMD
-│       ├── Phase1.md
-│       ├── Phase2.md
-│       ├── Phase3.md
-│       ├── Phase4.md
-│       ├── Phase5.md
-│       ├── Phase6.md
-│       └── Phase7.md
 ├── Makefile
 ├── README.md
 ├── angela
@@ -246,27 +224,4 @@ Located at `angela/intent/planner.py`, this module serves as the core task plann
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
-└── tests
-    ├── __init__.py
-    ├── conftest.py
-    ├── test_ai_client.py
-    ├── test_context.py
-    ├── test_context_enhancer.py
-    ├── test_enhanced_planner.py
-    ├── test_enhanced_rollback.py
-    ├── test_execution.py
-    ├── test_file_activity.py
-    ├── test_file_detector.py
-    ├── test_file_resolver.py
-    ├── test_filesystem.py
-    ├── test_frameworks.py
-    ├── test_integration.py
-    ├── test_orchestration.py
-    ├── test_prompt_building.py
-    ├── test_response_parsing.py
-    └── test_safety.py
-
-24 directories, 126 files
-
-
 ```

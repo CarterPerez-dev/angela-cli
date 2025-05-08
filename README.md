@@ -28,8 +28,6 @@ This in-depth description outlines a powerful tool that blends natural language 
 
 ## Tech stack:
 Python, Ubuntu Linux
---
-## *********WHAT I WANT TO ACHEIVE (BRIEF OVERVIEW-- IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****
 
 1.  **I want an AI partner so deeply woven into my shell that its presence feels almost ambient, yet instantly responsive.** It's more than just a keyword trigger; I want the boundary between my standard shell commands and my instructions to "Angela" to blur. When I type `Angela refactor the main loop in processor.py for clarity`, I want the shell's response mechanism itself to feel like it *understands* this isn't a literal command named "Angela" but an invocation of this embedded intelligence. The transition should be frictionless, immediate, and devoid of the clunkiness of launching a separate process or waiting for a distinct interface. It should feel less like I'm *running a tool* and more like the shell itself has gained a natural language understanding layer.
 
@@ -65,31 +63,10 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
     *   **MASSIVE CODE GENERATION AUTOMATICALLY ADN AUTONMOUSLY EVEN WITH CI/CD AUTOMATICALLY ADN AUTOTOMOUSLY WITH MASSIVE CONTEXT STORAGE**
 *   **THE AI AGENT IS INTERTWINED AND ESSENTIALLY LIVES IN THE SHELL AS TEH HIGH INTELLEGENT BRAIN AND CONDUCTOR OF THE SHELL/TERMINAL**
 
-**Technical Constraints:**
-
-*   **Platform:** Linux (Ubuntu focus), targeting Bash & Zsh shells.
-*   **Core AI Engine:** Google Gemini API.
-*   **Primary Implementation Language:** Python.
-
-# *********WHAT I WANT TO ACHEIVE (BRIEF OVERVIEW) - IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****
 
 ---------------
 ## Phases-- This is just a core struccture but will be expaned on 10x fold
---
-# Angela-CLI: Detailed Technical Blueprint
-
-## Technology Stack Specification
-
-### Core Foundation
-- **Python 3.9+**: Primary implementation language
-- **Bash/Zsh**: Target shells for integration
-- **Google Gemini API**: AI service backbone
-- **Ubuntu Linux**: Primary target platform
-
-
 ## Brief Roadmap
-
-
 ## Implementation Plan
 
 ### Step 1: Project Setup & Shell Hook
@@ -118,16 +95,13 @@ Ultimately, **I'm aiming for nothing less than a paradigm shift in command-line 
 2. Design initial prompt templates with context injection
 3. Implement response parsing and error handling
 4. Build basic intent classification (command vs. file operation)
-5. Add simple command suggestion capability (non-executing)
-
+5. Add simple command suggestion capability (non-executing
 ### Step 4: Intelligent Interaction & Contextual Execution
 (Focus: Make single commands/simple sequences smarter, faster, and provide richer feedback. Enhance immediate context use.)
 Enhanced NLU & Tolerant Parsing: Implement more sophisticated Natural Language Understanding (ai/parser.py, intent/analyzer.py) to handle more complex or slightly misspelled/ambiguous single commands or simple sequences. Introduce interactive clarification (safety/confirmation.py using prompt_toolkit) but only when confidence is low (e.g., below ~70% match or high ambiguity); otherwise, attempt the most likely interpretation to maintain flow.
 Rich Feedback & Asynchronous Streaming: Integrate rich and asyncio deeply (execution/engine.py, shell/formatter.py) for real-time, well-formatted feedback during command execution. Provide progress indicators (spinners/bars), stream stdout/stderr asynchronously, and give clear status updates, making Angela feel highly responsive. Capture all output cleanly.
 Context-Aware Adaptive Confirmation: Leverage project type, recent activity, and command history (context/manager.py) to dynamically adjust confirmation needs (safety/classifier.py, orchestrator.py). Frequently used, low-risk commands in familiar contexts execute with minimal friction, while riskier operations still get detailed previews (safety/preview.py), balancing seamlessness with safety. Add detailed command history tracking (context/history.py).
-Intelligent Error Analysis & Basic Fix Suggestions: When commands fail, use the AI (ai/parser.py, execution/engine.py) to analyze stderr in context. Proactively suggest potential fixes, relevant commands (e.g., ls if a file isn't found, permission checks), or documentation lookups based on the error message and command attempted.
 Enhanced File/Directory Operations & Context: Implement more robust and complex file/directory operations (execution/filesystem.py) building on Phase 3 basics (e.g., recursive operations, pattern matching). Enhance context (context/filesystem.py) with reliable file type detection and basic metadata understanding to inform AI suggestions and operations.
-
 ### Step 5: Autonomous Task Orchestration & Proactive Assistance
 (Focus: Enable high-level goal execution, deep content understanding, learning user workflows, and proactive behaviour.)
 High-Level Goal Decomposition & Multi-Step Orchestration: Empower the AI (intent/planner.py, orchestrator.py) to break down complex user goals ("Deploy latest dev to staging") into sequences of commands/actions. Plan dependencies, visualize the execution flow (shell/formatter.py with rich), gain confirmation, and execute the orchestrated plan, monitoring progress and handling intermediate steps/errors gracefully.
@@ -135,20 +109,17 @@ Conversational Context & Session Memory: Implement robust session memory (contex
 AI-Powered File Content Comprehension & Manipulation: Integrate AI (ai/client.py, potentially new ai/content_analyzer.py) to understand the content of files (code functions, config values, text). Enable natural language requests for content-aware tasks like refactoring simple functions, updating configuration entries, or summarizing logs (execution/filesystem.py, safety/preview.py showing diffs). Create underlying utilities for safe content manipulation.
 User-Defined Workflows via Natural Language: Allow users to teach Angela reusable multi-step workflows ("Define 'publish package' as: run tests, bump version, build, upload"). Angela (intent/planner.py, new workflows/manager.py) translates, confirms, saves, and allows invocation by the user-defined name.
 Proactive Monitoring, Suggestions & Advanced Rollback: Implement optional background monitoring (orchestrator.py, asyncio) for contextual nudges (lint errors, git status, process crashes) via shell/formatter.py. Offer proactive suggestions/autofill based on deeper context (context/*, ai/*). Enhance rollback mechanisms (safety/*, execution/*) to specifically support undoing multi-step or content-manipulation actions where feasible, maintaining safety without hindering the autonomous capabilities.
-
 ### Step 6: Enhanced Project Context
 1. Implement project type inference
 2. Add dependency detection in projects
 3. Create file reference resolution from natural language
 4. Implement recent activity tracking
 5. massivly Enhance prompt engineering with project context
-
 ### Step 7: Developer Tool Integration (MAIN ASPECTY OF THIS WHOLE THING WERE IT COMES ALL TOGETHOR)
 1. Add Git commands integration
 2. Implement Docker support
 3. Create code generation flow. it should be able to create 8000 word code files, or small websites/apps etc etc. its essntially a code agent capapbale of great coding stregths. if teh user sasy "create me a porfolio website" it shoud be able to udnertand that and go ahead and create a whole directory/tree structure with files and even code those files in full and have it fully ready for developement.
-
-
+# *********WHAT I WANT TO ACHEIVE (BRIEF OVERVIEW) - IT WILL BE SOEM OF THIS BUT EVEN MORE AND AT AN EVEN HIGHER LEVEL, WERE ESSENRTIALLY RECREATING TEH MOST INTELLEGENT AND CAPABLE OPERATING SYSTEM, TERMINAL, SOFTWARE DEVELOPER, DEVOPS ENGINEER, AI AGENT, AND MORE< WERE CREATING AGI BUT IN A TERMINAL. TEH WORLDS FIRST AGI WILL BE CREATED BY ME AND WILL LIVE IN A TERMINAL*****
 **Phase 8: Seamless Shell Integration & Enhanced Interaction**
 
 *   **Goal:** Make Angela feel like an intrinsic part of the shell, blurring the lines between standard commands and AI interactions. Improve the core user experience for invoking and interacting with Angela.

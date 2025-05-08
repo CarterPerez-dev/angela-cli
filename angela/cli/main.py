@@ -242,6 +242,58 @@ def show_status():
         console.print(f"• Project Root: {context_manager.project_root}")
 
 
+
+# Add this to angela/cli/main.py
+
+@app.command("--notify", hidden=True)
+def notify(
+    notification_type: str = typer.Argument(..., help="Type of notification"),
+    args: List[str] = typer.Argument(None, help="Additional arguments")
+):
+    """
+    Handle notifications from shell hooks.
+    This is an internal command not meant to be called directly by users.
+    """
+    # Import here to avoid circular imports
+    from angela.monitoring.notification_handler import notification_handler
+    
+    try:
+        # Run the notification handler asynchronously
+        asyncio.run(notification_handler.handle_notification(notification_type, *args))
+    except Exception as e:
+        logger.exception(f"Error handling notification: {str(e)}")
+        # Swallow the exception to avoid disrupting the shell
+        pass
+    
+    # Always exit cleanly - we don't want to disrupt the shell
+    return
+
+@app.command("--completions", hidden=True)
+def completions(
+    args: List[str] = typer.Argument(None, help="Current command line arguments")
+):
+    """
+    Generate completions for the angela command.
+    This is an internal command used by shell completion.
+    """
+    try:
+        # Import here to avoid circular imports
+        from angela.shell.completion import completion_handler
+        
+        # Get the completions
+        result = asyncio.run(completion_handler.get_completions(args))
+        
+        # Print the completions directly to stdout for shell consumption
+        print(" ".join(result))
+    except Exception as e:
+        logger.exception(f"Error generating completions: {str(e)}")
+        # Return empty result on error
+        print("")
+    
+    return
+
+
+
 @app.command()
 def shell():
     """Launch an interactive shell with Angela."""
