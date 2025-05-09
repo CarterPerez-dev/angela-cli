@@ -1,3 +1,4 @@
+# angela/cli/main.py
 """
 Main command-line interface for Angela CLI.
 """

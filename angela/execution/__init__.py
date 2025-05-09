@@ -21,7 +21,6 @@ __all__ = [
     'adaptive_engine',
     'rollback_manager',
     'execution_hooks',
-    # Filesystem operations
     'create_directory', 'delete_directory',
     'create_file', 'read_file', 'write_file', 'delete_file',
     'copy_file', 'move_file', 'FileSystemError'

@@ -1,3 +1,4 @@
+# angela/context/enhanced_file_activity.py
 """
 Enhanced file activity tracking for Angela CLI.
 

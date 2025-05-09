@@ -1,3 +1,4 @@
+# angela/context/manager.py
 """
 Context management for Angela CLI.
 """

@@ -1,7 +1,12 @@
 #!/bin/bash
 # Angela CLI Installation Script
 
-
+# ANSI color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 # Check if we're running as root
 if [ "$(id -u)" -eq 0 ]; then

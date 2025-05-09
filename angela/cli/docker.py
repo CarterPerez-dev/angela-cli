@@ -1,3 +1,4 @@
+# angela/cli/docker.py
 """
 CLI commands for Docker integration in Angela CLI.
 

@@ -417,12 +417,12 @@ class SemanticAnalyzer:
                 elif isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
                     # Check if we're inside a class
                     parent_class = None
-                    for ancestor in ast.iter_fields(tree):
-                        if isinstance(ancestor[1], list):
-                            for item in ancestor[1]:
-                                if isinstance(item, ast.ClassDef) and node in item.body:
-                                    parent_class = item.name
-                                    break
+                    for ancestor in ast.walk(tree):
+                        if isinstance(ancestor, ast.ClassDef):
+                            # Check if node is in the body of this class
+                            if any(node is child for child in ancestor.body):
+                                parent_class = ancestor.name
+                                break
                     
                     # Get function parameters
                     params = []

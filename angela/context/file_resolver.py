@@ -1,3 +1,4 @@
+# angela/context/file_resolver.py
 """
 File reference resolution for Angela CLI.
 

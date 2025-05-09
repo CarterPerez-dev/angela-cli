@@ -1,3 +1,4 @@
+# angela/context/file_detector.py
 """
 File type detection for Angela CLI.
 

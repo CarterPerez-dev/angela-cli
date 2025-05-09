@@ -1,3 +1,4 @@
+# angela/cli/file_extensions.py
 """
 CLI extensions for file resolution and activity tracking.
 

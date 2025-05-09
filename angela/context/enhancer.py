@@ -1,3 +1,4 @@
+# angela/context/enhancer.py
 """
 Enhanced project context management for Angela CLI.
 

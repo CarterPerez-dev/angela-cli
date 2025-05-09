@@ -1,6 +1,7 @@
 # angela/core/events.py
 from typing import Dict, Any, Callable, List
 import asyncio
+from angela.utils.logging import get_logger
 
 class EventBus:
     """Central event bus for system-wide communication."""

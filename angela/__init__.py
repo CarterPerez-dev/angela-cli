@@ -38,6 +38,4 @@ def init_application():
     
     # Register and initialize any other components as needed
     
-    # Apply semantic integration if available
-    if has_semantic_integration:
-        apply_semantic_integration()
+

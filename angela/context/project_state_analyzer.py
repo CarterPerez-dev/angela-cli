@@ -1,3 +1,4 @@
+# angela/context/project_state_analyzer.py
 """
 Project state analysis for Angela CLI.
 

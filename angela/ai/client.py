@@ -48,7 +48,7 @@ class GeminiClient:
             # Configure the generation configuration
             generation_config = genai.types.GenerationConfig(
                 temperature=request.temperature,
-                max_output_tokens=request.max_tokens,
+                max_output_tokens=request.max_output_tokens,
             )
             
             # Call the Gemini API

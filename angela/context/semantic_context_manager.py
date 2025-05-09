@@ -1,3 +1,4 @@
+# angela/context/semantic_context_manager.py
 """
 Semantic context management for Angela CLI.
 

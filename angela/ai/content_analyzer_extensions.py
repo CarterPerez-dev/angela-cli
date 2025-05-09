@@ -1,6 +1,6 @@
 # angela/ai/content_analyzer_extensions.py
 
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 import re
 import json
@@ -45,7 +45,7 @@ class EnhancedContentAnalyzer(ContentAnalyzer):
         "Makefile": "_analyze_makefile",
     }
     
-   async def analyze_content(self, file_path, request=None):
+    async def analyze_content(self, file_path, request=None):
         """Override the base analyze_content method to use specialized analyzers."""
         result = await super().analyze_content(file_path, request)
         

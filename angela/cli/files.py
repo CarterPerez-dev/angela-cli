@@ -1,3 +1,4 @@
+# angela/cli/files.py
 """
 File operation commands for Angela CLI.
 

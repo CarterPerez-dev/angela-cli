@@ -7,7 +7,8 @@ and supporting dependency inversion.
 """
 
 # Export core interfaces
-ffrom angela.interfaces import CommandExecutor
+from angela.interfaces.execution import CommandExecutor, AdaptiveExecutor
+from angela.interfaces.safety import SafetyValidator
 from angela.core import registry
 
 __all__ = [
