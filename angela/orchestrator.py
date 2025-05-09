@@ -6,12 +6,14 @@ user requests to executing commands with safety checks.
 """
 import asyncio
 import re
+import shlex
 from typing import Dict, Any, Optional, List, Tuple, Union
 from pathlib import Path
 from enum import Enum
 import uuid
 from rich.console import Console
-
+from datetime import datetime
+from rich.panel import Panel
 
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.ai.prompts import build_prompt
@@ -50,6 +52,9 @@ from angela.toolchain.docker import docker_integration
 
 logger = get_logger(__name__)
 
+console = Console()
+
+
 class RequestType(Enum):
     """Types of requests that can be handled by the orchestrator."""
     COMMAND = "command"                # Single command suggestion
@@ -66,7 +71,8 @@ class RequestType(Enum):
     UNKNOWN = "unknown"                # Unknown request type
     UNIVERSAL_CLI = "universal_cli"  # Request to use the Universal CLI Translator
     COMPLEX_WORKFLOW = "complex_workflow"  # Complex workflow involving multiple tools
-    
+    CI_CD_PIPELINE = "ci_cd_pipeline"  # CI/CD pipeline setup and execution
+    PROACTIVE_SUGGESTION = "proactive_suggestion"    
         
 class Orchestrator:
     """Main orchestration service for Angela CLI."""
@@ -158,8 +164,7 @@ class Orchestrator:
             elif request_type == RequestType.CLARIFICATION:
                 # Handle request for clarification
                 return await self._process_clarification_request(request, context)
-                               
-            # Phase 7 integration points
+                
             elif request_type == RequestType.CODE_GENERATION:
                 return await self._process_code_generation_request(request, context, execute, dry_run)
                 
@@ -175,14 +180,22 @@ class Orchestrator:
             elif request_type == RequestType.CODE_ARCHITECTURE:
                 return await self._process_code_architecture_request(request, context, execute, dry_run)
                 
-            elif request_type == RequestType.CLARIFICATION:
-                return await self._process_clarification_request(request, context)
+            elif request_type == RequestType.UNIVERSAL_CLI:
+                return await self._process_universal_cli_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.COMPLEX_WORKFLOW:
+                return await self._process_complex_workflow_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.CI_CD_PIPELINE:
+                return await self._process_ci_cd_pipeline_request(request, context, execute, dry_run)
+                
+            elif request_type == RequestType.PROACTIVE_SUGGESTION:
+                return await self._process_proactive_suggestion(request, context)
                 
             else:
                 # Handle unknown request type
                 return await self._process_unknown_request(request, context)
             
-         
         except Exception as e:
             self._logger.exception(f"Error processing request: {str(e)}")
             # Fallback behavior
@@ -192,6 +205,8 @@ class Orchestrator:
                 "error": str(e),
                 "context": context,
             }
+            
+
     
     async def _determine_request_type(
             self, 
@@ -299,24 +314,82 @@ class Orchestrator:
                 r'\bproject\s+structure\b',
             ]
 
-           universal_cli_patterns = [
-               r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
-               r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
-               r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
-           ]
-           
-           # Add patterns for complex workflows
-           complex_workflow_patterns = [
-               r'\bcomplex\s+workflow\b',
-               r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
-               r'\bautomated\s+(?:build|test|deploy)\b',
-               r'\bend-to-end\s+workflow\b',
-               r'\bchain\s+of\s+commands\b',
-               r'\bmulti-step\s+operation\s+across\b',
-               r'\bpipeline\s+using\b',
-               r'\bseries\s+of\s+tools\b',
-           ]
-       
+
+        ci_cd_patterns = [
+            r'\bset\s*up\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration|deployment)(?:\s+pipeline)?\b',
+            r'\bcreate\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration)(?:\s+pipeline)?\b',
+            r'\bci/cd\s+(?:pipeline|setup|configuration)\b',
+            r'\bpipeline\s+(?:setup|configuration|for)\b',
+            r'\bgithub\s+actions\b',
+            r'\bgitlab\s+ci\b',
+            r'\bjenkins(?:file)?\b',
+            r'\btravis\s+ci\b',
+            r'\bcircle\s+ci\b',
+            r'\b(?:automate|automation)\s+(?:build|test|deploy)\b',
+        ]
+        
+        # First check for CI/CD patterns since they're more specific
+        for pattern in ci_cd_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.CI_CD_PIPELINE
+        
+        # Then check for Universal CLI patterns
+        universal_cli_patterns = [
+            r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
+            r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
+            r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
+        ]
+        
+        for pattern in universal_cli_patterns:
+            match = re.search(pattern, request, re.IGNORECASE)
+            if match:
+                tool = match.group(1).strip().lower()
+                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Check for complex workflow patterns
+        complex_workflow_patterns = [
+            r'\bcomplex\s+workflow\b',
+            r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
+            r'\bautomated\s+(?:build|test|deploy)\b',
+            r'\bend-to-end\s+workflow\b',
+            r'\bchain\s+of\s+commands\b',
+            r'\bmulti-step\s+operation\s+across\b',
+            r'\bpipeline\s+using\b',
+            r'\bseries\s+of\s+tools\b',
+        ]
+        
+        for pattern in complex_workflow_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.COMPLEX_WORKFLOW
+        
+        # Check for common CLI tools explicitly mentioned
+        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
+        tool_words = request.lower().split()
+        for tool in common_tools:
+            if tool in tool_words:
+                # Make sure it's a standalone word, not part of another word
+                # Check the positions where the tool appears
+                positions = [i for i, word in enumerate(tool_words) if word == tool]
+                for pos in positions:
+                    # Check if it's a command (usually preceded by use, run, with, etc.)
+                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
+                        return RequestType.UNIVERSAL_CLI
+                
+                # If tool is the first word in the request, it's likely a direct usage
+                if tool_words[0] == tool:
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Also check for complexity indicators combined with multiple tool mentions
+        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
+                            if tool in request.lower())
+        has_complex_indicators = any(indicator in request.lower() for indicator in 
+                                    ["pipeline", "sequence", "then", "after", "followed"])
+    
+        if tool_mentions >= 2 and has_complex_indicators:
+            return RequestType.COMPLEX_WORKFLOW
+
+
         # Check for code generation first (highest priority)
         for pattern in code_generation_patterns:
             if re.search(pattern, request, re.IGNORECASE):
@@ -387,39 +460,6 @@ class Orchestrator:
             if re.search(pattern, request, re.IGNORECASE):
                 return RequestType.COMPLEX_WORKFLOW
         
-        # Check for Universal CLI patterns
-        for pattern in universal_cli_patterns:
-            match = re.search(pattern, request, re.IGNORECASE)
-            if match:
-                tool = match.group(1).strip().lower()
-                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Check for common CLI tools explicitly mentioned
-        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
-        tool_words = request.lower().split()
-        for tool in common_tools:
-            if tool in tool_words:
-                # Make sure it's a standalone word, not part of another word
-                # Check the positions where the tool appears
-                positions = [i for i, word in enumerate(tool_words) if word == tool]
-                for pos in positions:
-                    # Check if it's a command (usually preceded by use, run, with, etc.)
-                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
-                        return RequestType.UNIVERSAL_CLI
-                
-                # If tool is the first word in the request, it's likely a direct usage
-                if tool_words[0] == tool:
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Also check for complexity indicators combined with multiple tool mentions
-        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
-                            if tool in request.lower())
-        has_complex_indicators = any(indicator in request.lower() for indicator in 
-                                    ["pipeline", "sequence", "then", "after", "followed"])
-    
-        if tool_mentions >= 2 and has_complex_indicators:
-            return RequestType.COMPLEX_WORKFLOW
                     
         # Check for file content analysis/manipulation
         file_mentions = re.search(r'\b(?:file|code|script|document)\b', request, re.IGNORECASE)
@@ -483,45 +523,53 @@ class Orchestrator:
         if not execute and not dry_run:
             return result
         
-        # Generate the project using the generation engine
-        with console.status(f"[bold green]Generating project based on: {request}[/bold green]"):
-            project_plan = await code_generation_engine.generate_project(
-                description=request,  # Use full request as description
-                output_dir=output_dir,
-                project_type=project_type,
-                context=context
-            )
-        
-        # Add project plan to result
-        result["project_plan"] = {
-            "name": project_plan.name,
-            "description": project_plan.description,
-            "project_type": project_plan.project_type,
-            "file_count": len(project_plan.files),
-            "structure_explanation": project_plan.structure_explanation
-        }
-        
-        # Create files if not in dry run mode
-        if not dry_run:
-            with console.status("[bold green]Creating project files...[/bold green]"):
-                creation_result = await code_generation_engine.create_project_files(project_plan)
-                result["creation_result"] = creation_result
-        else:
-            result["dry_run"] = True
-            
-        # Add Git initialization if appropriate
-        if not dry_run and project_details.get("git_init", True):
-            from angela.toolchain.git import git_integration
-            
-            with console.status("[bold green]Initializing Git repository...[/bold green]"):
-                git_result = await git_integration.init_repository(
-                    path=output_dir,
-                    initial_branch="main",
-                    gitignore_template=project_plan.project_type
+        try:
+            # Generate the project using the generation engine
+            with console.status(f"[bold green]Generating project based on: {request}[/bold green]"):
+                project_plan = await code_generation_engine.generate_project(
+                    description=request,  # Use full request as description
+                    output_dir=output_dir,
+                    project_type=project_type,
+                    context=context
                 )
-                result["git_result"] = git_result
-        
-        return result
+            
+            # Add project plan to result
+            result["project_plan"] = {
+                "name": project_plan.name,
+                "description": project_plan.description,
+                "project_type": project_plan.project_type,
+                "file_count": len(project_plan.files),
+                "structure_explanation": project_plan.structure_explanation
+            }
+            
+            # Create files if not in dry run mode
+            if not dry_run:
+                with console.status("[bold green]Creating project files...[/bold green]"):
+                    creation_result = await code_generation_engine.create_project_files(project_plan)
+                    result["creation_result"] = creation_result
+                    result["success"] = creation_result.get("success", False)
+            else:
+                result["dry_run"] = True
+                result["success"] = True
+                
+            # Add Git initialization if appropriate
+            if not dry_run and project_details.get("git_init", True):
+                from angela.toolchain.git import git_integration
+                
+                with console.status("[bold green]Initializing Git repository...[/bold green]"):
+                    git_result = await git_integration.init_repository(
+                        path=output_dir,
+                        initial_branch="main",
+                        gitignore_template=project_plan.project_type
+                    )
+                    result["git_result"] = git_result
+            
+            return result
+        except Exception as e:
+            self._logger.exception(f"Error in code generation: {str(e)}")
+            result["error"] = str(e)
+            result["success"] = False
+            return result
 
     async def _process_feature_addition_request(
         self, 
@@ -1047,11 +1095,6 @@ class Orchestrator:
             details["docker_action"] = "general"
             
         return details
-
-
-
-
-
 
 
 
@@ -1908,7 +1951,8 @@ class Orchestrator:
                     "type": "file_content",
                     "context": context,
                     "error": "Could not determine file path from request",
-                    "response": "I couldn't determine which file you're referring to. Please specify the file path."
+                    "response": "I couldn't determine which file you're referring to. Please specify the file path.",
+                    "success": False
                 }
             
             # Determine if this is analysis or manipulation
@@ -1919,102 +1963,147 @@ class Orchestrator:
                 "type": "file_content",
                 "context": context,
                 "file_path": str(file_path),
-                "operation_type": operation_type
+                "operation_type": operation_type,
+                "success": False  # Default to False, will be updated if operation succeeds
             }
             
             if operation_type == "analyze":
                 # Analyze file content (no rollback needed)
-                analysis_result = await content_analyzer.analyze_content(file_path, request)
-                result["analysis"] = analysis_result
-                
-                # End transaction as completed
-                if transaction_id:
-                    await rollback_manager.end_transaction(transaction_id, "completed")
+                try:
+                    analysis_result = await content_analyzer.analyze_content(file_path, request)
+                    result["analysis"] = analysis_result
+                    result["success"] = True
+                    
+                    # End transaction as completed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "completed")
+                except Exception as e:
+                    self._logger.error(f"Error analyzing file content: {str(e)}")
+                    result["error"] = f"Error analyzing file content: {str(e)}"
+                    
+                    # End transaction as failed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "failed")
                 
             elif operation_type == "summarize":
                 # Summarize file content (no rollback needed)
-                summary_result = await content_analyzer.summarize_content(file_path)
-                result["summary"] = summary_result
-                
-                # End transaction as completed
-                if transaction_id:
-                    await rollback_manager.end_transaction(transaction_id, "completed")
+                try:
+                    summary_result = await content_analyzer.summarize_content(file_path)
+                    result["summary"] = summary_result
+                    result["success"] = True
+                    
+                    # End transaction as completed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "completed")
+                except Exception as e:
+                    self._logger.error(f"Error summarizing file content: {str(e)}")
+                    result["error"] = f"Error summarizing file content: {str(e)}"
+                    
+                    # End transaction as failed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "failed")
                 
             elif operation_type == "search":
                 # Search file content (no rollback needed)
-                search_result = await content_analyzer.search_content(file_path, request)
-                result["search_results"] = search_result
-                
-                # End transaction as completed
-                if transaction_id:
-                    await rollback_manager.end_transaction(transaction_id, "completed")
+                try:
+                    search_result = await content_analyzer.search_content(file_path, request)
+                    result["search_results"] = search_result
+                    result["success"] = True
+                    
+                    # End transaction as completed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "completed")
+                except Exception as e:
+                    self._logger.error(f"Error searching file content: {str(e)}")
+                    result["error"] = f"Error searching file content: {str(e)}"
+                    
+                    # End transaction as failed
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "failed")
                 
             elif operation_type == "manipulate":
                 # Manipulate file content
-                manipulation_result = await content_analyzer.manipulate_content(file_path, request)
-                result["manipulation"] = manipulation_result
-                
-                # Apply changes if requested
-                if execute and not dry_run and manipulation_result["has_changes"]:
-                    # Get confirmation before applying changes
-                    confirmed = await self._confirm_file_changes(
-                        file_path, 
-                        manipulation_result["diff"]
-                    )
+                try:
+                    manipulation_result = await content_analyzer.manipulate_content(file_path, request)
+                    result["manipulation"] = manipulation_result
                     
-                    if confirmed:
-                        # Read original content for rollback
-                        original_content = manipulation_result["original_content"]
-                        modified_content = manipulation_result["modified_content"]
+                    # Apply changes if requested
+                    if execute and not dry_run and manipulation_result.get("has_changes", False):
+                        # Get confirmation before applying changes
+                        confirmed = await self._confirm_file_changes(
+                            file_path, 
+                            manipulation_result.get("diff", "No changes")
+                        )
                         
-                        # Record the content manipulation for rollback
-                        if transaction_id:
-                            await rollback_manager.record_content_manipulation(
-                                file_path=file_path,
-                                original_content=original_content,
-                                modified_content=modified_content,
-                                instruction=request,
-                                transaction_id=transaction_id
-                            )
-                        
-                        # Write the changes to the file
-                        try:
-                            with open(file_path, 'w', encoding='utf-8') as f:
-                                f.write(modified_content)
-                            result["changes_applied"] = True
-                            result["success"] = True
+                        if confirmed:
+                            # Read original content for rollback
+                            original_content = manipulation_result.get("original_content", "")
+                            modified_content = manipulation_result.get("modified_content", "")
                             
-                            # End transaction as completed
+                            # Record the content manipulation for rollback
                             if transaction_id:
-                                await rollback_manager.end_transaction(transaction_id, "completed")
-                        except Exception as e:
-                            self._logger.error(f"Error applying changes to {file_path}: {str(e)}")
-                            result["error"] = f"Error applying changes: {str(e)}"
+                                await rollback_manager.record_content_manipulation(
+                                    file_path=file_path,
+                                    original_content=original_content,
+                                    modified_content=modified_content,
+                                    instruction=request,
+                                    transaction_id=transaction_id
+                                )
+                            
+                            # Write the changes to the file
+                            try:
+                                with open(file_path, 'w', encoding='utf-8') as f:
+                                    f.write(modified_content)
+                                result["changes_applied"] = True
+                                result["success"] = True
+                                
+                                # End transaction as completed
+                                if transaction_id:
+                                    await rollback_manager.end_transaction(transaction_id, "completed")
+                            except Exception as e:
+                                self._logger.error(f"Error applying changes to {file_path}: {str(e)}")
+                                result["error"] = f"Error applying changes: {str(e)}"
+                                result["changes_applied"] = False
+                                result["success"] = False
+                                
+                                # End transaction as failed
+                                if transaction_id:
+                                    await rollback_manager.end_transaction(transaction_id, "failed")
+                        else:
                             result["changes_applied"] = False
-                            result["success"] = False
+                            result["cancelled"] = True
                             
-                            # End transaction as failed
+                            # End transaction as cancelled
                             if transaction_id:
-                                await rollback_manager.end_transaction(transaction_id, "failed")
-                    else:
+                                await rollback_manager.end_transaction(transaction_id, "cancelled")
+                    elif dry_run and manipulation_result.get("has_changes", False):
                         result["changes_applied"] = False
-                        result["cancelled"] = True
+                        result["success"] = True
+                        result["dry_run"] = True
                         
-                        # End transaction as cancelled
+                        # End transaction as completed for dry run
                         if transaction_id:
-                            await rollback_manager.end_transaction(transaction_id, "cancelled")
-                elif dry_run and manipulation_result["has_changes"]:
-                    result["changes_applied"] = False
-                    result["success"] = True
-                    result["dry_run"] = True
+                            await rollback_manager.end_transaction(transaction_id, "completed")
+                    else:
+                        # No changes to apply or not executing
+                        result["success"] = True
+                        if transaction_id:
+                            await rollback_manager.end_transaction(transaction_id, "completed")
+                except Exception as e:
+                    self._logger.error(f"Error manipulating file content: {str(e)}")
+                    result["error"] = f"Error manipulating file content: {str(e)}"
                     
-                    # End transaction as completed for dry run
+                    # End transaction as failed
                     if transaction_id:
-                        await rollback_manager.end_transaction(transaction_id, "completed")
-                else:
-                    # No changes to apply or not executing
-                    if transaction_id:
-                        await rollback_manager.end_transaction(transaction_id, "completed")
+                        await rollback_manager.end_transaction(transaction_id, "failed")
+                
+            else:
+                # Unknown operation type
+                result["error"] = f"Unknown file operation type: {operation_type}"
+                
+                # End transaction as failed
+                if transaction_id:
+                    await rollback_manager.end_transaction(transaction_id, "failed")
             
             return result
             
@@ -2024,7 +2113,14 @@ class Orchestrator:
                 await rollback_manager.end_transaction(transaction_id, "failed")
             
             self._logger.exception(f"Error processing file content request: {str(e)}")
-            raise
+            
+            return {
+                "request": request,
+                "type": "file_content",
+                "context": context,
+                "error": f"Error processing file content request: {str(e)}",
+                "success": False
+            }
     
 
     
@@ -2048,10 +2144,18 @@ class Orchestrator:
         # Find failed steps
         for i, result in enumerate(execution_results):
             if not result.get("success", False):
-                # Get the corresponding step
-                if i < len(plan.steps):
+                # Get the corresponding step - safely handle potential index errors
+                step = None
+                if hasattr(plan, 'steps') and isinstance(plan.steps, list) and i < len(plan.steps):
                     step = plan.steps[i]
-                    
+                elif hasattr(plan, 'steps') and isinstance(plan.steps, dict):
+                    # Try to find the step by id if it's a dictionary
+                    step_id = result.get('step_id')
+                    if step_id and step_id in plan.steps:
+                        step = plan.steps[step_id]
+                
+                # Only attempt recovery if we have a valid step
+                if step:
                     # Attempt recovery
                     recovery_result = await self._error_recovery_manager.handle_error(
                         step, result, {"plan": plan}
@@ -2399,39 +2503,78 @@ Keep your response concise and focused.
         """
         self._logger.debug(f"Extracting file path from: {request}")
         
-        # Try to extract file references
-        file_references = await file_resolver.extract_references(request, context)
-        
-        # If we found any resolved references, return the first one
-        for reference, path in file_references:
-            if path:
-                # Track as viewed file
-                file_activity_tracker.track_file_viewing(path, None, {
-                    "request": request,
-                    "reference": reference
-                })
-                return path
-        
-        # If we found references but couldn't resolve them, use AI extraction as fallback
-        if file_references:
-            for reference, _ in file_references:
-                # Try to resolve with a broader scope
-                path = await file_resolver.resolve_reference(
-                    reference, 
-                    context,
-                    search_scope="project"
-                )
+        try:
+            # Try to extract file references
+            file_references = await file_resolver.extract_references(request, context)
+            
+            # If we found any resolved references, return the first one
+            for reference, path in file_references:
                 if path:
                     # Track as viewed file
-                    file_activity_tracker.track_file_viewing(path, None, {
-                        "request": request,
-                        "reference": reference
-                    })
+                    try:
+                        file_activity_tracker.track_file_viewing(path, None, {
+                            "request": request,
+                            "reference": reference
+                        })
+                    except Exception as e:
+                        self._logger.warning(f"Error tracking file viewing: {str(e)}")
+                        
                     return path
-        
-        # If all else fails, fall back to the original AI method
-        # [Existing AI extraction code]
-        return None
+            
+            # If we found references but couldn't resolve them, use AI extraction as fallback
+            if file_references:
+                for reference, _ in file_references:
+                    # Try to resolve with a broader scope
+                    try:
+                        path = await file_resolver.resolve_reference(
+                            reference, 
+                            context,
+                            search_scope="project"
+                        )
+                        if path:
+                            # Track as viewed file
+                            try:
+                                file_activity_tracker.track_file_viewing(path, None, {
+                                    "request": request,
+                                    "reference": reference
+                                })
+                            except Exception as e:
+                                self._logger.warning(f"Error tracking file viewing: {str(e)}")
+                                
+                            return path
+                    except Exception as e:
+                        self._logger.warning(f"Error resolving reference '{reference}': {str(e)}")
+            
+            # If all else fails, try to extract from the request text directly
+            file_patterns = [
+                r'file[s]?\s+(?:called|named)\s+"([^"]+)"',
+                r'file[s]?\s+(?:called|named)\s+\'([^\']+)\'',
+                r'file[s]?\s+([a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]+)',
+                r'(?:in|from|to)\s+(?:the\s+)?file[s]?\s+"([^"]+)"',
+                r'(?:in|from|to)\s+(?:the\s+)?file[s]?\s+\'([^\']+)\'',
+                r'(?:in|from|to)\s+(?:the\s+)?file[s]?\s+([a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]+)'
+            ]
+            
+            for pattern in file_patterns:
+                match = re.search(pattern, request, re.IGNORECASE)
+                if match:
+                    file_name = match.group(1)
+                    # Check if this file exists in the current directory
+                    file_path = Path(context.get('cwd', '.')) / file_name
+                    if file_path.exists():
+                        return file_path
+                    
+                    # Check if it exists in the project root
+                    if 'project_root' in context:
+                        project_path = Path(context['project_root']) / file_name
+                        if project_path.exists():
+                            return project_path
+            
+            return None
+            
+        except Exception as e:
+            self._logger.error(f"Error extracting file path: {str(e)}")
+            return None
     
     async def _determine_file_operation_type(self, request: str) -> str:
         """
@@ -2816,21 +2959,43 @@ Include only the JSON object with no additional text.
     
     def _start_background_monitoring(self, command: str, error_analysis: Dict[str, Any]) -> None:
         """
-        Start background monitoring for a failed command.
+        Start background monitoring for a failed command with proper cleanup.
         
         Args:
             command: The failed command
             error_analysis: Analysis of the error
         """
-        # Create and start a background task
-        task = asyncio.create_task(
-            self._monitor_for_suggestions(command, error_analysis)
-        )
+        # Create and start a background task with timeout
+        async def monitored_task():
+            try:
+                # Set a reasonable timeout for monitoring (e.g., 5 minutes)
+                timeout = 300  # seconds
+                await asyncio.wait_for(
+                    self._monitor_for_suggestions(command, error_analysis),
+                    timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                self._logger.info(f"Background monitoring timed out after {timeout} seconds")
+            except Exception as e:
+                self._logger.error(f"Error in background monitoring: {str(e)}")
+        
+        # Create the task and add it to our set of background tasks
+        task = asyncio.create_task(monitored_task())
         
         # Add the task to our set of background tasks
         self._background_tasks.add(task)
-        # Remove the task when it's done
-        task.add_done_callback(self._background_tasks.discard)
+        
+        # Define a callback to remove the task when it's done and handle any exceptions
+        def task_done_callback(task):
+            self._background_tasks.discard(task)
+            # Check for exceptions that weren't handled inside the task
+            if not task.cancelled():
+                exception = task.exception()
+                if exception:
+                    self._logger.error(f"Unhandled exception in background task: {str(exception)}")
+        
+        # Add the callback
+        task.add_done_callback(task_done_callback)
     
     async def _monitor_for_suggestions(self, command: str, error_analysis: Dict[str, Any]) -> None:
         """
@@ -2890,83 +3055,6 @@ Include only the JSON object with no additional text.
         return await execute_file_operation(operation, parameters, dry_run=dry_run)
 
 
-    async def _determine_request_type(
-        self, 
-        request: str, 
-        context: Dict[str, Any]
-    ) -> RequestType:
-        """
-        Determine the type of request.
-        
-        Args:
-            request: The user request
-            context: Context information
-            
-        Returns:
-            RequestType enum value
-        """
-        # ... (existing code)
-        
-        # Add new patterns for Universal CLI requests
-        universal_cli_patterns = [
-            r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
-            r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
-            r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
-        ]
-        
-        # Add patterns for complex workflows
-        complex_workflow_patterns = [
-            r'\bcomplex\s+workflow\b',
-            r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
-            r'\bautomated\s+(?:build|test|deploy)\b',
-            r'\bend-to-end\s+workflow\b',
-            r'\bchain\s+of\s+commands\b',
-            r'\bmulti-step\s+operation\s+across\b',
-            r'\bpipeline\s+using\b',
-            r'\bseries\s+of\s+tools\b',
-        ]
-        
-        # Check for complex workflow patterns
-        for pattern in complex_workflow_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.COMPLEX_WORKFLOW
-        
-        # Check for Universal CLI patterns
-        for pattern in universal_cli_patterns:
-            match = re.search(pattern, request, re.IGNORECASE)
-            if match:
-                tool = match.group(1).strip().lower()
-                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Check for common CLI tools explicitly mentioned
-        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
-        tool_words = request.lower().split()
-        for tool in common_tools:
-            if tool in tool_words:
-                # Make sure it's a standalone word, not part of another word
-                # Check the positions where the tool appears
-                positions = [i for i, word in enumerate(tool_words) if word == tool]
-                for pos in positions:
-                    # Check if it's a command (usually preceded by use, run, with, etc.)
-                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
-                        return RequestType.UNIVERSAL_CLI
-                
-                # If tool is the first word in the request, it's likely a direct usage
-                if tool_words[0] == tool:
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Also check for complexity indicators combined with multiple tool mentions
-        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
-                            if tool in request.lower())
-        has_complex_indicators = any(indicator in request.lower() for indicator in 
-                                    ["pipeline", "sequence", "then", "after", "followed"])
-    
-        if tool_mentions >= 2 and has_complex_indicators:
-            return RequestType.COMPLEX_WORKFLOW
-        
-
-    
 
     async def _process_universal_cli_request(
         self, 
@@ -3290,6 +3378,366 @@ Include only the JSON object with no additional text.
         if insight_type == "critical_resource_warning" and insight_data.get("severity") == "high":
             # Take immediate action
             await self._handle_critical_resource_warning(insight_data)
+
+    async def _process_complex_workflow_request(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a complex workflow request involving multiple tools.
+        
+        This method handles advanced workflows that span multiple tools and services,
+        such as complete CI/CD pipelines, end-to-end deployment processes, etc.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the workflow
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing complex workflow request: {request}")
+        
+        # Import here to avoid circular imports
+        from angela.intent.complex_workflow_planner import complex_workflow_planner
+        
+        # Start a transaction for this complex workflow
+        transaction_id = None
+        if not dry_run and execute:
+            transaction_id = await rollback_manager.start_transaction(f"Complex workflow: {request[:50]}...")
+        
+        try:
+            # Generate a workflow plan
+            workflow_plan = await complex_workflow_planner.plan_complex_workflow(
+                request=request,
+                context=context,
+                max_steps=50  # Allow more steps for complex workflows
+            )
+            
+            # Create result structure
+            result = {
+                "request": request,
+                "type": "complex_workflow",
+                "context": context,
+                "workflow_plan": {
+                    "id": workflow_plan.id,
+                    "name": workflow_plan.name,
+                    "description": workflow_plan.description,
+                    "steps_count": len(workflow_plan.steps),
+                    "tools": self._extract_unique_tools(workflow_plan),
+                    "estimated_duration": self._estimate_workflow_duration(workflow_plan)
+                }
+            }
+            
+            # Execute the workflow if requested
+            if execute or dry_run:
+                # Display the workflow plan
+                await terminal_formatter.display_complex_workflow_plan(workflow_plan)
+                
+                # Get confirmation from user unless forced
+                confirmed = True
+                if not context.get("session", {}).get("force_execution", False):
+                    confirmed = await self._confirm_complex_workflow_execution(workflow_plan, dry_run)
+                
+                if confirmed or dry_run:
+                    # Execute the workflow with transaction support
+                    execution_results = await complex_workflow_planner.execute_complex_workflow(
+                        workflow_plan, 
+                        dry_run=dry_run,
+                        transaction_id=transaction_id
+                    )
+                    
+                    result["execution_results"] = execution_results
+                    result["success"] = execution_results.get("success", False)
+                    
+                    # End transaction based on result
+                    if transaction_id:
+                        status = "completed" if result["success"] else "failed"
+                        await rollback_manager.end_transaction(transaction_id, status)
+                else:
+                    # User cancelled execution
+                    result["cancelled"] = True
+                    result["success"] = False
+                    
+                    # End transaction as cancelled
+                    if transaction_id:
+                        await rollback_manager.end_transaction(transaction_id, "cancelled")
+            
+            return result
+            
+        except Exception as e:
+            # Handle any exceptions and end the transaction
+            self._logger.exception(f"Error processing complex workflow: {str(e)}")
+            
+            if transaction_id:
+                await rollback_manager.end_transaction(transaction_id, "failed")
+            
+            return {
+                "request": request,
+                "type": "complex_workflow",
+                "context": context,
+                "error": str(e),
+                "success": False
+            }
+    
+    def _extract_unique_tools(self, workflow_plan: Any) -> List[str]:
+        """
+        Extract the unique tools used in a workflow plan.
+        
+        Args:
+            workflow_plan: The workflow plan
+            
+        Returns:
+            List of unique tools
+        """
+        import shlex  # Make sure shlex is imported
+        
+        tools = set()
+        
+        # Safely check if steps exists and is iterable
+        if not hasattr(workflow_plan, 'steps') or not workflow_plan.steps:
+            return []
+        
+        # Handle both dictionary and list step structures
+        steps = []
+        if isinstance(workflow_plan.steps, dict):
+            steps = workflow_plan.steps.items()
+        elif isinstance(workflow_plan.steps, list):
+            steps = [(i, step) for i, step in enumerate(workflow_plan.steps)]
+        else:
+            # Unknown structure, return empty list
+            return []
+        
+        for step_id, step in steps:
+            if hasattr(step, "tool") and step.tool:
+                tools.add(step.tool)
+            elif hasattr(step, "type") and step.type == "TOOL" and hasattr(step, "tool") and step.tool:
+                tools.add(step.tool)
+            elif hasattr(step, "command") and step.command:
+                # Try to extract tool from command
+                try:
+                    cmd_parts = shlex.split(step.command)
+                    if cmd_parts:
+                        tools.add(cmd_parts[0])
+                except Exception:
+                    # If shlex.split fails, just use the first word as a fallback
+                    first_word = step.command.split()[0] if step.command.split() else ""
+                    if first_word:
+                        tools.add(first_word)
+        
+        return sorted(list(tools))
+    
+    def _estimate_workflow_duration(self, workflow_plan: Any) -> int:
+        """
+        Estimate the duration of a workflow in seconds.
+        
+        Args:
+            workflow_plan: The workflow plan
+            
+        Returns:
+            Estimated duration in seconds
+        """
+        # Base duration per step type
+        step_durations = {
+            "COMMAND": 10,  # Simple commands take ~10 seconds
+            "TOOL": 30,     # Tool commands might take longer
+            "API": 15,      # API calls typically take 15 seconds
+            "FILE": 5,      # File operations are usually fast
+            "WAIT": 30,     # Wait steps default to 30 seconds
+            "DECISION": 2,  # Decisions are quick
+            "VALIDATION": 5,  # Validations are usually fast
+            "PARALLEL": 40,  # Parallel steps might take longer
+            "CUSTOM_CODE": 20,  # Custom code execution
+            "NOTIFICATION": 2   # Notifications are instantaneous
+        }
+        
+        total_duration = 0
+        
+        for step_id, step in workflow_plan.steps.items():
+            step_type = getattr(step, "type", "COMMAND")
+            
+            # Get base duration for this step type
+            duration = step_durations.get(step_type, 10)
+            
+            # Adjust for specific commands or operations
+            if hasattr(step, "command") and step.command:
+                cmd = step.command.lower()
+                
+                # Long-running processes
+                if any(pattern in cmd for pattern in ["build", "compile", "install", "test", "deploy"]):
+                    duration = max(duration, 60)  # At least a minute
+                
+                # Very long running processes
+                if any(pattern in cmd for pattern in ["docker build", "mvn install", "npm build", "deployment"]):
+                    duration = max(duration, 300)  # At least 5 minutes
+            
+            # For wait steps, use the actual timeout if specified
+            if step_type == "WAIT" and hasattr(step, "timeout") and step.timeout:
+                duration = max(duration, step.timeout)
+            
+            total_duration += duration
+        
+        # Adjust for parallel execution
+        # This is a simplification - we're not building a full dependency graph
+        parallel_reduction = 0
+        parallel_steps = sum(1 for step in workflow_plan.steps.values() 
+                            if getattr(step, "type", "") == "PARALLEL")
+        
+        if parallel_steps > 0:
+            # Rough estimate - each parallel step reduces total time by ~20%
+            parallel_reduction = total_duration * (0.2 * min(parallel_steps, 3))
+        
+        # Apply the reduction, but ensure we don't go below 10 seconds
+        return max(10, int(total_duration - parallel_reduction))
+    
+    async def _confirm_complex_workflow_execution(self, workflow_plan: Any, dry_run: bool) -> bool:
+        """
+        Get confirmation for executing a complex workflow.
+        
+        Args:
+            workflow_plan: The workflow plan
+            dry_run: Whether this is a dry run
+            
+        Returns:
+            True if confirmed, False otherwise
+        """
+        if dry_run:
+            return True  # No confirmation needed for dry run
+        
+        # Analyze the workflow risk level
+        high_risk_steps = []
+        for step_id, step in workflow_plan.steps.items():
+            risk_level = getattr(step, "risk_level", 0)
+            if risk_level >= 3:  # High risk
+                high_risk_steps.append((step_id, getattr(step, "name", f"Step {step_id}")))
+        
+        # Import here to avoid circular imports
+        from rich.console import Console
+        from rich.panel import Panel
+        from prompt_toolkit.shortcuts import yes_no_dialog
+        
+        console = Console()
+        
+        # Display a warning for high-risk steps
+        if high_risk_steps:
+            warning_text = "This workflow includes HIGH RISK operations:\n\n"
+            for step_id, step_name in high_risk_steps:
+                warning_text += f"• {step_name} ({step_id})\n"
+            warning_text += "\nSome of these steps could make significant changes to your system."
+            
+            console.print(Panel(
+                warning_text,
+                title="⚠️ Warning: High Risk Operations ⚠️",
+                border_style="red",
+                expand=False
+            ))
+        
+        # Display workflow scope and impact
+        tools = self._extract_unique_tools(workflow_plan)
+        estimated_duration = self._estimate_workflow_duration(workflow_plan)
+        
+        scope_text = f"This workflow will use {len(tools)} different tools: {', '.join(tools)}\n"
+        scope_text += f"Estimated duration: {int(estimated_duration/60)} minutes {estimated_duration%60} seconds\n"
+        scope_text += f"Step count: {len(workflow_plan.steps)}"
+        
+        console.print(Panel(
+            scope_text,
+            title="Workflow Scope",
+            border_style="blue",
+            expand=False
+        ))
+        
+        # Get confirmation
+        confirmed = yes_no_dialog(
+            title="Confirm Complex Workflow Execution",
+            text=f"Do you want to execute this complex workflow with {len(workflow_plan.steps)} steps?",
+        ).run()
+        
+        return confirmed
+
+    async def _execute_with_feedback(self, command: str, dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Execute a command with real-time feedback.
+        
+        Args:
+            command: The command to execute
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with execution results
+        """
+        self._logger.info(f"{'Dry run of' if dry_run else 'Executing'} command: {command}")
+        
+        if dry_run:
+            return {
+                "command": command,
+                "success": True,
+                "stdout": f"[DRY RUN] Would execute: {command}",
+                "stderr": "",
+                "return_code": 0,
+                "dry_run": True
+            }
+        
+        # Use the execution engine to run the command
+        stdout, stderr, exit_code = await execution_engine.execute_command(
+            command=command,
+            check_safety=True
+        )
+        
+        return {
+            "command": command,
+            "success": exit_code == 0,
+            "stdout": stdout,
+            "stderr": stderr,
+            "return_code": exit_code,
+            "dry_run": False
+        }
+
+
+    async def _handle_critical_resource_warning(self, warning_data: Dict[str, Any]) -> None:
+        """
+        Handle a critical resource warning from the monitoring system.
+        
+        Args:
+            warning_data: Warning data from the monitoring system
+        """
+        self._logger.warning(f"Handling critical resource warning: {warning_data}")
+        
+        # Log the warning
+        resource_type = warning_data.get("resource_type", "unknown")
+        resource_name = warning_data.get("resource_name", "unknown")
+        severity = warning_data.get("severity", "unknown")
+        
+        # Take action based on resource type
+        if resource_type == "memory" and severity == "high":
+            # Suggest garbage collection or process restart
+            from rich.console import Console
+            console = Console()
+            console.print(f"\n[bold red]Warning:[/bold red] High memory usage detected for {resource_name}")
+            console.print("Consider freeing up memory or restarting resource-intensive processes.")
+        
+        elif resource_type == "disk" and severity == "high":
+            # Suggest disk cleanup
+            from rich.console import Console
+            console = Console()
+            console.print(f"\n[bold red]Warning:[/bold red] Low disk space detected for {resource_name}")
+            console.print("Consider removing temporary files or unused artifacts.")
+        
+        elif resource_type == "cpu" and severity == "high":
+            # Suggest process throttling
+            from rich.console import Console
+            console = Console()
+            console.print(f"\n[bold red]Warning:[/bold red] High CPU usage detected for {resource_name}")
+            console.print("Consider throttling or pausing resource-intensive processes.")
+        
+        return None  
+
+
 
 # Global orchestrator instance
 orchestrator = Orchestrator()

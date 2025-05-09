@@ -9,6 +9,7 @@ def init_application():
     from angela.generation.context_manager import generation_context_manager
     from angela.generation.refiner import interactive_refiner    
     from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
+    from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
     
     # This import might be missing, let's check if it exists
     try:

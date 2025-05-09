@@ -867,5 +867,1192 @@ pipeline {
                 "project_type": project_type
             }
 
+
+    async def create_complete_pipeline(
+        self,
+        project_path: Union[str, Path],
+        platform: str,
+        pipeline_type: str = "full",  # "full", "build-only", "deploy-only"
+        custom_settings: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a complete CI/CD pipeline for a project.
+        
+        Args:
+            project_path: Path to the project
+            platform: CI/CD platform to use
+            pipeline_type: Type of pipeline to create
+            custom_settings: Custom settings for the pipeline
+            
+        Returns:
+            Dictionary with the creation result
+        """
+        project_path = Path(project_path)
+        self._logger.info(f"Creating complete {pipeline_type} pipeline for {project_path} on {platform}")
+        
+        # Detect project type
+        detection_result = await self.detect_project_type(project_path)
+        if not detection_result.get("detected"):
+            return {
+                "success": False,
+                "error": detection_result.get("error", "Could not detect project type"),
+                "platform": platform
+            }
+        
+        project_type = detection_result["project_type"]
+        
+        # Determine pipeline steps based on project type and pipeline type
+        pipeline_steps = await self._determine_pipeline_steps(
+            project_type, 
+            platform, 
+            pipeline_type
+        )
+        
+        # Merge with custom settings
+        if custom_settings:
+            pipeline_steps.update(custom_settings)
+        
+        # Generate configuration
+        result = await self.generate_ci_configuration(
+            path=project_path,
+            platform=platform,
+            project_type=project_type,
+            custom_settings=pipeline_steps
+        )
+        
+        if not result.get("success"):
+            return result
+        
+        # Set up additional required files
+        if pipeline_type == "full" or pipeline_type == "deploy-only":
+            # Set up deployment configuration if needed
+            deploy_result = await self._setup_deployment_config(
+                project_path, 
+                platform, 
+                project_type,
+                pipeline_steps
+            )
+            
+            if deploy_result:
+                result["deployment_config"] = deploy_result
+        
+        # Set up testing configurations if needed
+        if pipeline_type == "full" or pipeline_type == "build-only":
+            testing_result = await self._setup_testing_config(
+                project_path,
+                project_type,
+                pipeline_steps
+            )
+            
+            if testing_result:
+                result["testing_config"] = testing_result
+        
+        return result
+    
+    async def _determine_pipeline_steps(
+        self,
+        project_type: str,
+        platform: str,
+        pipeline_type: str
+    ) -> Dict[str, Any]:
+        """
+        Determine the steps for a CI/CD pipeline.
+        
+        Args:
+            project_type: Type of project
+            platform: CI/CD platform
+            pipeline_type: Type of pipeline
+            
+        Returns:
+            Dictionary with pipeline steps
+        """
+        self._logger.debug(f"Determining pipeline steps for {project_type} on {platform} ({pipeline_type})")
+        
+        # Base steps common to all pipelines
+        pipeline_steps = {
+            "build": True,
+            "test": True,
+            "lint": True,
+            "security_scan": pipeline_type == "full",
+            "package": pipeline_type != "build-only",
+            "deploy": pipeline_type != "build-only",
+            "notify": pipeline_type == "full"
+        }
+        
+        # Add platform-specific settings
+        if platform == "github_actions":
+            # GitHub Actions specific settings
+            pipeline_steps["triggers"] = {
+                "push": ["main", "master"],
+                "pull_request": ["main", "master"],
+                "manual": pipeline_type != "build-only"
+            }
+            
+            # Add deployment environment based on pipeline type
+            if pipeline_type != "build-only":
+                pipeline_steps["environments"] = ["staging"]
+                if pipeline_type == "full":
+                    pipeline_steps["environments"].append("production")
+        
+        elif platform == "gitlab_ci":
+            # GitLab CI specific settings
+            pipeline_steps["stages"] = ["build", "test", "package"]
+            if pipeline_type != "build-only":
+                pipeline_steps["stages"].extend(["deploy", "verify"])
+            
+            pipeline_steps["cache"] = True
+            pipeline_steps["artifacts"] = True
+        
+        # Add project-type specific settings
+        if project_type == "python":
+            pipeline_steps["python_versions"] = ["3.8", "3.9", "3.10"]
+            pipeline_steps["test_command"] = "pytest --cov"
+            pipeline_steps["lint_command"] = "flake8"
+        
+        elif project_type == "node":
+            pipeline_steps["node_versions"] = ["14", "16", "18"]
+            pipeline_steps["test_command"] = "npm test"
+            pipeline_steps["lint_command"] = "npm run lint"
+        
+        elif project_type == "go":
+            pipeline_steps["go_versions"] = ["1.18", "1.19"]
+            pipeline_steps["test_command"] = "go test ./..."
+            pipeline_steps["lint_command"] = "golangci-lint run"
+        
+        elif project_type == "java":
+            pipeline_steps["java_versions"] = ["11", "17"]
+            pipeline_steps["test_command"] = "mvn test"
+            pipeline_steps["lint_command"] = "mvn checkstyle:check"
+        
+        return pipeline_steps
+    
+    async def _setup_deployment_config(
+        self,
+        project_path: Path,
+        platform: str,
+        project_type: str,
+        pipeline_steps: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Set up deployment configuration files.
+        
+        Args:
+            project_path: Path to the project
+            platform: CI/CD platform
+            project_type: Type of project
+            pipeline_steps: Pipeline steps configuration
+            
+        Returns:
+            Dictionary with deployment configuration result
+        """
+        self._logger.info(f"Setting up deployment configuration for {project_type}")
+        
+        # Create deployment configuration based on project type
+        if project_type == "python":
+            # For Python, create a simple deployment script
+            scripts_dir = project_path / "scripts"
+            deploy_script = scripts_dir / "deploy.sh"
+            
+            # Create scripts directory if it doesn't exist
+            os.makedirs(scripts_dir, exist_ok=True)
+            
+            # Write deployment script
+            with open(deploy_script, "w") as f:
+                f.write("""#!/bin/bash
+    set -e
+    
+    # Deployment script for Python project
+    echo "Deploying Python application..."
+    
+    # Install dependencies
+    pip install -r requirements.txt
+    
+    # Check for common deployment frameworks
+    if [ -f "manage.py" ]; then
+        echo "Django project detected"
+        python manage.py migrate
+        python manage.py collectstatic --noinput
+    elif [ -f "app.py" ] || [ -f "wsgi.py" ]; then
+        echo "Flask/WSGI project detected"
+    else
+        echo "Generic Python project"
+    fi
+    
+    # Reload application (depends on hosting)
+    if [ -f "gunicorn.pid" ]; then
+        echo "Reloading Gunicorn..."
+        kill -HUP $(cat gunicorn.pid)
+    elif command -v systemctl &> /dev/null && systemctl list-units --type=service | grep -q "$(basename $(pwd))"; then
+        echo "Restarting service..."
+        systemctl restart $(basename $(pwd))
+    else
+        echo "Starting application..."
+        # Add your start command here
+    fi
+    
+    echo "Deployment complete!"
+    """)
+            
+            # Make the script executable
+            deploy_script.chmod(0o755)
+            
+            return {
+                "success": True,
+                "files_created": [str(deploy_script)],
+                "message": "Created deployment script"
+            }
+        
+        elif project_type == "node":
+            # For Node.js, create a deployment configuration
+            scripts_dir = project_path / "scripts"
+            deploy_script = scripts_dir / "deploy.js"
+            
+            # Create scripts directory if it doesn't exist
+            os.makedirs(scripts_dir, exist_ok=True)
+            
+            # Write deployment script
+            with open(deploy_script, "w") as f:
+                f.write("""// Deployment script for Node.js project
+    console.log('Deploying Node.js application...');
+    
+    const { execSync } = require('child_process');
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Execute shell command and print output
+    function exec(command) {
+        console.log(`> ${command}`);
+        try {
+            const output = execSync(command, { encoding: 'utf8' });
+            if (output) console.log(output);
+        } catch (error) {
+            console.error(`Error: ${error.message}`);
+            process.exit(1);
+        }
+    }
+    
+    // Install dependencies
+    exec('npm ci --production');
+    
+    // Check for common frameworks
+    const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+    const dependencies = packageJson.dependencies || {};
+    
+    if (dependencies.next) {
+        console.log('Next.js project detected');
+        exec('npm run build');
+    } else if (dependencies.react) {
+        console.log('React project detected');
+        exec('npm run build');
+    } else if (dependencies.vue) {
+        console.log('Vue.js project detected');
+        exec('npm run build');
+    } else if (dependencies.express) {
+        console.log('Express.js project detected');
+    } else {
+        console.log('Generic Node.js project');
+    }
+    
+    // Restart application
+    try {
+        if (fs.existsSync('process.pid')) {
+            console.log('Reloading application...');
+            const pid = fs.readFileSync('process.pid', 'utf8').trim();
+            try {
+                process.kill(pid, 'SIGUSR2');
+                console.log(`Sent SIGUSR2 to process ${pid}`);
+            } catch (err) {
+                console.log(`Process ${pid} not found, starting fresh`);
+                // Start application
+                if (fs.existsSync('ecosystem.config.js')) {
+                    exec('npx pm2 reload ecosystem.config.js');
+                } else {
+                    // Determine main file
+                    const mainFile = packageJson.main || 'index.js';
+                    exec(`npx pm2 start ${mainFile} --name ${path.basename(process.cwd())}`);
+                }
+            }
+        } else if (fs.existsSync('ecosystem.config.js')) {
+            console.log('Starting with PM2...');
+            exec('npx pm2 reload ecosystem.config.js');
+        } else {
+            console.log('Starting application...');
+            // Determine main file
+            const mainFile = packageJson.main || 'index.js';
+            exec(`npx pm2 start ${mainFile} --name ${path.basename(process.cwd())}`);
+        }
+    } catch (error) {
+        console.error(`Error managing application process: ${error.message}`);
+    }
+    
+    console.log('Deployment complete!');
+    """)
+            
+            return {
+                "success": True,
+                "files_created": [str(deploy_script)],
+                "message": "Created deployment script"
+            }
+        
+        elif project_type == "go":
+            # For Go, create a deployment script
+            scripts_dir = project_path / "scripts"
+            deploy_script = scripts_dir / "deploy.sh"
+            
+            # Create scripts directory if it doesn't exist
+            os.makedirs(scripts_dir, exist_ok=True)
+            
+            # Write deployment script
+            with open(deploy_script, "w") as f:
+                f.write("""#!/bin/bash
+    set -e
+    
+    # Deployment script for Go project
+    echo "Deploying Go application..."
+    
+    # Build the application
+    go build -o bin/app
+    
+    # Check if systemd service exists
+    SERVICE_NAME=$(basename $(pwd))
+    if systemctl list-units --type=service | grep -q "$SERVICE_NAME"; then
+        echo "Restarting service $SERVICE_NAME..."
+        sudo systemctl restart $SERVICE_NAME
+    else
+        echo "Starting application..."
+        # Create a systemd service file if needed
+        if [ ! -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
+            echo "Creating systemd service..."
+            cat > /tmp/$SERVICE_NAME.service <<EOL
+    [Unit]
+    Description=$SERVICE_NAME
+    After=network.target
+    
+    [Service]
+    Type=simple
+    User=$(whoami)
+    WorkingDirectory=$(pwd)
+    ExecStart=$(pwd)/bin/app
+    Restart=on-failure
+    
+    [Install]
+    WantedBy=multi-user.target
+    EOL
+            sudo mv /tmp/$SERVICE_NAME.service /etc/systemd/system/
+            sudo systemctl daemon-reload
+            sudo systemctl enable $SERVICE_NAME
+            sudo systemctl start $SERVICE_NAME
+        else
+            # Start directly if no service exists and we can't create one
+            nohup bin/app > logs/app.log 2>&1 &
+            echo $! > app.pid
+            echo "Application started with PID $(cat app.pid)"
+        fi
+    fi
+    
+    echo "Deployment complete!"
+    """)
+            
+            # Make the script executable
+            deploy_script.chmod(0o755)
+            
+            return {
+                "success": True,
+                "files_created": [str(deploy_script)],
+                "message": "Created deployment script"
+            }
+        
+        # Add more project types as needed
+        
+        return {
+            "success": False,
+            "message": f"No deployment configuration available for {project_type}"
+        }
+    
+    async def _setup_testing_config(
+        self,
+        project_path: Path,
+        project_type: str,
+        pipeline_steps: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Set up testing configuration files.
+        
+        Args:
+            project_path: Path to the project
+            project_type: Type of project
+            pipeline_steps: Pipeline steps configuration
+            
+        Returns:
+            Dictionary with testing configuration result
+        """
+        self._logger.info(f"Setting up testing configuration for {project_type}")
+        
+        created_files = []
+        
+        if project_type == "python":
+            # Check if pytest.ini exists, create if not
+            pytest_ini = project_path / "pytest.ini"
+            if not pytest_ini.exists():
+                with open(pytest_ini, "w") as f:
+                    f.write("""[pytest]
+    testpaths = tests
+    python_files = test_*.py
+    python_classes = Test*
+    python_functions = test_*
+    addopts = --verbose --cov=./ --cov-report=term-missing
+    """)
+                created_files.append(str(pytest_ini))
+            
+            # Create a basic test directory and example test if not exists
+            tests_dir = project_path / "tests"
+            if not tests_dir.exists():
+                os.makedirs(tests_dir, exist_ok=True)
+                
+                # Create __init__.py
+                with open(tests_dir / "__init__.py", "w") as f:
+                    f.write("# Test package initialization")
+                created_files.append(str(tests_dir / "__init__.py"))
+                
+                # Create an example test
+                with open(tests_dir / "test_example.py", "w") as f:
+                    f.write("""import unittest
+    
+    class TestExample(unittest.TestCase):
+        def test_simple_assertion(self):
+            self.assertEqual(1 + 1, 2)
+            
+        def test_truth_value(self):
+            self.assertTrue(True)
+    """)
+                created_files.append(str(tests_dir / "test_example.py"))
+            
+            return {
+                "success": True,
+                "files_created": created_files,
+                "message": "Created testing configuration"
+            }
+        
+        elif project_type == "node":
+            # Check if jest configuration exists in package.json
+            package_json_path = project_path / "package.json"
+            if package_json_path.exists():
+                try:
+                    import json
+                    with open(package_json_path, "r") as f:
+                        package_data = json.load(f)
+                    
+                    # Check if jest is configured
+                    has_jest = False
+                    if "jest" not in package_data and "scripts" in package_data:
+                        # If not in scripts.test, add jest configuration
+                        if "test" not in package_data["scripts"] or "jest" not in package_data["scripts"]["test"]:
+                            package_data["scripts"]["test"] = "jest"
+                            has_jest = True
+                            
+                            # Save the updated package.json
+                            with open(package_json_path, "w") as f:
+                                json.dump(package_data, f, indent=2)
+                            
+                    # Create jest.config.js if needed
+                    jest_config = project_path / "jest.config.js"
+                    if not jest_config.exists() and has_jest:
+                        with open(jest_config, "w") as f:
+                            f.write("""module.exports = {
+      testEnvironment: 'node',
+      coverageDirectory: 'coverage',
+      collectCoverageFrom: [
+        'src/**/*.js',
+        '!src/index.js',
+        '!**/node_modules/**',
+      ],
+      testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
+    };
+    """)
+                        created_files.append(str(jest_config))
+                    
+                    # Create tests directory if needed
+                    tests_dir = project_path / "__tests__"
+                    if not tests_dir.exists() and has_jest:
+                        os.makedirs(tests_dir, exist_ok=True)
+                        
+                        # Create an example test
+                        with open(tests_dir / "example.test.js", "w") as f:
+                            f.write("""describe('Example Test Suite', () => {
+      test('adds 1 + 2 to equal 3', () => {
+        expect(1 + 2).toBe(3);
+      });
+      
+      test('true is truthy', () => {
+        expect(true).toBeTruthy();
+      });
+    });
+    """)
+                        created_files.append(str(tests_dir / "example.test.js"))
+                    
+                    return {
+                        "success": True,
+                        "files_created": created_files,
+                        "message": "Created testing configuration"
+                    }
+                    
+                except (json.JSONDecodeError, IOError) as e:
+                    self._logger.error(f"Error reading or updating package.json: {str(e)}")
+                    return {
+                        "success": False,
+                        "error": f"Failed to update package.json: {str(e)}"
+                    }
+        
+        # Add more project types as needed
+        
+        return {
+            "success": False,
+            "message": f"No testing configuration available for {project_type}"
+        }
+    
+    def get_repository_provider_from_url(self, url: str) -> str:
+        """
+        Determine the repository provider from a URL.
+        
+        Args:
+            url: Repository URL
+            
+        Returns:
+            Repository provider name ('github', 'gitlab', etc.) or 'unknown'
+        """
+        # Support for both HTTPS and SSH URLs
+        url = url.lower()
+        
+        # GitHub detection
+        if any(pattern in url for pattern in ["github.com", "github:", "@github.com"]):
+            return "github"
+        
+        # GitLab detection
+        elif any(pattern in url for pattern in ["gitlab.com", "gitlab:", "@gitlab.com"]):
+            return "gitlab"
+        
+        # Bitbucket detection
+        elif any(pattern in url for pattern in ["bitbucket.org", "bitbucket:", "@bitbucket.org"]):
+            return "bitbucket"
+        
+        # Azure DevOps detection
+        elif any(pattern in url for pattern in ["dev.azure.com", "visualstudio.com", "@ssh.dev.azure.com"]):
+            return "azure_devops"
+        
+        # AWS CodeCommit detection
+        elif "codecommit" in url:
+            return "aws_codecommit"
+        
+        # Google Cloud Source Repositories
+        elif "source.developers.google.com" in url:
+            return "google_source_repos"
+        
+        # Self-hosted detection for common platforms
+        elif re.search(r'git@[\w\.-]+:', url):
+            # This is an SSH URL to a git repo, try to determine type from structure
+            if "/scm/" in url:  # Common in Bitbucket Server
+                return "bitbucket_server"
+            elif "/gogs/" in url:
+                return "gogs"
+            elif "/gitea/" in url:
+                return "gitea"
+            else:
+                # Generic self-hosted
+                return "self_hosted_git"
+        
+        # Return unknown if no match
+        return "unknown"
+
+    async def _create_complete_pipeline(
+        self, 
+        project_dir: Union[str, Path], 
+        repository_info: Dict[str, Any],
+        platform: str,
+        project_type: Optional[str] = None,
+        deployment_targets: Optional[List[str]] = None,
+        custom_config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Create a complete CI/CD pipeline for a project.
+        
+        Args:
+            project_dir: Project directory
+            repository_info: Repository information (URL, provider, etc.)
+            platform: CI/CD platform (github_actions, gitlab_ci, etc.)
+            project_type: Optional project type
+            deployment_targets: Optional list of deployment targets
+            custom_config: Optional custom configuration
+            
+        Returns:
+            Dictionary with the pipeline creation result
+        """
+        self._logger.info(f"Creating complete CI/CD pipeline for {project_type} on {platform}")
+        
+        # Detect project type if not provided
+        if project_type is None:
+            detection_result = await self.detect_project_type(project_dir)
+            project_type = detection_result.get("project_type")
+            
+            if not project_type:
+                return {
+                    "success": False,
+                    "error": f"Could not detect project type: {detection_result.get('error', 'Unknown error')}",
+                    "platform": platform
+                }
+        
+        # Determine pipeline steps
+        pipeline_steps = await self._determine_pipeline_steps(
+            project_type=project_type,
+            platform=platform,
+            repository_info=repository_info,
+            deployment_targets=deployment_targets,
+            custom_config=custom_config
+        )
+        
+        # Set up testing configuration
+        testing_config = await self._setup_testing_config(
+            project_type=project_type,
+            platform=platform,
+            pipeline_steps=pipeline_steps
+        )
+        
+        # Set up deployment configuration if targets are specified
+        deployment_config = None
+        if deployment_targets:
+            deployment_config = await self._setup_deployment_config(
+                project_type=project_type,
+                platform=platform,
+                deployment_targets=deployment_targets,
+                repository_info=repository_info
+            )
+        
+        # Generate the final pipeline configuration
+        config = {
+            "pipeline_steps": pipeline_steps,
+            "testing_config": testing_config
+        }
+        
+        if deployment_config:
+            config["deployment_config"] = deployment_config
+        
+        if custom_config:
+            config = self._merge_configs(config, custom_config)
+        
+        # Generate the actual CI/CD configuration file
+        result = await self.generate_ci_configuration(
+            path=project_dir,
+            platform=platform,
+            project_type=project_type,
+            custom_settings=config
+        )
+        
+        # Add pipeline metadata to the result
+        result["pipeline_info"] = {
+            "steps": [step["name"] for step in pipeline_steps],
+            "testing": testing_config.get("framework"),
+            "deployment": [target for target in deployment_targets] if deployment_targets else []
+        }
+        
+        return result
+    
+    async def _determine_pipeline_steps(
+        self,
+        project_type: str,
+        platform: str,
+        repository_info: Dict[str, Any],
+        deployment_targets: Optional[List[str]] = None,
+        custom_config: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Determine the appropriate pipeline steps based on project type and deployment targets.
+        
+        Args:
+            project_type: Project type (python, node, etc.)
+            platform: CI/CD platform
+            repository_info: Repository information
+            deployment_targets: Optional deployment targets
+            custom_config: Optional custom configuration
+            
+        Returns:
+            List of pipeline step configurations
+        """
+        self._logger.info(f"Determining pipeline steps for {project_type} project")
+        
+        # Initialize basic pipeline steps
+        steps = []
+        
+        # Add checkout step
+        steps.append({
+            "name": "checkout",
+            "description": "Check out the repository code",
+            "required": True
+        })
+        
+        # Add setup step based on project type
+        setup_step = {
+            "name": "setup",
+            "description": f"Set up {project_type} environment",
+            "required": True
+        }
+        
+        if project_type == "python":
+            setup_step["tool"] = "python"
+            setup_step["version"] = ["3.8", "3.9", "3.10"]
+        elif project_type == "node":
+            setup_step["tool"] = "node"
+            setup_step["version"] = ["14", "16", "18"]
+        elif project_type == "java":
+            setup_step["tool"] = "java"
+            setup_step["version"] = ["11", "17"]
+        elif project_type == "go":
+            setup_step["tool"] = "go"
+            setup_step["version"] = ["1.18", "1.19"]
+        else:
+            setup_step["tool"] = project_type
+            setup_step["version"] = ["latest"]
+        
+        steps.append(setup_step)
+        
+        # Add dependency installation step
+        steps.append({
+            "name": "install_dependencies",
+            "description": "Install project dependencies",
+            "required": True,
+            "depends_on": ["setup"]
+        })
+        
+        # Add linting step if appropriate for the project type
+        if project_type in ["python", "node", "go", "java"]:
+            steps.append({
+                "name": "lint",
+                "description": "Run code linting",
+                "required": False,
+                "depends_on": ["install_dependencies"]
+            })
+        
+        # Add testing step
+        steps.append({
+            "name": "test",
+            "description": "Run tests",
+            "required": True,
+            "depends_on": ["install_dependencies"]
+        })
+        
+        # Add build step if needed
+        if project_type in ["node", "java", "go"]:
+            steps.append({
+                "name": "build",
+                "description": "Build the project",
+                "required": True,
+                "depends_on": ["test"]
+            })
+        
+        # Add deployment steps if targets are specified
+        if deployment_targets:
+            for target in deployment_targets:
+                steps.append({
+                    "name": f"deploy_to_{target}",
+                    "description": f"Deploy to {target} environment",
+                    "required": True,
+                    "depends_on": ["build"] if "build" in [s["name"] for s in steps] else ["test"],
+                    "environment": target
+                })
+        
+        # Override or add steps from custom config if provided
+        if custom_config and "steps" in custom_config:
+            for custom_step in custom_config["steps"]:
+                # Check if this step is overriding an existing one
+                existing_steps = [i for i, s in enumerate(steps) if s["name"] == custom_step["name"]]
+                if existing_steps:
+                    # Update existing step
+                    steps[existing_steps[0]].update(custom_step)
+                else:
+                    # Add new step
+                    steps.append(custom_step)
+        
+        return steps
+    
+    async def _setup_deployment_config(
+        self,
+        project_type: str,
+        platform: str,
+        deployment_targets: List[str],
+        repository_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Set up deployment configuration for specified targets.
+        
+        Args:
+            project_type: Project type
+            platform: CI/CD platform
+            deployment_targets: List of deployment targets
+            repository_info: Repository information
+            
+        Returns:
+            Deployment configuration dictionary
+        """
+        self._logger.info(f"Setting up deployment configuration for {deployment_targets}")
+        
+        deployment_config = {
+            "environments": {}
+        }
+        
+        for target in deployment_targets:
+            env_config = {
+                "name": target,
+                "protected": target in ["production", "prod"],
+                "manual_approval": target in ["production", "prod", "staging", "stage"],
+                "url_pattern": f"https://{target}-${{REPO_NAME}}.example.com"
+            }
+            
+            # Add provider-specific configuration
+            if "aws" in target or target in ["production", "staging", "dev"]:
+                env_config["provider"] = "aws"
+                env_config["service"] = "elastic_beanstalk" if project_type in ["node", "python", "java"] else "ec2"
+                env_config["region"] = "us-east-1"  # Default region, should be customizable
+                env_config["variables"] = [
+                    "AWS_ACCESS_KEY_ID",
+                    "AWS_SECRET_ACCESS_KEY"
+                ]
+            elif "azure" in target:
+                env_config["provider"] = "azure"
+                env_config["service"] = "app_service"
+                env_config["variables"] = [
+                    "AZURE_CREDENTIALS"
+                ]
+            elif "gcp" in target:
+                env_config["provider"] = "gcp"
+                env_config["service"] = "app_engine" if project_type in ["node", "python", "java", "go"] else "compute_engine"
+                env_config["variables"] = [
+                    "GCP_SERVICE_ACCOUNT_KEY"
+                ]
+            elif "heroku" in target:
+                env_config["provider"] = "heroku"
+                env_config["variables"] = [
+                    "HEROKU_API_KEY"
+                ]
+            else:
+                # Generic environment
+                env_config["provider"] = "generic"
+                env_config["variables"] = [
+                    f"{target.upper()}_DEPLOY_URL",
+                    f"{target.upper()}_DEPLOY_TOKEN"
+                ]
+            
+            deployment_config["environments"][target] = env_config
+        
+        # Add deployment triggers - deploy to dev on every push to develop branch,
+        # to staging on tags or releases, to production on specific approval
+        deployment_config["triggers"] = {
+            "dev": {
+                "branches": ["develop", "dev", "feature/*"],
+            },
+            "staging": {
+                "branches": ["main", "master", "release/*"],
+                "tags": ["v*-beta", "v*-rc*"]
+            },
+            "production": {
+                "branches": ["main", "master"],
+                "tags": ["v*"],
+                "requires_approval": True
+            }
+        }
+        
+        return deployment_config
+    
+    async def _setup_testing_config(
+        self,
+        project_type: str,
+        platform: str,
+        pipeline_steps: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Set up testing configuration based on project type.
+        
+        Args:
+            project_type: Project type
+            platform: CI/CD platform
+            pipeline_steps: Pipeline steps
+            
+        Returns:
+            Testing configuration dictionary
+        """
+        self._logger.info(f"Setting up testing configuration for {project_type}")
+        
+        testing_config = {
+            "enabled": True,
+            "requires_framework": True
+        }
+        
+        # Determine testing framework based on project type
+        if project_type == "python":
+            testing_config["framework"] = "pytest"
+            testing_config["commands"] = [
+                "pytest --cov=. --cov-report=xml"
+            ]
+            testing_config["coverage_tool"] = "pytest-cov"
+            testing_config["report_file"] = "coverage.xml"
+        elif project_type == "node":
+            testing_config["framework"] = "jest"
+            testing_config["commands"] = [
+                "npm test -- --coverage"
+            ]
+            testing_config["coverage_tool"] = "jest"
+            testing_config["report_file"] = "coverage/lcov.info"
+        elif project_type == "java":
+            if os.path.exists(os.path.join(os.getcwd(), "pom.xml")):
+                testing_config["framework"] = "junit"
+                testing_config["commands"] = [
+                    "mvn test"
+                ]
+                testing_config["coverage_tool"] = "jacoco"
+                testing_config["report_file"] = "target/site/jacoco/jacoco.xml"
+            else:
+                testing_config["framework"] = "junit"
+                testing_config["commands"] = [
+                    "./gradlew test"
+                ]
+                testing_config["coverage_tool"] = "jacoco"
+                testing_config["report_file"] = "build/reports/jacoco/test/jacocoTestReport.xml"
+        elif project_type == "go":
+            testing_config["framework"] = "go-test"
+            testing_config["commands"] = [
+                "go test -v ./... -coverprofile=coverage.out"
+            ]
+            testing_config["coverage_tool"] = "go-cover"
+            testing_config["report_file"] = "coverage.out"
+        else:
+            testing_config["requires_framework"] = False
+            testing_config["framework"] = "custom"
+            testing_config["commands"] = [
+                "# Add your test commands here"
+            ]
+        
+        # Add coverage thresholds
+        testing_config["coverage_thresholds"] = {
+            "line": 80,
+            "function": 80,
+            "branch": 70,
+            "statement": 80
+        }
+        
+        return testing_config
+    
+    def _merge_configs(self, base_config: Dict[str, Any], custom_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Merge base configuration with custom configuration recursively.
+        
+        Args:
+            base_config: Base configuration
+            custom_config: Custom configuration to merge in
+            
+        Returns:
+            Merged configuration
+        """
+        result = base_config.copy()
+        
+        for key, value in custom_config.items():
+            if (
+                key in result and 
+                isinstance(result[key], dict) and 
+                isinstance(value, dict)
+            ):
+                # Recursively merge dictionaries
+                result[key] = self._merge_configs(result[key], value)
+            elif (
+                key in result and 
+                isinstance(result[key], list) and 
+                isinstance(value, list)
+            ):
+                # For lists, either concatenate or replace based on special marker
+                if value and value[0] == "__REPLACE__":
+                    result[key] = value[1:]
+                else:
+                    result[key] = result[key] + value
+            else:
+                # Simple value replacement
+                result[key] = value
+        
+        return result
+    
+    async def setup_ci_cd_pipeline(
+        self,
+        request: str,
+        project_dir: Union[str, Path],
+        repository_url: Optional[str] = None,
+        platform: Optional[str] = None,
+        deployment_targets: Optional[List[str]] = None,
+        custom_config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Set up a complete CI/CD pipeline based on a natural language request.
+        
+        Args:
+            request: Natural language request
+            project_dir: Project directory
+            repository_url: Optional repository URL
+            platform: Optional CI/CD platform override
+            deployment_targets: Optional deployment targets override
+            custom_config: Optional custom configuration
+            
+        Returns:
+            Dictionary with the setup result
+        """
+        self._logger.info(f"Setting up CI/CD pipeline from request: {request}")
+        
+        # Analyze request to extract key information if not explicitly provided
+        parsed_request = await self._parse_ci_cd_request(request)
+        
+        # Use provided values or fall back to parsed values
+        repository_url = repository_url or parsed_request.get("repository_url")
+        platform = platform or parsed_request.get("platform")
+        deployment_targets = deployment_targets or parsed_request.get("deployment_targets")
+        
+        # If repository URL is not provided, try to infer from git config
+        if not repository_url:
+            try:
+                git_output = await self._run_git_command(["remote", "get-url", "origin"], cwd=project_dir)
+                if git_output:
+                    repository_url = git_output.strip()
+            except Exception as e:
+                self._logger.warning(f"Could not determine repository URL from git: {str(e)}")
+        
+        # Determine repository provider
+        repository_provider = "unknown"
+        if repository_url:
+            repository_provider = self.get_repository_provider_from_url(repository_url)
+        
+        # If platform is not specified, try to determine from repository provider
+        if not platform:
+            if repository_provider == "github":
+                platform = "github_actions"
+            elif repository_provider == "gitlab":
+                platform = "gitlab_ci"
+            elif repository_provider == "bitbucket":
+                platform = "bitbucket_pipelines"
+            elif repository_provider == "azure_devops":
+                platform = "azure_pipelines"
+            else:
+                # Default to GitHub Actions
+                platform = "github_actions"
+        
+        # Create repository info dictionary
+        repository_info = {
+            "url": repository_url,
+            "provider": repository_provider
+        }
+        
+        # Create the complete pipeline
+        result = await self._create_complete_pipeline(
+            project_dir=project_dir,
+            repository_info=repository_info,
+            platform=platform,
+            deployment_targets=deployment_targets,
+            custom_config=custom_config
+        )
+        
+        # Add parsed request information to the result
+        result["parsed_request"] = parsed_request
+        
+        return result
+    
+    async def _parse_ci_cd_request(self, request: str) -> Dict[str, Any]:
+        """
+        Parse a natural language CI/CD setup request to extract key information.
+        
+        Args:
+            request: Natural language request
+            
+        Returns:
+            Dictionary with extracted information
+        """
+        self._logger.info(f"Parsing CI/CD request: {request}")
+        
+        # Use AI to parse the request
+        prompt = f"""
+    Extract key information from this CI/CD setup request:
+    "{request}"
+    
+    Return a JSON object with these fields:
+    1. platform: The CI/CD platform name (github_actions, gitlab_ci, jenkins, etc.)
+    2. repository_url: Repository URL if mentioned
+    3. deployment_targets: List of deployment environments to set up
+    4. testing_requirements: Any specific testing requirements
+    5. build_requirements: Any specific build requirements
+    6. security_requirements: Any security scanning requirements
+    """
+    
+        try:
+            # Call AI service
+            from angela.ai.client import gemini_client, GeminiRequest
+            api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
+            response = await gemini_client.generate_text(api_request)
+            
+            # Parse the response
+            import json
+            import re
+            
+            # Try to find JSON in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Assume the entire response is JSON
+                json_str = response.text
+            
+            # Parse JSON
+            parsed_info = json.loads(json_str)
+            
+            # Ensure expected keys exist
+            expected_keys = ["platform", "repository_url", "deployment_targets", 
+                            "testing_requirements", "build_requirements", "security_requirements"]
+            for key in expected_keys:
+                if key not in parsed_info:
+                    parsed_info[key] = None
+            
+            return parsed_info
+            
+        except Exception as e:
+            self._logger.error(f"Error parsing CI/CD request: {str(e)}")
+            # Return minimal information on error
+            return {
+                "platform": None,
+                "repository_url": None,
+                "deployment_targets": None,
+                "testing_requirements": None,
+                "build_requirements": None,
+                "security_requirements": None
+            }
+    
+    async def _run_git_command(self, args: List[str], cwd: Union[str, Path] = ".") -> str:
+        """
+        Run a git command and return the output.
+        
+        Args:
+            args: Git command arguments
+            cwd: Working directory
+            
+        Returns:
+            Command output as a string
+        """
+        try:
+            from angela.execution.engine import execution_engine
+            command = ["git"] + args
+            command_str = " ".join(command)
+            
+            stdout, stderr, return_code = await execution_engine.execute_command(
+                command=command_str,
+                check_safety=True,
+                working_dir=str(cwd)
+            )
+            
+            if return_code != 0:
+                raise RuntimeError(f"Git command failed: {stderr}")
+            
+            return stdout
+        except Exception as e:
+            self._logger.error(f"Error running git command: {str(e)}")
+            raise
+
 # Global CI/CD integration instance
 ci_cd_integration = CiCdIntegration()

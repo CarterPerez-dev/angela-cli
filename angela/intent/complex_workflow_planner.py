@@ -130,54 +130,64 @@ class ComplexWorkflowPlanner(EnhancedTaskPlanner):
         }
     
     async def plan_complex_workflow(
-        self, 
-        request: str, 
+        self,
+        request: str,
         context: Dict[str, Any],
         max_steps: int = 30
     ) -> ComplexWorkflowPlan:
         """
-        Plan a complex workflow based on a natural language request.
+        Plan a complex workflow involving multiple tools based on a natural language request.
         
         Args:
-            request: Natural language request
-            context: Context information
-            max_steps: Maximum number of steps to include
+            request: Natural language request describing the workflow
+            context: Context information for enhanced planning
+            max_steps: Maximum number of steps to include in the plan
             
         Returns:
-            ComplexWorkflowPlan object
+            A ComplexWorkflowPlan object
         """
         self._logger.info(f"Planning complex workflow: {request}")
         
-        # Generate workflow plan using AI
-        plan_data = await self._generate_workflow_plan(request, context, max_steps)
-        
         try:
-            # Create unique ID for the workflow
-            workflow_id = str(uuid.uuid4())
+            # Generate the workflow plan data using AI
+            plan_data = await self._generate_workflow_plan(request, context, max_steps)
             
-            # Convert to the workflow plan model
+            # Extract the plan components
+            workflow_id = plan_data.get("id", str(uuid.uuid4()))
+            workflow_name = plan_data.get("name", f"Workflow {workflow_id[:8]}")
+            description = plan_data.get("description", request)
+            
+            # Convert step data to model objects
+            steps_data = plan_data.get("steps", {})
+            steps = self._convert_step_data_to_models(steps_data)
+            
+            # Convert variable data to model objects
+            variables_data = plan_data.get("variables", {})
+            variables = self._convert_variable_data_to_models(variables_data)
+            
+            # Get entry points
+            entry_points = plan_data.get("entry_points", [])
+            if not entry_points and steps:
+                # If no entry points specified, use the first step
+                entry_points = [next(iter(steps.keys()))]
+            
+            # Create the workflow plan
             workflow_plan = ComplexWorkflowPlan(
                 id=workflow_id,
-                name=plan_data.get("name", f"Workflow_{workflow_id[:8]}"),
-                description=plan_data.get("description", "Complex workflow"),
-                goal=request,
-                steps=self._convert_step_data_to_models(plan_data.get("steps", {})),
-                variables=self._convert_variable_data_to_models(plan_data.get("variables", {})),
-                entry_points=plan_data.get("entry_points", []),
-                exit_points=plan_data.get("exit_points", []),
-                context=context,
-                created=datetime.now(),
-                metadata={
-                    "request": request,
-                    "generated_at": datetime.now().isoformat(),
-                    "generation_model": "Gemini"
-                }
+                name=workflow_name,
+                description=description,
+                steps=steps,
+                variables=variables,
+                entry_points=entry_points,
+                request=request,
+                context_snapshot=self._take_context_snapshot(context)
             )
             
+            self._logger.info(f"Created complex workflow plan with {len(steps)} steps")
             return workflow_plan
             
         except Exception as e:
-            self._logger.error(f"Error creating complex workflow plan: {str(e)}")
+            self._logger.error(f"Error generating complex workflow plan: {str(e)}")
             # Create a fallback workflow
             return self._create_fallback_workflow(request, context)
     
@@ -439,198 +449,239 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
     async def execute_complex_workflow(
         self,
         workflow: ComplexWorkflowPlan,
-        variables: Optional[Dict[str, Any]] = None,
         dry_run: bool = False,
-        transaction_id: Optional[str] = None
+        transaction_id: Optional[str] = None,
+        initial_variables: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Execute a complex workflow plan.
         
         Args:
             workflow: The workflow plan to execute
-            variables: Initial variable values
-            dry_run: Whether to simulate execution
-            transaction_id: ID for the rollback transaction
+            dry_run: Whether to simulate execution without making changes
+            transaction_id: Optional transaction ID for rollback support
+            initial_variables: Optional initial variables to set
             
         Returns:
             Dictionary with execution results
         """
-        self._logger.info(f"Executing complex workflow: {workflow.name} (ID: {workflow.id})")
+        self._logger.info(f"Executing complex workflow: {workflow.name}")
         
-        # Register this workflow as active
-        self._active_workflows[workflow.id] = {
-            "start_time": datetime.now(),
-            "status": "running",
-            "workflow": workflow,
+        # Initialize execution state
+        execution_state = {
+            "workflow_id": workflow.id,
+            "started_at": datetime.now().isoformat(),
+            "dry_run": dry_run,
+            "current_step": None,
+            "completed_steps": set(),
+            "failed_steps": set(),
             "results": {},
-            "variables": variables or {}
+            "variables": {},
+            "transaction_id": transaction_id,
+            "status": "running"
         }
         
-        try:
-            # Initialize execution state
-            execution_state = {
-                "workflow_id": workflow.id,
-                "start_time": datetime.now(),
-                "variables": dict(variables or {}),
-                "results": {},
-                "completed_steps": set(),
-                "pending_steps": {},
-                "execution_path": [],
-                "dry_run": dry_run,
-                "transaction_id": transaction_id,
-                "status": "running"
-            }
+        # Add initial variables if provided
+        if initial_variables:
+            execution_state["variables"].update(initial_variables)
+        
+        # Initialize variables from workflow definition
+        for var_name, var_obj in workflow.variables.items():
+            if var_obj.default_value is not None:
+                execution_state["variables"][var_name] = var_obj.default_value
+        
+        # Start with entry points
+        steps_to_execute = set(workflow.entry_points)
+        all_steps = set(workflow.steps.keys())
+        
+        # Execute steps until there are no more steps to execute
+        while steps_to_execute:
+            # Get the next step to execute
+            executable_steps = set()
             
-            # Add default values for variables
-            for var_name, var_def in workflow.variables.items():
-                if var_name not in execution_state["variables"] and var_def.default_value is not None:
-                    execution_state["variables"][var_name] = var_def.default_value
-            
-            # Initialize with entry points
-            for entry_point in workflow.entry_points:
-                if entry_point in workflow.steps:
-                    execution_state["pending_steps"][entry_point] = workflow.steps[entry_point]
-            
-            # Execute steps until all are completed or no more can be executed
-            while execution_state["pending_steps"] and execution_state["status"] == "running":
-                # Find steps that can be executed (all dependencies satisfied)
-                executable_steps = {}
-                for step_id, step in execution_state["pending_steps"].items():
-                    if all(self._is_dependency_satisfied(dep, execution_state) for dep in step.dependencies):
-                        executable_steps[step_id] = step
-                
-                # If no steps can be executed, we're stuck (circular dependencies or missing steps)
-                if not executable_steps:
-                    self._logger.warning(f"No executable steps found in workflow {workflow.id}")
-                    execution_state["status"] = "blocked"
-                    break
-                
-                # Execute all executable steps
-                newly_completed_steps = []
-                
-                for step_id, step in executable_steps.items():
-                    self._logger.info(f"Executing step {step_id}: {step.name}")
+            for step_id in steps_to_execute:
+                if step_id in execution_state["completed_steps"] or step_id in execution_state["failed_steps"]:
+                    continue
                     
-                    # Execute the step
-                    handler = self._step_handlers.get(step.type)
-                    if not handler:
-                        self._logger.error(f"No handler found for step type {step.type}")
+                step = workflow.steps.get(step_id)
+                if not step:
+                    self._logger.warning(f"Step {step_id} not found in workflow")
+                    continue
+                    
+                # Check if all dependencies are satisfied
+                dependencies_satisfied = True
+                for dep in step.dependencies:
+                    if not self._is_dependency_satisfied(dep, execution_state):
+                        dependencies_satisfied = False
+                        break
+                        
+                if dependencies_satisfied:
+                    executable_steps.add(step_id)
+            
+            # If no steps can be executed, check if we're stuck or done
+            if not executable_steps:
+                if len(execution_state["completed_steps"]) + len(execution_state["failed_steps"]) < len(all_steps):
+                    # We're stuck - there are steps that can't be executed
+                    self._logger.warning("Workflow execution is stuck - some steps cannot be executed")
+                    execution_state["status"] = "stuck"
+                    
+                    # Find the steps that couldn't be executed
+                    remaining_steps = all_steps - execution_state["completed_steps"] - execution_state["failed_steps"]
+                    self._logger.warning(f"Steps not executed: {remaining_steps}")
+                    
+                    # Check each remaining step for its blocker
+                    for step_id in remaining_steps:
+                        step = workflow.steps.get(step_id)
+                        if step:
+                            for dep in step.dependencies:
+                                if not self._is_dependency_satisfied(dep, execution_state):
+                                    self._logger.warning(f"Step {step_id} blocked by dependency {dep.step_id} ({dep.type})")
+                    
+                    break
+                else:
+                    # All steps have been processed
+                    self._logger.info("All workflow steps processed")
+                    execution_state["status"] = "completed"
+                    break
+            
+            # Execute the steps in parallel or sequentially
+            execute_in_parallel = (
+                len(executable_steps) > 1 and
+                self._can_execute_in_parallel(executable_steps, workflow.steps)
+            )
+            
+            if execute_in_parallel:
+                # Execute steps in parallel
+                self._logger.info(f"Executing {len(executable_steps)} steps in parallel")
+                
+                tasks = []
+                for step_id in executable_steps:
+                    step = workflow.steps[step_id]
+                    execution_state["current_step"] = step_id
+                    tasks.append(self._execute_step(step, execution_state))
+                
+                # Wait for all tasks to complete
+                step_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # Process results
+                for i, step_id in enumerate(executable_steps):
+                    result = step_results[i]
+                    
+                    if isinstance(result, Exception):
+                        self._logger.error(f"Step {step_id} failed with exception: {str(result)}")
+                        execution_state["failed_steps"].add(step_id)
                         execution_state["results"][step_id] = {
                             "success": False,
-                            "error": f"Unsupported step type: {step.type}"
+                            "error": str(result),
+                            "exception": True
                         }
-                        newly_completed_steps.append(step_id)
-                        continue
-                    
-                    try:
-                        # Execute the step handler with the current execution state
-                        result = await handler(step, execution_state)
-                        
-                        # Store the result
+                    else:
                         execution_state["results"][step_id] = result
                         
-                        # Update execution path
-                        execution_state["execution_path"].append(step_id)
-                        
-                        # Process the step's output variables
-                        if result.get("success") and result.get("outputs"):
-                            # Update the global variables
-                            for var_name, var_value in result["outputs"].items():
-                                execution_state["variables"][var_name] = var_value
-                                self._logger.debug(f"Variable '{var_name}' set to value from step {step_id}")
-                        
-                        # Handle on_success or on_failure hooks if present
-                        if result.get("success") and step.on_success:
-                            # Add the success hook to pending steps if it exists
-                            if step.on_success in workflow.steps:
-                                execution_state["pending_steps"][step.on_success] = workflow.steps[step.on_success]
-                        elif not result.get("success") and step.on_failure:
-                            # Add the failure hook to pending steps if it exists
-                            if step.on_failure in workflow.steps:
-                                execution_state["pending_steps"][step.on_failure] = workflow.steps[step.on_failure]
-                                
-                        # Check if this is an exit point
-                        if step_id in workflow.exit_points:
-                            self._logger.info(f"Reached exit point {step_id}")
-                            if not result.get("success"):
-                                execution_state["status"] = "failed"
-                            else:
-                                execution_state["status"] = "completed"
+                        if result.get("success", False):
+                            execution_state["completed_steps"].add(step_id)
                             
-                        newly_completed_steps.append(step_id)
+                            # Extract variables from the result
+                            if "variables" in result:
+                                for var_name, var_value in result["variables"].items():
+                                    execution_state["variables"][var_name] = var_value
+                        else:
+                            execution_state["failed_steps"].add(step_id)
+            else:
+                # Execute steps sequentially
+                for step_id in executable_steps:
+                    step = workflow.steps[step_id]
+                    execution_state["current_step"] = step_id
+                    
+                    # Execute the step
+                    self._logger.info(f"Executing step {step_id}: {step.name}")
+                    try:
+                        result = await self._execute_step(step, execution_state)
+                        execution_state["results"][step_id] = result
                         
+                        if result.get("success", False):
+                            execution_state["completed_steps"].add(step_id)
+                            
+                            # Extract variables from the result
+                            if "variables" in result:
+                                for var_name, var_value in result["variables"].items():
+                                    execution_state["variables"][var_name] = var_value
+                        else:
+                            execution_state["failed_steps"].add(step_id)
+                            
+                            # Stop execution on failure unless step is marked as non-critical
+                            if not step.continue_on_failure:
+                                self._logger.warning(f"Step {step_id} failed and is critical - stopping workflow")
+                                execution_state["status"] = "failed"
+                                break
                     except Exception as e:
-                        self._logger.exception(f"Error executing step {step_id}: {str(e)}")
-                        
+                        self._logger.error(f"Error executing step {step_id}: {str(e)}")
+                        execution_state["failed_steps"].add(step_id)
                         execution_state["results"][step_id] = {
                             "success": False,
-                            "error": str(e)
+                            "error": str(e),
+                            "exception": True
                         }
                         
-                        # Check if step has on_failure hook
-                        if step.on_failure:
-                            # Add the failure hook to pending steps if it exists
-                            if step.on_failure in workflow.steps:
-                                execution_state["pending_steps"][step.on_failure] = workflow.steps[step.on_failure]
-                        
-                        newly_completed_steps.append(step_id)
-                
-                # Mark completed steps
-                for step_id in newly_completed_steps:
-                    execution_state["completed_steps"].add(step_id)
-                    if step_id in execution_state["pending_steps"]:
-                        del execution_state["pending_steps"][step_id]
+                        # Stop execution on exception unless step is marked as non-critical
+                        if not step.continue_on_failure:
+                            self._logger.warning(f"Step {step_id} failed with exception and is critical - stopping workflow")
+                            execution_state["status"] = "failed"
+                            break
             
-            # Calculate execution time
-            end_time = datetime.now()
-            execution_time = (end_time - execution_state["start_time"]).total_seconds()
+            # Update steps to execute - remove completed and failed steps
+            steps_to_execute -= execution_state["completed_steps"]
+            steps_to_execute -= execution_state["failed_steps"]
             
-            # Prepare final result
-            success = execution_state["status"] == "completed"
-            if execution_state["status"] == "running" and not execution_state["pending_steps"]:
-                # All steps completed successfully
-                success = True
-                execution_state["status"] = "completed"
+            # Add any new steps that might have become executable
+            for step_id in all_steps - execution_state["completed_steps"] - execution_state["failed_steps"]:
+                if step_id not in steps_to_execute:
+                    step = workflow.steps.get(step_id)
+                    if step:
+                        # Check if all dependencies are satisfied
+                        dependencies_satisfied = True
+                        for dep in step.dependencies:
+                            if not self._is_dependency_satisfied(dep, execution_state):
+                                dependencies_satisfied = False
+                                break
+                                
+                        if dependencies_satisfied:
+                            steps_to_execute.add(step_id)
             
-            result = {
-                "success": success,
-                "status": execution_state["status"],
-                "workflow_id": workflow.id,
-                "workflow_name": workflow.name,
-                "steps_completed": len(execution_state["completed_steps"]),
-                "steps_total": len(workflow.steps),
-                "results": execution_state["results"],
-                "variables": execution_state["variables"],
-                "execution_path": execution_state["execution_path"],
-                "execution_time": execution_time,
-                "start_time": execution_state["start_time"].isoformat(),
-                "end_time": end_time.isoformat()
-            }
-            
-            # Update workflow status in active workflows
-            self._active_workflows[workflow.id]["status"] = execution_state["status"]
-            self._active_workflows[workflow.id]["end_time"] = end_time
-            self._active_workflows[workflow.id]["results"] = result
-            
-            return result
-            
-        except Exception as e:
-            self._logger.exception(f"Error in workflow execution: {str(e)}")
-            
-            # Update workflow status in active workflows
-            end_time = datetime.now()
-            self._active_workflows[workflow.id]["status"] = "failed"
-            self._active_workflows[workflow.id]["end_time"] = end_time
-            self._active_workflows[workflow.id]["error"] = str(e)
-            
-            return {
-                "success": False,
-                "status": "failed",
-                "error": str(e),
-                "workflow_id": workflow.id,
-                "workflow_name": workflow.name,
-                "execution_time": (end_time - self._active_workflows[workflow.id]["start_time"]).total_seconds()
-            }
+            # If status is failed, stop execution
+            if execution_state["status"] == "failed":
+                break
+        
+        # Calculate success based on critical steps
+        critical_steps = [step_id for step_id, step in workflow.steps.items() if not step.continue_on_failure]
+        failed_critical_steps = execution_state["failed_steps"].intersection(critical_steps)
+        
+        execution_state["success"] = (
+            execution_state["status"] != "failed" and
+            execution_state["status"] != "stuck" and
+            len(failed_critical_steps) == 0
+        )
+        
+        # Add end time
+        execution_state["ended_at"] = datetime.now().isoformat()
+        
+        # Log completion
+        status_str = "succeeded" if execution_state["success"] else "failed"
+        self._logger.info(f"Workflow execution {status_str}: {len(execution_state['completed_steps'])} completed, {len(execution_state['failed_steps'])} failed")
+        
+        # Clean up the execution state for the return value
+        return {
+            "workflow_id": execution_state["workflow_id"],
+            "success": execution_state["success"],
+            "status": execution_state["status"],
+            "steps_total": len(all_steps),
+            "steps_completed": len(execution_state["completed_steps"]),
+            "steps_failed": len(execution_state["failed_steps"]),
+            "started_at": execution_state["started_at"],
+            "ended_at": execution_state["ended_at"],
+            "results": execution_state["results"],
+            "variables": execution_state["variables"]
+        }
     
     def _is_dependency_satisfied(
         self, 
@@ -670,6 +721,225 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
         # Unknown dependency type
         self._logger.warning(f"Unknown dependency type: {dependency.type}")
         return False
+
+
+    async def _execute_step(self, step: WorkflowStep, execution_state: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a single workflow step.
+        
+        Args:
+            step: The workflow step to execute
+            execution_state: Current execution state
+            
+        Returns:
+            Dictionary with step execution results
+        """
+        self._logger.debug(f"Executing step {step.id}: {step.name} (Type: {step.type})")
+        
+        # Check if we need to substitute variables
+        try:
+            # Find and replace all variable references
+            if hasattr(step, "command") and step.command:
+                step.command = self._substitute_variables(step.command, execution_state["variables"])
+                
+            if hasattr(step, "api_url") and step.api_url:
+                step.api_url = self._substitute_variables(step.api_url, execution_state["variables"])
+                
+            if hasattr(step, "condition") and step.condition:
+                step.condition = self._substitute_variables(step.condition, execution_state["variables"])
+                
+            if hasattr(step, "file_path") and step.file_path:
+                step.file_path = self._substitute_variables(step.file_path, execution_state["variables"])
+                
+            if hasattr(step, "file_content") and step.file_content:
+                step.file_content = self._substitute_variables(step.file_content, execution_state["variables"])
+        except Exception as e:
+            self._logger.error(f"Error substituting variables: {str(e)}")
+        
+        # Log step execution
+        step_info = f"Executing step {step.id}"
+        if step.description:
+            step_info += f": {step.description}"
+            
+        self._logger.info(step_info)
+        
+        # Check if this is a dry run
+        if execution_state["dry_run"]:
+            return {
+                "success": True,
+                "dry_run": True,
+                "message": f"[DRY RUN] Would execute step: {step.name} ({step.type})"
+            }
+        
+        # Get the appropriate handler for this step type
+        handler = self._step_handlers.get(step.type)
+        if not handler:
+            return {
+                "success": False,
+                "error": f"Unsupported step type: {step.type}"
+            }
+        
+        # Execute the step
+        try:
+            result = await handler(step, execution_state)
+            
+            # Check for variables to extract
+            if result.get("success", False) and "output" in result:
+                output = result["output"]
+                if isinstance(output, str):
+                    extracted_vars = self._extract_variables_from_output(output)
+                    if extracted_vars:
+                        if "variables" not in result:
+                            result["variables"] = {}
+                        result["variables"].update(extracted_vars)
+            
+            return result
+        except Exception as e:
+            self._logger.error(f"Error executing step {step.id}: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "exception": True
+            }
+    
+    async def execute_tool_across_environments(
+        self,
+        request: str,
+        tools: List[str],
+        environments: List[str] = None,
+        context: Dict[str, Any] = None,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Execute a natural language request across multiple tools and environments.
+        
+        This is a higher-level method that creates and executes a workflow spanning
+        multiple tools across different environments (like dev, staging, prod).
+        
+        Args:
+            request: Natural language request
+            tools: List of tools to include in the workflow
+            environments: Optional list of environments to target
+            context: Optional context information
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with execution results
+        """
+        self._logger.info(f"Executing request across environments: {request}")
+        
+        # Get context if not provided
+        if context is None:
+            context = context_manager.get_context_dict()
+        
+        # Set default environments if not provided
+        if not environments:
+            environments = ["dev"]
+        
+        # Build a complex workflow request that includes all tools and environments
+        enhanced_request = f"{request}\n\nTools to use: {', '.join(tools)}\n"
+        enhanced_request += f"Target environments: {', '.join(environments)}\n"
+        
+        # Add additional context about the tools if available
+        tool_context = "Tool information:\n"
+        for tool in tools:
+            tool_info = await self._get_tool_information(tool)
+            if tool_info:
+                tool_context += f"- {tool}: {tool_info}\n"
+        
+        enhanced_request += f"\n{tool_context}"
+        
+        # Plan and execute the workflow
+        workflow = await self.plan_complex_workflow(
+            request=enhanced_request,
+            context=context
+        )
+        
+        # Execute the workflow
+        result = await self.execute_complex_workflow(
+            workflow=workflow,
+            dry_run=dry_run
+        )
+        
+        return {
+            "original_request": request,
+            "enhanced_request": enhanced_request,
+            "tools": tools,
+            "environments": environments,
+            "workflow": workflow.dict(exclude={"context_snapshot"}),
+            "execution_result": result
+        }
+    
+    async def _get_tool_information(self, tool: str) -> Optional[str]:
+        """
+        Get information about a CLI tool by running its help command.
+        
+        Args:
+            tool: The tool name
+            
+        Returns:
+            Tool information string or None if not available
+        """
+        try:
+            from angela.toolchain.universal_cli import universal_cli_translator
+            suggestions = await universal_cli_translator.get_tool_suggestions(tool)
+            
+            if tool in suggestions:
+                # Tool exists, try to get its help info
+                help_cmd = f"{tool} --help"
+                
+                from angela.execution.engine import execution_engine
+                stdout, stderr, return_code = await execution_engine.execute_command(
+                    command=help_cmd,
+                    check_safety=True
+                )
+                
+                if return_code == 0:
+                    # Parse the help output to extract a brief description
+                    lines = stdout.split('\n')
+                    # Filter out blank lines and syntax lines
+                    lines = [line for line in lines if line.strip() and not line.strip().startswith("usage:")]
+                    
+                    if lines:
+                        # Take the first non-empty line as the description
+                        return lines[0].strip()
+                
+                return f"CLI tool available in the system"
+            return None
+        except Exception as e:
+            self._logger.debug(f"Error getting tool information for {tool}: {str(e)}")
+            return None
+    
+    def _take_context_snapshot(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Take a snapshot of the relevant context information for workflow execution.
+        
+        Args:
+            context: The full context dictionary
+            
+        Returns:
+            A filtered copy of the context with only relevant information
+        """
+        # Extract only the keys we need for workflow execution
+        relevant_keys = [
+            "cwd", "project_root", "project_type", "user", "environment",
+            "recent_files", "session"
+        ]
+        
+        snapshot = {}
+        for key in relevant_keys:
+            if key in context:
+                # Make a deep copy to avoid modifying the original
+                try:
+                    # Try to serialize to JSON and back to ensure it's serializable
+                    snapshot[key] = json.loads(json.dumps(context[key]))
+                except (TypeError, json.JSONDecodeError):
+                    # If not JSON serializable, convert to string
+                    snapshot[key] = str(context[key])
+        
+        return snapshot
+
+
     
     async def _execute_command_step(
         self, 
@@ -1153,6 +1423,156 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
                     f"{step.id}_success": True
                 }
             }
+
+
+
+
+
+    def _can_execute_in_parallel(self, step_ids: Set[str], steps: Dict[str, WorkflowStep]) -> bool:
+        """
+        Determine if a set of steps can be executed in parallel.
+        
+        Args:
+            step_ids: Set of step IDs to check
+            steps: Dictionary of all workflow steps
+            
+        Returns:
+            True if the steps can be executed in parallel, False otherwise
+        """
+        # Check for steps that are explicitly marked as not parallel-safe
+        for step_id in step_ids:
+            step = steps.get(step_id)
+            if step and hasattr(step, "parallel_safe") and not step.parallel_safe:
+                return False
+        
+        # Check for steps that might modify the same resources
+        resource_map = {}
+        
+        for step_id in step_ids:
+            step = steps.get(step_id)
+            if not step:
+                continue
+                
+            # Determine resources affected by this step
+            resources = self._get_step_resources(step)
+            
+            # Check for conflicts with already scheduled steps
+            for resource in resources:
+                if resource in resource_map:
+                    # Another step uses this resource - check if operations are compatible
+                    other_ops = resource_map[resource]
+                    for op in resources[resource]:
+                        if not self._are_operations_compatible(other_ops, op):
+                            return False
+                        
+                    # Add operation to resource map
+                    resource_map[resource].update(resources[resource])
+                else:
+                    # First step to use this resource
+                    resource_map[resource] = resources[resource]
+        
+        return True
+    
+    def _get_step_resources(self, step: WorkflowStep) -> Dict[str, Set[str]]:
+        """
+        Determine resources affected by a workflow step.
+        
+        Args:
+            step: The workflow step to analyze
+            
+        Returns:
+            Dictionary mapping resource names to sets of operations
+        """
+        resources = {}
+        
+        # Check step type
+        if step.type == WorkflowStepType.COMMAND or step.type == WorkflowStepType.TOOL:
+            # Extract file paths from command
+            command = step.command
+            if not command:
+                return resources
+                
+            # Look for file paths in the command
+            path_pattern = r'(?:\'|\")([\/\w\.-]+)(?:\'|\")'
+            file_paths = re.findall(path_pattern, command)
+            
+            # Add each file as a resource
+            for path in file_paths:
+                if os.path.isabs(path) or path.startswith('./') or path.startswith('../'):
+                    resources[path] = {"access"}
+                    
+                    # Infer operation from command
+                    if any(x in command for x in ["rm", "del", "remove", "unlink"]):
+                        resources[path].add("delete")
+                    elif any(x in command for x in ["write", "create", ">", "tee"]):
+                        resources[path].add("write")
+                    elif any(x in command for x in ["cp", "copy", "mv", "move"]):
+                        resources[path].add("write")
+                        resources[path].add("read")
+                    else:
+                        resources[path].add("read")
+            
+            # Check for database operations
+            if any(x in command for x in ["mysql", "psql", "mongo", "sqlite"]):
+                db_name = "database"
+                resources[db_name] = {"access"}
+                
+                if any(x in command.lower() for x in ["select", "show", "describe"]):
+                    resources[db_name].add("read")
+                elif any(x in command.lower() for x in ["insert", "update", "delete", "drop", "create"]):
+                    resources[db_name].add("write")
+        
+        elif step.type == WorkflowStepType.FILE:
+            # File operations directly specify the resource
+            if hasattr(step, "file_path") and step.file_path:
+                path = step.file_path
+                resources[path] = {"access"}
+                
+                # Determine operation from step properties
+                operation = getattr(step, "operation", "read")
+                if operation in ["write", "create", "append"]:
+                    resources[path].add("write")
+                elif operation in ["delete", "remove"]:
+                    resources[path].add("delete")
+                else:
+                    resources[path].add("read")
+        
+        elif step.type == WorkflowStepType.API:
+            # API calls are generally independent
+            api_url = getattr(step, "api_url", "")
+            if api_url:
+                resources[api_url] = {"access"}
+                
+                # Determine operation from HTTP method
+                method = getattr(step, "method", "GET").upper()
+                if method in ["GET", "HEAD", "OPTIONS"]:
+                    resources[api_url].add("read")
+                else:
+                    resources[api_url].add("write")
+        
+        return resources
+    
+    def _are_operations_compatible(self, existing_ops: Set[str], new_op: str) -> bool:
+        """
+        Determine if operations on the same resource are compatible for parallel execution.
+        
+        Args:
+            existing_ops: Set of existing operations
+            new_op: New operation to check
+            
+        Returns:
+            True if operations are compatible, False otherwise
+        """
+        # Delete is never compatible with anything
+        if "delete" in existing_ops or new_op == "delete":
+            return False
+        
+        # Write is not compatible with another write
+        if "write" in existing_ops and new_op == "write":
+            return False
+        
+        # Read is compatible with other reads
+        return True
     
     async def _execute_parallel_step(
         self, 
