@@ -1,6 +1,9 @@
 # angela/cli/__init__.py
 """
 CLI components for Angela CLI.
+
+This package provides the command-line interface for interacting with Angela,
+including the main application and various subcommands for different functionality.
 """
 from angela.cli.main import app as main_app
 from angela.cli.files import app as files_app
@@ -18,3 +21,5 @@ main_app.add_typer(docker_app, name="docker", help="Docker and Docker Compose op
 
 # Export the main app
 app = main_app
+
+__all__ = ['app']
