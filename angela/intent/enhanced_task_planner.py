@@ -2013,732 +2013,214 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                 "condition": step.condition
             }
     
-    async def _evaluate_expression(
-        self, 
-        expression: str, 
-        context: StepExecutionContext
-    ) -> bool:
-        """
-        Evaluate a simple condition expression.
-        
-        Args:
-            expression: The condition expression
-            context: Execution context
-            
-        Returns:
-            Boolean result of the condition
-        """
-        # Check for file existence condition
-        file_exists_match = re.search(r'file(?:\s+)exists(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-        if file_exists_match:
-            file_path = file_exists_match.group(1).strip()
-            # Resolve variables in the file path
-            file_path = await self._resolve_variables_in_string(file_path, context)
-            return Path(file_path).exists()
-        
-        # Check for command success condition
-        cmd_success_match = re.search(r'command(?:\s+)success(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-        if cmd_success_match:
-            step_id = cmd_success_match.group(1).strip()
-            return context.results.get(step_id, {}).get("success", False)
-        
-        # Check for output contains condition
-        output_contains_match = re.search(r'output(?:\s+)contains(?:[:=\s]+)(.+?)(?:[:=\s]+)in(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-        if output_contains_match:
-            pattern = output_contains_match.group(1).strip()
-            step_id = output_contains_match.group(2).strip()
-            
-            # Resolve variables in the pattern
-            pattern = await self._resolve_variables_in_string(pattern, context)
-            
-            # Get output from the specified step
-            step_output = context.results.get(step_id, {}).get("stdout", "")
-            return pattern in step_output
-        
-        # Check for variable condition
-        var_match = re.search(r'variable(?:\s+)(.+?)(?:\s*)([=!<>]=|[<>])(?:\s*)(.+)', expression, re.IGNORECASE)
-        if var_match:
-            var_name = var_match.group(1).strip()
-            operator = var_match.group(2).strip()
-            value = var_match.group(3).strip()
-            
-            # Get variable value
-            var_value = self._get_variable_value(var_name, context)
-            if var_value is None:
-                return False
-            
-            # Evaluate comparison
-            try:
-                # Convert value to appropriate type
-                if value.lower() == "true":
-                    compare_value = True
-                elif value.lower() == "false":
-                    compare_value = False
-                elif value.isdigit():
-                    compare_value = int(value)
-                elif re.match(r'^-?\d+(\.\d+)?
-
-
-# Now define the EnhancedTaskPlanner class that uses the core implementation
-class EnhancedTaskPlanner(TaskPlanner):
+async def _evaluate_expression(
+    self, 
+    expression: str, 
+    context: StepExecutionContext
+) -> bool:
     """
-    Enhanced TaskPlanner with support for advanced execution capabilities.
+    Evaluate a simple condition expression.
     
-    This class extends the original TaskPlanner with advanced execution capabilities
-    while avoiding the infinite recursion problem.
+    Args:
+        expression: The condition expression
+        context: Execution context
+        
+    Returns:
+        Boolean result of the condition
     """
+    # Check for file existence condition
+    file_exists_match = re.search(r'file(?:\s+)exists(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+    if file_exists_match:
+        file_path = file_exists_match.group(1).strip()
+        # Resolve variables in the file path
+        file_path = await self._resolve_variables_in_string(file_path, context)
+        return Path(file_path).exists()
     
-    def __init__(self):
-        """Initialize the enhanced task planner."""
-        super().__init__()
-        # Create a CoreEnhancedTaskPlanner instance instead of recursively creating
-        # another EnhancedTaskPlanner
-        self._core_planner = CoreEnhancedTaskPlanner()
-        self._logger = logger
+    # Check for command success condition
+    cmd_success_match = re.search(r'command(?:\s+)success(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+    if cmd_success_match:
+        step_id = cmd_success_match.group(1).strip()
+        return context.results.get(step_id, {}).get("success", False)
     
-    async def execute_plan(
-        self, 
-        plan: Union[TaskPlan, AdvancedTaskPlan], 
-        dry_run: bool = False,
-        transaction_id: Optional[str] = None,
-        initial_variables: Optional[Dict[str, Any]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Execute a task plan with full support for all step types.
+    # Check for output contains condition
+    output_contains_match = re.search(r'output(?:\s+)contains(?:[:=\s]+)(.+?)(?:[:=\s]+)in(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+    if output_contains_match:
+        pattern = output_contains_match.group(1).strip()
+        step_id = output_contains_match.group(2).strip()
         
-        Args:
-            plan: The plan to execute
-            dry_run: Whether to simulate execution without making changes
-            transaction_id: ID of the transaction this execution belongs to
-            initial_variables: Initial variables for data flow
-            
-        Returns:
-            List of execution results for each step or execution result dict
-        """
-        if isinstance(plan, AdvancedTaskPlan):
-            # Use the core planner for advanced plans
-            return await self._core_planner.execute_advanced_plan(
-                plan, dry_run, transaction_id, initial_variables
-            )
-        else:
-            # Use the original execution for basic plans
-            return await super()._execute_basic_plan(plan, dry_run, transaction_id)
+        # Resolve variables in the pattern
+        pattern = await self._resolve_variables_in_string(pattern, context)
+        
+        # Get output from the specified step
+        step_output = context.results.get(step_id, {}).get("stdout", "")
+        return pattern in step_output
     
-    async def plan_task(
-        self, 
-        request: str, 
-        context: Dict[str, Any],
-        complexity: str = "auto"
-    ) -> Union[TaskPlan, AdvancedTaskPlan]:
-        """
-        Plan a task by breaking it down into actionable steps.
+    # Check for variable condition
+    var_match = re.search(r'variable(?:\s+)(.+?)(?:\s*)([=!<>]=|[<>])(?:\s*)(.+)', expression, re.IGNORECASE)
+    if var_match:
+        var_name = var_match.group(1).strip()
+        operator = var_match.group(2).strip()
+        value = var_match.group(3).strip()
         
-        Enhanced version that can generate advanced task plans directly
-        from natural language requests.
+        # Get variable value
+        var_value = self._get_variable_value(var_name, context)
+        if var_value is None:
+            return False
         
-        Args:
-            request: The high-level goal description
-            context: Context information
-            complexity: Planning complexity level ("simple", "advanced", or "auto")
-            
-        Returns:
-            Either a basic TaskPlan or an advanced AdvancedTaskPlan based on complexity
-        """
-        self._logger.info(f"Planning task: {request} (complexity: {complexity})")
-        
-        # Determine planning complexity if auto
-        if complexity == "auto":
-            complexity = await self._determine_complexity(request)
-            self._logger.info(f"Determined complexity: {complexity}")
-        
-        # Use the appropriate planning strategy
-        if complexity == "advanced":
-            # Use core planner for advanced planning
-            return await self._core_planner.plan_advanced_task(request, context)
-        else:
-            # Use basic planning for simple tasks
-            return await super()._create_basic_plan(request, context)
-
-# Create an instance of the enhanced task planner
-enhanced_task_planner = EnhancedTaskPlanner()
-
-# Replace the global task_planner with the enhanced version
-task_planner = enhanced_task_planner
-, value):
-                    compare_value = float(value)
-                else:
-                    # Try to resolve variables in the value
-                    resolved_value = await self._resolve_variables_in_string(value, context)
-                    if resolved_value != value:
-                        # Value contained variables, use the resolved value
-                        compare_value = resolved_value
-                    else:
-                        # Treat as a string but strip quotes
-                        compare_value = value.strip('\'"')
-                
-                # Compare based on operator
-                if operator == "==":
-                    return var_value == compare_value
-                elif operator == "!=":
-                    return var_value != compare_value
-                elif operator == "<":
-                    return var_value < compare_value
-                elif operator == ">":
-                    return var_value > compare_value
-                elif operator == "<=":
-                    return var_value <= compare_value
-                elif operator == ">=":
-                    return var_value >= compare_value
-                else:
-                    return False
-            except Exception as e:
-                self._logger.error(f"Error comparing variable {var_name} with value {value}: {str(e)}")
-                return False
-        
-        # Simple boolean evaluation for unknown conditions
-        return bool(expression and expression.lower() not in ['false', '0', 'no', 'n', ''])
-    
-    async def _resolve_variables_in_string(
-        self, 
-        text: str, 
-        context: StepExecutionContext
-    ) -> str:
-        """
-        Resolve variables in a string.
-        
-        Args:
-            text: The string with potential variable references
-            context: Execution context
-            
-        Returns:
-            String with variables resolved
-        """
-        if not text or "${" not in text:
-            return text
-        
-        result = text
-        var_pattern = r'\${([^}]+)}'
-        matches = re.findall(var_pattern, text)
-        
-        for var_name in matches:
-            var_value = self._get_variable_value(var_name, context)
-            if var_value is not None:
-                # Replace the variable reference with its value
-                result = result.replace(f"${{{var_name}}}", str(var_value))
-        
-        return result
-    
-    async def _execute_api_step(
-        self, 
-        step: AdvancedPlanStep, 
-        context: StepExecutionContext
-    ) -> Dict[str, Any]:
-        """
-        Execute an API call step.
-        
-        Args:
-            step: The step to execute
-            context: Execution context
-            
-        Returns:
-            Dictionary with execution results
-        """
-        if not step.api_url:
-            return {
-                "success": False,
-                "error": "Missing API URL for API step"
-            }
-        
-        method = getattr(step, "api_method", "GET").upper()
-        self._logger.info(f"Executing API call: {method} {step.api_url}")
-        
-        if context.dry_run:
-            # Simulate API call
-            return {
-                "success": True,
-                "message": f"[DRY RUN] Would call API: {method} {step.api_url}",
-                "outputs": {
-                    f"{step.id}_message": f"[DRY RUN] Would call API: {method} {step.api_url}",
-                    f"{step.id}_url": step.api_url,
-                    f"{step.id}_method": method,
-                    f"{step.id}_success": True
-                }
-            }
-        
+        # Evaluate comparison
         try:
-            # Get timeout if specified
-            timeout = getattr(step, "timeout", 30)
-            
-            # Get headers if specified
-            headers = getattr(step, "api_headers", {})
-            
-            # Get query parameters if specified
-            params = getattr(step, "api_params", {})
-            
-            # Get payload if specified
-            payload = getattr(step, "api_payload", None)
-            
-            # Create a client session
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
-                # Prepare the request
-                request_kwargs = {
-                    "headers": headers,
-                    "params": params,
-                    "ssl": not getattr(step, "insecure_ssl", False)  # Allow insecure SSL as an explicit option
-                }
-                
-                # Add payload for methods that support it
-                if method in ["POST", "PUT", "PATCH"] and payload is not None:
-                    # Determine content type
-                    content_type = headers.get("Content-Type") if headers else None
-                    
-                    if content_type and "application/json" in content_type:
-                        # Send as JSON
-                        request_kwargs["json"] = payload
-                    elif content_type and "application/x-www-form-urlencoded" in content_type:
-                        # Send as form data
-                        request_kwargs["data"] = payload
-                    elif isinstance(payload, dict):
-                        # Default to JSON if payload is a dict
-                        request_kwargs["json"] = payload
-                    else:
-                        # Default to raw data
-                        request_kwargs["data"] = payload
-                
-                # Execute the request
-                async with session.request(method, step.api_url, **request_kwargs) as response:
-                    # Read response
-                    response_text = await response.text()
-                    
-                    # Try to parse as JSON
-                    response_json = None
-                    try:
-                        response_json = await response.json()
-                    except Exception:
-                        # Not JSON, leave as None
-                        pass
-                    
-                    # Prepare result
-                    result = {
-                        "success": 200 <= response.status < 300,
-                        "status_code": response.status,
-                        "headers": dict(response.headers),
-                        "text": response_text,
-                        "outputs": {
-                            f"{step.id}_status_code": response.status,
-                            f"{step.id}_response_text": response_text,
-                            f"{step.id}_success": 200 <= response.status < 300
-                        }
-                    }
-                    
-                    # Add JSON response if available
-                    if response_json is not None:
-                        result["json"] = response_json
-                        result["outputs"][f"{step.id}_response_json"] = response_json
-                    
-                    # Add error information for non-success responses
-                    if not result["success"]:
-                        result["error"] = f"API call failed with status code {response.status}"
-                    
-                    return result
-                    
-        except aiohttp.ClientError as e:
-            self._logger.exception(f"Error in API call: {str(e)}")
-            return {
-                "success": False,
-                "error": f"API request error: {str(e)}",
-                "url": step.api_url,
-                "method": method
-            }
-        except Exception as e:
-            self._logger.exception(f"Unexpected error in API call: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "url": step.api_url,
-                "method": method
-            }
-    
-    async def _execute_loop_step(
-        self, 
-        step: AdvancedPlanStep, 
-        context: StepExecutionContext
-    ) -> Dict[str, Any]:
-        """
-        Execute a loop step.
-        
-        Args:
-            step: The step to execute
-            context: Execution context
-            
-        Returns:
-            Dictionary with execution results
-        """
-        if not hasattr(step, "loop_items") or not hasattr(step, "loop_body"):
-            return {
-                "success": False,
-                "error": "Missing loop_items or loop_body for loop step"
-            }
-        
-        self._logger.info(f"Executing loop step: {step.id}")
-        
-        if context.dry_run:
-            # Simulate loop execution
-            return {
-                "success": True,
-                "message": f"[DRY RUN] Would loop over {step.loop_items}",
-                "outputs": {
-                    f"{step.id}_message": f"[DRY RUN] Would loop over {step.loop_items}",
-                    f"{step.id}_success": True
-                }
-            }
-        
-        try:
-            # Resolve loop items
-            loop_items = await self._resolve_loop_items(step.loop_items, context)
-            
-            if not loop_items:
-                return {
-                    "success": True,
-                    "message": "Loop executed with empty items list",
-                    "loop_results": [],
-                    "outputs": {
-                        f"{step.id}_message": "Loop executed with empty items list",
-                        f"{step.id}_success": True,
-                        f"{step.id}_iterations": 0
-                    }
-                }
-            
-            self._logger.debug(f"Loop will execute over {len(loop_items)} items")
-            
-            # Execute the loop body for each item
-            loop_results = []
-            iteration_outputs = {}
-            
-            for i, item in enumerate(loop_items):
-                iteration_key = f"iteration_{i}"
-                iteration_id = f"{step.id}_{iteration_key}"
-                
-                self._logger.debug(f"Executing loop iteration {i} with item: {item}")
-                
-                # Create a new context for this iteration
-                iteration_context = StepExecutionContext(
-                    step_id=iteration_id,
-                    plan_id=context.plan_id,
-                    transaction_id=context.transaction_id,
-                    dry_run=context.dry_run,
-                    results=context.results.copy(),
-                    variables={
-                        **context.variables,
-                        "loop_item": item,
-                        "loop_index": i,
-                        "loop_item_index": i,  # Alternative name
-                        "loop_first": i == 0,
-                        "loop_last": i == len(loop_items) - 1
-                    },
-                    parent_context=context.dict(),
-                    execution_path=context.execution_path + [f"{step.id}[{i}]"]
-                )
-                
-                # Execute each step in the loop body
-                iteration_results = {}
-                
-                for body_step_id in step.loop_body:
-                    # For simplicity in this implementation, assume body_step_id refers to a step in the plan
-                    # A more complete implementation would handle nested execution
-                    body_step = None
-                    
-                    # Check if the step is available in the parent plan
-                    from angela.intent.planner import task_planner
-                    if hasattr(task_planner, "_current_plan") and task_planner._current_plan:
-                        if hasattr(task_planner._current_plan, "steps"):
-                            if isinstance(task_planner._current_plan.steps, dict) and body_step_id in task_planner._current_plan.steps:
-                                body_step = task_planner._current_plan.steps[body_step_id]
-                    
-                    if body_step:
-                        # Execute the step
-                        iter_result = await self._execute_advanced_step(body_step, iteration_context)
-                        iteration_results[body_step_id] = iter_result
-                
-                # Record iteration result
-                loop_results.append({
-                    "index": i,
-                    "item": item,
-                    "success": all(r.get("success", False) for r in iteration_results.values()),
-                    "results": iteration_results
-                })
-                
-                # Extract variables from this iteration to pass back to parent context
-                for var_name, var_value in iteration_context.variables.items():
-                    if var_name not in context.variables and not var_name.startswith("loop_"):
-                        # Set the variable in the parent context
-                        self._set_variable(var_name, var_value, iteration_id)
-                
-            # Prepare the result
-            result = {
-                "success": all(r.get("success", False) for r in loop_results),
-                "loop_results": loop_results,
-                "iterations": len(loop_results),
-                "outputs": {
-                    **iteration_outputs,
-                    f"{step.id}_success": all(r.get("success", False) for r in loop_results),
-                    f"{step.id}_iterations": len(loop_results)
-                }
-            }
-            
-            return result
-            
-        except Exception as e:
-            self._logger.exception(f"Error in loop execution: {str(e)}")
-            return {
-                "success": False,
-                "error": str(e),
-                "loop_items": step.loop_items
-            }
-    
-    async def _resolve_loop_items(
-        self, 
-        loop_items_expr: str, 
-        context: StepExecutionContext
-    ) -> List[Any]:
-        """
-        Resolve loop items from various sources.
-        
-        Args:
-            loop_items_expr: Expression for loop items
-            context: Execution context
-            
-        Returns:
-            List of items to loop over
-        """
-        # Check if loop_items is a variable reference
-        var_match = re.match(r'\${([^}]+)}
-
-
-# Now define the EnhancedTaskPlanner class that uses the core implementation
-class EnhancedTaskPlanner(TaskPlanner):
-    """
-    Enhanced TaskPlanner with support for advanced execution capabilities.
-    
-    This class extends the original TaskPlanner with advanced execution capabilities
-    while avoiding the infinite recursion problem.
-    """
-    
-    def __init__(self):
-        """Initialize the enhanced task planner."""
-        super().__init__()
-        # Create a CoreEnhancedTaskPlanner instance instead of recursively creating
-        # another EnhancedTaskPlanner
-        self._core_planner = CoreEnhancedTaskPlanner()
-        self._logger = logger
-    
-    async def execute_plan(
-        self, 
-        plan: Union[TaskPlan, AdvancedTaskPlan], 
-        dry_run: bool = False,
-        transaction_id: Optional[str] = None,
-        initial_variables: Optional[Dict[str, Any]] = None
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
-        """
-        Execute a task plan with full support for all step types.
-        
-        Args:
-            plan: The plan to execute
-            dry_run: Whether to simulate execution without making changes
-            transaction_id: ID of the transaction this execution belongs to
-            initial_variables: Initial variables for data flow
-            
-        Returns:
-            List of execution results for each step or execution result dict
-        """
-        if isinstance(plan, AdvancedTaskPlan):
-            # Use the core planner for advanced plans
-            return await self._core_planner.execute_advanced_plan(
-                plan, dry_run, transaction_id, initial_variables
-            )
-        else:
-            # Use the original execution for basic plans
-            return await super()._execute_basic_plan(plan, dry_run, transaction_id)
-    
-    async def plan_task(
-        self, 
-        request: str, 
-        context: Dict[str, Any],
-        complexity: str = "auto"
-    ) -> Union[TaskPlan, AdvancedTaskPlan]:
-        """
-        Plan a task by breaking it down into actionable steps.
-        
-        Enhanced version that can generate advanced task plans directly
-        from natural language requests.
-        
-        Args:
-            request: The high-level goal description
-            context: Context information
-            complexity: Planning complexity level ("simple", "advanced", or "auto")
-            
-        Returns:
-            Either a basic TaskPlan or an advanced AdvancedTaskPlan based on complexity
-        """
-        self._logger.info(f"Planning task: {request} (complexity: {complexity})")
-        
-        # Determine planning complexity if auto
-        if complexity == "auto":
-            complexity = await self._determine_complexity(request)
-            self._logger.info(f"Determined complexity: {complexity}")
-        
-        # Use the appropriate planning strategy
-        if complexity == "advanced":
-            # Use core planner for advanced planning
-            return await self._core_planner.plan_advanced_task(request, context)
-        else:
-            # Use basic planning for simple tasks
-            return await super()._create_basic_plan(request, context)
-
-# Create an instance of the enhanced task planner
-enhanced_task_planner = EnhancedTaskPlanner()
-
-# Replace the global task_planner with the enhanced version
-task_planner = enhanced_task_planner
-, loop_items_expr)
-        if var_match:
-            var_name = var_match.group(1)
-            var_value = self._get_variable_value(var_name, context)
-            
-            if var_value is not None:
-                if isinstance(var_value, list):
-                    return var_value
-                elif isinstance(var_value, dict):
-                    # For dictionaries, loop over items
-                    return list(var_value.items())
-                elif isinstance(var_value, str):
-                    # For strings, try to parse as JSON
-                    try:
-                        parsed = json.loads(var_value)
-                        if isinstance(parsed, list):
-                            return parsed
-                    except json.JSONDecodeError:
-                        # Not JSON, split by lines
-                        return var_value.splitlines()
-        
-        # Check for range expression: range(start, end, step)
-        range_match = re.match(r'range\((\d+)(?:,\s*(\d+))?(?:,\s*(\d+))?\)', loop_items_expr)
-        if range_match:
-            if range_match.group(2):
-                # range(start, end, [step])
-                start = int(range_match.group(1))
-                end = int(range_match.group(2))
-                step = int(range_match.group(3)) if range_match.group(3) else 1
-                return list(range(start, end, step))
+            # Convert value to appropriate type
+            if value.lower() == "true":
+                compare_value = True
+            elif value.lower() == "false":
+                compare_value = False
+            elif value.isdigit():
+                compare_value = int(value)
+            elif re.match(r'^-?\d+(\.\d+)?$', value):  # Fixed regex pattern here
+                compare_value = float(value)
             else:
-                # range(end)
-                end = int(range_match.group(1))
-                return list(range(end))
-        
-        # Check for file list: files(pattern)
-        files_match = re.match(r'files\(([^)]+)\)', loop_items_expr)
-        if files_match:
-            pattern = files_match.group(1).strip('"\'')
+                # Try to resolve variables in the value
+                resolved_value = await self._resolve_variables_in_string(value, context)
+                if resolved_value != value:
+                    # Value contained variables, use the resolved value
+                    compare_value = resolved_value
+                else:
+                    # Treat as a string but strip quotes
+                    compare_value = value.strip('\'"')
             
-            # Resolve pattern if it contains variables
-            resolved_pattern = await self._resolve_variables_in_string(pattern, context)
-            
-            # Import here to avoid circular imports
-            from glob import glob
-            
-            # Get list of files matching the pattern
-            file_list = glob(resolved_pattern)
-            return file_list
-        
-        # Check for JSON array
-        if loop_items_expr.startswith('[') and loop_items_expr.endswith(']'):
-            try:
-                items = json.loads(loop_items_expr)
-                if isinstance(items, list):
-                    return items
-            except json.JSONDecodeError:
-                pass
-        
-        # Check for comma-separated list
-        if ',' in loop_items_expr:
-            return [item.strip() for item in loop_items_expr.split(',')]
-        
-        # Default: return as single item
-        return [loop_items_expr]
-    
-    async def _attempt_recovery(
-        self, 
-        step: AdvancedPlanStep,
-        result: Dict[str, Any],
-        context: StepExecutionContext
-    ) -> Dict[str, Any]:
-        """
-        Attempt to recover from a failed step.
-        
-        Args:
-            step: The failed step
-            result: The failure result
-            context: Execution context
-            
-        Returns:
-            Updated result after recovery attempt
-        """
-        if not self._error_recovery_manager:
-            return {
-                **result,
-                "recovery_attempted": True,
-                "recovery_success": False,
-                "recovery_error": "Error recovery manager not available"
-            }
-        
-        self._logger.info(f"Attempting recovery for failed step {step.id}")
-        
-        try:
-            # Create a recovery-compatible step dictionary
-            step_dict = {
-                "id": step.id,
-                "command": getattr(step, "command", ""),
-                "explanation": step.description
-            }
-            
-            # Call the error recovery manager
-            recovery_result = await self._error_recovery_manager.handle_error(
-                step_dict, result, {"context": context.dict()}
-            )
-            
-            if recovery_result.get("recovery_success", False):
-                self._logger.info(f"Recovery succeeded for step {step.id}")
-                
-                # Merge success fields
-                result["success"] = True
-                result["recovery_applied"] = True
-                result["recovery_strategy"] = recovery_result.get("recovery_strategy")
-                
-                # Add outputs from recovery
-                if "outputs" not in result:
-                    result["outputs"] = {}
-                
-                if "outputs" in recovery_result:
-                    result["outputs"].update(recovery_result["outputs"])
-                
-                return result
+            # Compare based on operator
+            if operator == "==":
+                return var_value == compare_value
+            elif operator == "!=":
+                return var_value != compare_value
+            elif operator == "<":
+                return var_value < compare_value
+            elif operator == ">":
+                return var_value > compare_value
+            elif operator == "<=":
+                return var_value <= compare_value
+            elif operator == ">=":
+                return var_value >= compare_value
             else:
-                self._logger.warning(f"Recovery failed for step {step.id}")
-                return {
-                    **result,
-                    "recovery_attempted": True,
-                    "recovery_success": False,
-                    "recovery_error": recovery_result.get("error", "Unknown recovery error")
-                }
-            
+                return False
         except Exception as e:
-            self._logger.exception(f"Error in recovery attempt: {str(e)}")
-            return {
-                **result,
-                "recovery_attempted": True,
-                "recovery_success": False,
-                "recovery_error": str(e)
-            }
+            self._logger.error(f"Error comparing variable {var_name} with value {value}: {str(e)}")
+            return False
+    
+    # Simple boolean evaluation for unknown conditions
+    return bool(expression and expression.lower() not in ['false', '0', 'no', 'n', ''])
+
+async def _resolve_variables_in_string(
+    self, 
+    text: str, 
+    context: StepExecutionContext
+) -> str:
+    """
+    Resolve variables in a string.
+    
+    Args:
+        text: The string with potential variable references
+        context: Execution context
+        
+    Returns:
+        String with variables resolved
+    """
+    if not text or "${" not in text:
+        return text
+    
+    result = text
+    var_pattern = r'\${([^}]+)}'
+    matches = re.findall(var_pattern, text)
+    
+    for var_name in matches:
+        var_value = self._get_variable_value(var_name, context)
+        if var_value is not None:
+            # Replace the variable reference with its value
+            result = result.replace(f"${{{var_name}}}", str(var_value))
+    
+    return result
+
+async def _resolve_loop_items(
+    self, 
+    loop_items_expr: str, 
+    context: StepExecutionContext
+) -> List[Any]:
+    """
+    Resolve loop items from various sources.
+    
+    Args:
+        loop_items_expr: Expression for loop items
+        context: Execution context
+        
+    Returns:
+        List of items to loop over
+    """
+    # Check if loop_items is a variable reference
+    var_match = re.match(r'\${([^}]+)}', loop_items_expr)
+    if var_match:
+        var_name = var_match.group(1)
+        var_value = self._get_variable_value(var_name, context)
+        
+        if var_value is not None:
+            if isinstance(var_value, list):
+                return var_value
+            elif isinstance(var_value, dict):
+                # For dictionaries, loop over items
+                return list(var_value.items())
+            elif isinstance(var_value, str):
+                # For strings, try to parse as JSON
+                try:
+                    parsed = json.loads(var_value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except json.JSONDecodeError:
+                    # Not JSON, split by lines
+                    return var_value.splitlines()
+    
+    # Check for range expression: range(start, end, step)
+    range_match = re.match(r'range\((\d+)(?:,\s*(\d+))?(?:,\s*(\d+))?\)', loop_items_expr)
+    if range_match:
+        if range_match.group(2):
+            # range(start, end, [step])
+            start = int(range_match.group(1))
+            end = int(range_match.group(2))
+            step = int(range_match.group(3)) if range_match.group(3) else 1
+            return list(range(start, end, step))
+        else:
+            # range(end)
+            end = int(range_match.group(1))
+            return list(range(end))
+    
+    # Check for file list: files(pattern)
+    files_match = re.match(r'files\(([^)]+)\)', loop_items_expr)
+    if files_match:
+        pattern = files_match.group(1).strip('"\'')
+        
+        # Resolve pattern if it contains variables
+        resolved_pattern = await self._resolve_variables_in_string(pattern, context)
+        
+        # Import here to avoid circular imports
+        from glob import glob
+        
+        # Get list of files matching the pattern
+        file_list = glob(resolved_pattern)
+        return file_list
+    
+    # Check for JSON array
+    if loop_items_expr.startswith('[') and loop_items_expr.endswith(']'):
+        try:
+            items = json.loads(loop_items_expr)
+            if isinstance(items, list):
+                return items
+        except json.JSONDecodeError:
+            pass
+    
+    # Check for comma-separated list
+    if ',' in loop_items_expr:
+        return [item.strip() for item in loop_items_expr.split(',')]
+    
+    # Default: return as single item
+    return [loop_items_expr]
 
 
 # Now define the EnhancedTaskPlanner class that uses the core implementation

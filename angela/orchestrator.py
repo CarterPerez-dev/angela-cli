@@ -29,7 +29,7 @@ from angela.execution.engine import execution_engine
 from angela.execution.adaptive_engine import adaptive_engine
 from angela.ai.analyzer import error_analyzer
 from angela.ai.intent_analyzer import intent_analyzer
-from angela.intent.models import AdvancedTaskPlan, TaskPlan
+from angela.intent.planner import AdvancedTaskPlan, TaskPlan
 from angela.ai.confidence import confidence_scorer
 from angela.intent.planner import task_planner
 from angela.workflows.manager import workflow_manager
