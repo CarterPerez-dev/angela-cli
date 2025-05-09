@@ -1441,7 +1441,9 @@ Ensure the structure follows best practices for {framework} projects.
             prompt=prompt,
             max_tokens=4000,
             temperature=0.2
-        )   response = await gemini_client.generate_text(api_request)
+        )   
+        
+        response = await gemini_client.generate_text(api_request)
         
         # Extract JSON from the response
         structure_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
@@ -2159,7 +2161,7 @@ Ensure the structure follows best practices for {framework} projects.
                     "language": "text"
                 }
             ])
-        }
+        # Removed the extra closing brace that was here
         
         # Project configuration
         files.extend([
@@ -2323,8 +2325,9 @@ Ensure the structure follows best practices for {framework} projects.
             ])
         
         # Generate files
+        generated_files = []
         for file_info in files:
-            files.append(CodeFile(
+            generated_files.append(CodeFile(
                 path=file_info["path"],
                 content=file_info["content"],
                 purpose=file_info["purpose"],
@@ -2335,7 +2338,7 @@ Ensure the structure follows best practices for {framework} projects.
         return {
             "success": True,
             "framework": "django",
-            "files": files,
+            "files": generated_files,
             "project_type": "python",
             "project_name": project_name,
             "app_name": app_name,
@@ -2345,20 +2348,6 @@ Ensure the structure follows best practices for {framework} projects.
             "templates": include_templates,
             "static": include_static
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 async def _generate_file_content(

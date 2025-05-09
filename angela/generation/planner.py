@@ -256,83 +256,81 @@ class ProjectPlanner:
                 data_flow=["User input -> Core processing -> Storage"]
             )
 
-def _build_plan_refinement_prompt(
-    self, 
-    project: CodeProject,
-    architecture: ProjectArchitecture,
-    context: Dict[str, Any]
-) -> str:
-    """
-    Build a prompt for plan refinement.
-    
-    Args:
-        project: Initial CodeProject
-        architecture: ProjectArchitecture to use for refinement
-        context: Additional context information
+    async def _build_plan_refinement_prompt(
+        self, 
+        project: CodeProject,
+        architecture: ProjectArchitecture,
+        context: Dict[str, Any]
+    ) -> str:
+        """
+        Build a prompt for plan refinement.
         
-    Returns:
-        Prompt string for the AI service
-    """
-    # Extract architecture info
-    arch_json = {}
-    arch_json["components"] = [comp.dict() for comp in architecture.components]
-    arch_json["layers"] = architecture.layers
-    arch_json["patterns"] = architecture.patterns
-    arch_json["data_flow"] = architecture.data_flow
+        Args:
+            project: Initial CodeProject
+            architecture: ProjectArchitecture to use for refinement
+            context: Additional context information
+            
+        Returns:
+            Prompt string for the AI service
+        """
+        # Extract architecture info
+        arch_json = {}
+        arch_json["components"] = [comp.dict() for comp in architecture.components]
+        arch_json["layers"] = architecture.layers
+        arch_json["patterns"] = architecture.patterns
+        arch_json["data_flow"] = architecture.data_flow
+        
+        # Extract project info
+        project_json = {}
+        project_json["name"] = project.name
+        project_json["description"] = project.description
+        project_json["project_type"] = project.project_type
+        project_json["dependencies"] = project.dependencies
+        project_json["files"] = [
+            {
+                "path": file.path,
+                "purpose": file.purpose,
+                "dependencies": file.dependencies
+            }
+            for file in project.files
+        ]
+        
+        prompt = f"""
+    You are refining a project plan based on a high-level architecture.
+    Here is the current project plan:
+    json{json.dumps(project_json, indent=2)}
+    And here is the architecture design:
+    json{json.dumps(arch_json, indent=2)}
+    Your task is to refine the project plan to better align with the architecture.
+    This may involve:
     
-    # Extract project info
-    project_json = {}
-    project_json["name"] = project.name
-    project_json["description"] = project.description
-    project_json["project_type"] = project.project_type
-    project_json["dependencies"] = project.dependencies
-    project_json["files"] = [
-        {
-            "path": file.path,
-            "purpose": file.purpose,
-            "dependencies": file.dependencies
-        }
-        for file in project.files
-    ]
+    1. Adding missing files that would be needed for components in the architecture
+    2. Updating existing file purposes to match component responsibilities
+    3. Adjusting file dependencies to match component dependencies
+    4. Ensuring the project structure follows the architectural layers
     
-    prompt = f"""
-You are refining a project plan based on a high-level architecture.
-Here is the current project plan:
-json{json.dumps(project_json, indent=2)}
-And here is the architecture design:
-json{json.dumps(arch_json, indent=2)}
-Your task is to refine the project plan to better align with the architecture.
-This may involve:
-
-1. Adding missing files that would be needed for components in the architecture
-2. Updating existing file purposes to match component responsibilities
-3. Adjusting file dependencies to match component dependencies
-4. Ensuring the project structure follows the architectural layers
-
-Return a refined project plan in this JSON format:
-json{{
-  "name": "project_name",
-  "description": "project description",
-  "project_type": "{project.project_type}",
-  "dependencies": {{
-    "runtime": ["dep1", "dep2"],
-    "development": ["dev_dep1", "dev_dep2"]
-  }},
-  "files": [
-    {{
-      "path": "path/to/file.ext",
-      "purpose": "file purpose",
-      "dependencies": ["other/file/paths"],
-      "component": "associated_component_name"
+    Return a refined project plan in this JSON format:
+    json{{
+      "name": "project_name",
+      "description": "project description",
+      "project_type": "{project.project_type}",
+      "dependencies": {{
+        "runtime": ["dep1", "dep2"],
+        "development": ["dev_dep1", "dev_dep2"]
+      }},
+      "files": [
+        {{
+          "path": "path/to/file.ext",
+          "purpose": "file purpose",
+          "dependencies": ["other/file/paths"],
+          "component": "associated_component_name"
+        }}
+      ],
+      "structure_explanation": "explanation of the refined structure"
     }}
-  ],
-  "structure_explanation": "explanation of the refined structure"
-}}
-Make sure the refined plan implements all components and follows all architectural patterns in the design.
-"""
-    return prompt
-
-
+    Make sure the refined plan implements all components and follows all architectural patterns in the design.
+    """
+        return prompt
 
     async def create_detailed_project_architecture(
         self, 

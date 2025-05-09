@@ -182,7 +182,7 @@ def create_project(
         console.print(f"[bold red]Error generating project:[/bold red] {str(e)}")
 
 @app.command("add-feature")
-def add_feature(
+async def add_feature(
     description: str = typer.Argument(..., help="Description of the feature to add"),
     project_dir: str = typer.Option(".", help="Project directory"),
     branch: Optional[str] = typer.Option(None, help="Create a feature branch"),
@@ -203,7 +203,7 @@ def add_feature(
     try:
         # Get current context
         context = context_manager.get_context_dict()
-        context = asyncio.run(context_enhancer.enrich_context(context))
+        context = await context_enhancer.enrich_context(context)
         
         # Check if project directory exists
         project_path = Path(project_dir)
@@ -217,11 +217,11 @@ def add_feature(
             
             if not dry_run:
                 with console.status("[bold green]Creating branch...[/bold green]"):
-                    branch_result = asyncio.run(git_integration.create_branch(
+                    branch_result = await git_integration.create_branch(
                         path=project_dir,
                         branch_name=branch,
                         checkout=True
-                    ))
+                    )
                 
                 if branch_result["success"]:
                     console.print(f"[green]Created and checked out branch: {branch}[/green]")
@@ -231,7 +231,7 @@ def add_feature(
         # Get project info
         with console.status("[bold green]Analyzing project...[/bold green]"):
             # Detect project type
-            project_type_result = asyncio.run(ci_cd_integration.detect_project_type(project_dir))
+            project_type_result = await ci_cd_integration.detect_project_type(project_dir)
             project_type = project_type_result.get("project_type")
             
             if not project_type:
@@ -244,11 +244,11 @@ def add_feature(
         
         with console.status("[bold green]Generating feature implementation...[/bold green]"):
             # Use the new feature addition method
-            result = asyncio.run(code_generation_engine.add_feature_to_project(
+            result = await code_generation_engine.add_feature_to_project(
                 description=description,
                 project_dir=project_dir,
                 context=context
-            ))
+            )
         
         if result["success"]:
             # Display results
@@ -288,11 +288,11 @@ def add_feature(
                             console.print(f"[yellow]Error reading file {file_path}: {str(e)}[/yellow]")
                     
                     if src_files:
-                        test_result = asyncio.run(test_framework_integration.generate_test_files(
+                        test_result = await test_framework_integration.generate_test_files(
                             src_files=src_files,
                             project_type=project_type,
                             root_dir=project_dir
-                        ))
+                        )
                         
                         if test_result["success"]:
                             console.print(f"[green]Generated {test_result['file_count']} test files[/green]")

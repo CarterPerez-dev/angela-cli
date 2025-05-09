@@ -366,312 +366,479 @@ class CiCdIntegration:
                         },
                         "steps": [
                             {
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["cargo"],
-                        "script": [
-                            "rustup component add clippy",
-                            "cargo build --verbose",
-                            "cargo test --verbose",
-                            "cargo clippy -- -D warnings"
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Set up Python ${{ matrix.python-version }}",
+                                "uses": "actions/setup-python@v4",
+                                "with": {
+                                    "python-version": "${{ matrix.python-version }}"
+                                }
+                            },
+                            {
+                                "name": "Install dependencies",
+                                "run": "python -m pip install --upgrade pip\npip install -r requirements.txt\npip install pytest pytest-cov flake8"
+                            },
+                            {
+                                "name": "Lint with flake8",
+                                "run": "flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics"
+                            },
+                            {
+                                "name": "Test with pytest",
+                                "run": "pytest --cov=. --cov-report=xml"
+                            },
+                            {
+                                "name": "Upload coverage to Codecov",
+                                "uses": "codecov/codecov-action@v3",
+                                "with": {
+                                    "file": "./coverage.xml",
+                                    "fail_ci_if_error": "false"
+                                }
+                            }
                         ]
                     }
                 }
-            ]
-        elif project_type == "java":
-            if (path / "pom.xml").exists():
-                config["image"] = "maven:latest"
-                default_pipe = [
-                    {
-                        "step": {
-                            "name": "Build and test",
-                            "caches": ["maven"],
-                            "script": [
-                                "mvn clean package"
-                            ]
-                        }
-                    }
-                ]
-            else:
-                config["image"] = "gradle:latest"
-                default_pipe = [
-                    {
-                        "step": {
-                            "name": "Build and test",
-                            "caches": ["gradle"],
-                            "script": [
-                                "gradle build"
-                            ]
-                        }
-                    }
-                ]
-        elif project_type == "ruby":
-            config["image"] = "ruby:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["bundler"],
-                        "script": [
-                            "bundle install",
-                            "bundle exec rake test"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "php":
-            config["image"] = "php:8.0"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["composer"],
-                        "script": [
-                            "apt-get update && apt-get install -y git unzip",
-                            "curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer",
-                            "composer install",
-                            "vendor/bin/phpunit"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "dotnet":
-            config["image"] = "mcr.microsoft.com/dotnet/sdk:6.0"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "dotnet restore",
-                            "dotnet build",
-                            "dotnet test"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "cpp":
-            config["image"] = "gcc:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "apt-get update && apt-get install -y cmake",
-                            "cmake -B build -DCMAKE_BUILD_TYPE=Release",
-                            "cmake --build build",
-                            "cd build && ctest -V"
-                        ]
-                    }
-                }
-            ]
-        else:
-            config["image"] = "alpine:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "echo 'Add your build commands here'",
-                            "echo 'Add your test commands here'"
-                        ]
-                    }
-                }
-            ]
-        
-        # Set up the pipeline steps
-        config["pipelines"]["default"] = default_pipe
-        config["pipelines"]["branches"]["main"] = default_pipe
-        config["pipelines"]["branches"]["master"] = default_pipe
-        config["pipelines"]["pull-requests"] = default_pipe
-        
-        # Add deployment step for tags
-        deploy_pipe = list(default_pipe)
-        deploy_pipe.append({
-            "step": {
-                "name": "Deploy on tag",
-                "deployment": "production",
-                "script": [
-                    "echo 'Deploying to production...'"
-                ]
             }
-        })
-        config["pipelines"]["tags"] = deploy_pipe
-        
+        elif project_type == "node":
+            workflow = {
+                "name": "Node.js CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "strategy": {
+                            "matrix": {
+                                "node-version": ["14.x", "16.x", "18.x"]
+                            }
+                        },
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Use Node.js ${{ matrix.node-version }}",
+                                "uses": "actions/setup-node@v3",
+                                "with": {
+                                    "node-version": "${{ matrix.node-version }}",
+                                    "cache": "npm"
+                                }
+                            },
+                            {
+                                "name": "Install dependencies",
+                                "run": "npm ci"
+                            },
+                            {
+                                "name": "Run linting",
+                                "run": "npm run lint --if-present"
+                            },
+                            {
+                                "name": "Build",
+                                "run": "npm run build --if-present"
+                            },
+                            {
+                                "name": "Test",
+                                "run": "npm test"
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "go":
+            workflow = {
+                "name": "Go CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Set up Go",
+                                "uses": "actions/setup-go@v3",
+                                "with": {
+                                    "go-version": "1.18"
+                                }
+                            },
+                            {
+                                "name": "Build",
+                                "run": "go build -v ./..."
+                            },
+                            {
+                                "name": "Test",
+                                "run": "go test -v ./..."
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "rust":
+            workflow = {
+                "name": "Rust CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Install Rust",
+                                "uses": "actions-rs/toolchain@v1",
+                                "with": {
+                                    "profile": "minimal",
+                                    "toolchain": "stable",
+                                    "override": "true",
+                                    "components": "rustfmt, clippy"
+                                }
+                            },
+                            {
+                                "name": "Check formatting",
+                                "uses": "actions-rs/cargo@v1",
+                                "with": {
+                                    "command": "fmt",
+                                    "args": "-- --check"
+                                }
+                            },
+                            {
+                                "name": "Clippy",
+                                "uses": "actions-rs/cargo@v1",
+                                "with": {
+                                    "command": "clippy",
+                                    "args": "-- -D warnings"
+                                }
+                            },
+                            {
+                                "name": "Build",
+                                "uses": "actions-rs/cargo@v1",
+                                "with": {
+                                    "command": "build"
+                                }
+                            },
+                            {
+                                "name": "Test",
+                                "uses": "actions-rs/cargo@v1",
+                                "with": {
+                                    "command": "test"
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "java":
+            workflow = {
+                "name": "Java CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "strategy": {
+                            "matrix": {
+                                "java-version": ["11", "17"]
+                            }
+                        },
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Set up JDK ${{ matrix.java-version }}",
+                                "uses": "actions/setup-java@v3",
+                                "with": {
+                                    "java-version": "${{ matrix.java-version }}",
+                                    "distribution": "temurin",
+                                    "cache": "maven"
+                                }
+                            },
+                            {
+                                "name": "Build with Maven",
+                                "run": "mvn -B package --file pom.xml"
+                            },
+                            {
+                                "name": "Test",
+                                "run": "mvn test"
+                            }
+                        ]
+                    }
+                }
+            }
+            # Check if it's Gradle
+            if (path / "build.gradle").exists() or (path / "build.gradle.kts").exists():
+                workflow["jobs"]["build"]["steps"][2] = {
+                    "name": "Build with Gradle",
+                    "uses": "gradle/gradle-build-action@v2",
+                    "with": {
+                        "arguments": "build"
+                    }
+                }
+                workflow["jobs"]["build"]["steps"][3] = {
+                    "name": "Test",
+                    "uses": "gradle/gradle-build-action@v2",
+                    "with": {
+                        "arguments": "test"
+                    }
+                }
+        elif project_type == "ruby":
+            workflow = {
+                "name": "Ruby CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "strategy": {
+                            "matrix": {
+                                "ruby-version": ["2.7", "3.0", "3.1"]
+                            }
+                        },
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Set up Ruby ${{ matrix.ruby-version }}",
+                                "uses": "ruby/setup-ruby@v1",
+                                "with": {
+                                    "ruby-version": "${{ matrix.ruby-version }}",
+                                    "bundler-cache": "true"
+                                }
+                            },
+                            {
+                                "name": "Install dependencies",
+                                "run": "bundle install"
+                            },
+                            {
+                                "name": "Run tests",
+                                "run": "bundle exec rake test"
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "php":
+            workflow = {
+                "name": "PHP CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "strategy": {
+                            "matrix": {
+                                "php-version": ["7.4", "8.0", "8.1"]
+                            }
+                        },
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Set up PHP ${{ matrix.php-version }}",
+                                "uses": "shivammathur/setup-php@v2",
+                                "with": {
+                                    "php-version": "${{ matrix.php-version }}",
+                                    "extensions": "mbstring, xml, ctype, iconv, intl, pdo_sqlite",
+                                    "coverage": "xdebug"
+                                }
+                            },
+                            {
+                                "name": "Install Composer dependencies",
+                                "run": "composer install --prefer-dist --no-progress"
+                            },
+                            {
+                                "name": "Run tests",
+                                "run": "vendor/bin/phpunit"
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "dotnet":
+            workflow = {
+                "name": ".NET CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "strategy": {
+                            "matrix": {
+                                "dotnet-version": ["6.0.x", "7.0.x"]
+                            }
+                        },
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Setup .NET ${{ matrix.dotnet-version }}",
+                                "uses": "actions/setup-dotnet@v3",
+                                "with": {
+                                    "dotnet-version": "${{ matrix.dotnet-version }}"
+                                }
+                            },
+                            {
+                                "name": "Restore dependencies",
+                                "run": "dotnet restore"
+                            },
+                            {
+                                "name": "Build",
+                                "run": "dotnet build --no-restore"
+                            },
+                            {
+                                "name": "Test",
+                                "run": "dotnet test --no-build --verbosity normal"
+                            }
+                        ]
+                    }
+                }
+            }
+        elif project_type == "cpp":
+            workflow = {
+                "name": "C/C++ CI",
+                "on": {
+                    "push": {
+                        "branches": ["main", "master"]
+                    },
+                    "pull_request": {
+                        "branches": ["main", "master"]
+                    }
+                },
+                "jobs": {
+                    "build": {
+                        "runs-on": "ubuntu-latest",
+                        "steps": [
+                            {
+                                "name": "Checkout code",
+                                "uses": "actions/checkout@v3"
+                            },
+                            {
+                                "name": "Configure CMake",
+                                "run": "cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug"
+                            },
+                            {
+                                "name": "Build",
+                                "run": "cmake --build ${{github.workspace}}/build"
+                            },
+                            {
+                                "name": "Test",
+                                "working-directory": "${{github.workspace}}/build",
+                                "run": "ctest -C Debug"
+                            }
+                        ]
+                    }
+                }
+            }
+        else: # Default empty workflow if project_type is not recognized
+             workflow = {
+                 "name": f"{project_type} CI", 
+                 "on": {
+                     "push": {
+                         "branches": ["main", "master"]
+                     },
+                     "pull_request": {
+                         "branches": ["main", "master"]
+                     }
+                 }, 
+                 "jobs": {
+                     "build": {
+                         "runs-on": "ubuntu-latest",
+                         "steps": [
+                             {
+                                 "name": "Checkout code", 
+                                 "uses": "actions/checkout@v3"
+                             },
+                             {
+                                 "name": "Build",
+                                 "run": "echo 'Add your build commands here'"
+                             },
+                             {
+                                 "name": "Test",
+                                 "run": "echo 'Add your test commands here'"
+                             }
+                         ]
+                     }
+                 }
+             }
+    
         # Update with custom settings using deep merge
         if custom_settings:
-            config = deep_update(config, custom_settings)
-        
-        # Write the config file
-        config_file = path / "bitbucket-pipelines.yml"
+            workflow = deep_update(workflow, custom_settings)
+    
+        # Write the workflow file
+        workflow_file = workflows_dir / f"{project_type}-ci.yml"
         try:
-            with open(config_file, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+            with open(workflow_file, 'w') as f:
+                yaml.dump(workflow, f, default_flow_style=False, sort_keys=False)
             
             return {
                 "success": True,
-                "platform": "bitbucket_pipelines",
+                "platform": "github_actions",
                 "project_type": project_type,
-                "config_file": str(config_file)
+                "config_file": str(workflow_file)
             }
         except Exception as e:
             return {
                 "success": False,
-                "error": f"Failed to write Bitbucket Pipelines config: {str(e)}",
-                "platform": "bitbucket_pipelines",
-                "project_type": project_type
-            }
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["cargo"],
-                        "script": [
-                            "rustup component add clippy",
-                            "cargo build --verbose",
-                            "cargo test --verbose",
-                            "cargo clippy -- -D warnings"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "java":
-            if (path / "pom.xml").exists():
-                config["image"] = "maven:latest"
-                default_pipe = [
-                    {
-                        "step": {
-                            "name": "Build and test",
-                            "caches": ["maven"],
-                            "script": [
-                                "mvn clean package"
-                            ]
-                        }
-                    }
-                ]
-            else:
-                config["image"] = "gradle:latest"
-                default_pipe = [
-                    {
-                        "step": {
-                            "name": "Build and test",
-                            "caches": ["gradle"],
-                            "script": [
-                                "gradle build"
-                            ]
-                        }
-                    }
-                ]
-        elif project_type == "ruby":
-            config["image"] = "ruby:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["bundler"],
-                        "script": [
-                            "bundle install",
-                            "bundle exec rake test"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "php":
-            config["image"] = "php:8.0"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "caches": ["composer"],
-                        "script": [
-                            "apt-get update && apt-get install -y git unzip",
-                            "curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer",
-                            "composer install",
-                            "vendor/bin/phpunit"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "dotnet":
-            config["image"] = "mcr.microsoft.com/dotnet/sdk:6.0"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "dotnet restore",
-                            "dotnet build",
-                            "dotnet test"
-                        ]
-                    }
-                }
-            ]
-        elif project_type == "cpp":
-            config["image"] = "gcc:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "apt-get update && apt-get install -y cmake",
-                            "cmake -B build -DCMAKE_BUILD_TYPE=Release",
-                            "cmake --build build",
-                            "cd build && ctest -V"
-                        ]
-                    }
-                }
-            ]
-        else:
-            config["image"] = "alpine:latest"
-            default_pipe = [
-                {
-                    "step": {
-                        "name": "Build and test",
-                        "script": [
-                            "echo 'Add your build commands here'",
-                            "echo 'Add your test commands here'"
-                        ]
-                    }
-                }
-            ]
-        
-        # Set up the pipeline steps
-        config["pipelines"]["default"] = default_pipe
-        config["pipelines"]["branches"]["main"] = default_pipe
-        config["pipelines"]["branches"]["master"] = default_pipe
-        config["pipelines"]["pull-requests"] = default_pipe
-        
-        # Add deployment step for tags
-        deploy_pipe = list(default_pipe)
-        deploy_pipe.append({
-            "step": {
-                "name": "Deploy on tag",
-                "deployment": "production",
-                "script": [
-                    "echo 'Deploying to production...'"
-                ]
-            }
-        })
-        config["pipelines"]["tags"] = deploy_pipe
-        
-        # Update with custom settings using deep merge
-        if custom_settings:
-            config = deep_update(config, custom_settings)
-        
-        # Write the config file
-        config_file = path / "bitbucket-pipelines.yml"
-        try:
-            with open(config_file, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-            
-            return {
-                "success": True,
-                "platform": "bitbucket_pipelines",
-                "project_type": project_type,
-                "config_file": str(config_file)
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Failed to write Bitbucket Pipelines config: {str(e)}",
-                "platform": "bitbucket_pipelines",
+                "error": f"Failed to write GitHub Actions workflow: {str(e)}",
+                "platform": "github_actions",
                 "project_type": project_type
             }
     

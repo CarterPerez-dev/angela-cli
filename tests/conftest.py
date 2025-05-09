@@ -47,7 +47,7 @@ class MockTerminal:
         return any(text in out for out in self.output_history)
 
 
-@@pytest.fixture
+@pytest.fixture
 def temp_project_dir():
     """Create a temporary directory for project testing."""
     temp_dir = tempfile.mkdtemp()

@@ -314,169 +314,166 @@ class Orchestrator:
                 r'\bredesign\s+(?:the\s+)?(?:architecture|structure)\b',
                 r'\bproject\s+structure\b',
             ]
-
-
-        ci_cd_patterns = [
-            r'\bset\s*up\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration|deployment)(?:\s+pipeline)?\b',
-            r'\bcreate\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration)(?:\s+pipeline)?\b',
-            r'\bci/cd\s+(?:pipeline|setup|configuration)\b',
-            r'\bpipeline\s+(?:setup|configuration|for)\b',
-            r'\bgithub\s+actions\b',
-            r'\bgitlab\s+ci\b',
-            r'\bjenkins(?:file)?\b',
-            r'\btravis\s+ci\b',
-            r'\bcircle\s+ci\b',
-            r'\b(?:automate|automation)\s+(?:build|test|deploy)\b',
-        ]
-        
-        # First check for CI/CD patterns since they're more specific
-        for pattern in ci_cd_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CI_CD_PIPELINE
-        
-        # Then check for Universal CLI patterns
-        universal_cli_patterns = [
-            r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
-            r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
-            r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
-        ]
-        
-        for pattern in universal_cli_patterns:
-            match = re.search(pattern, request, re.IGNORECASE)
-            if match:
-                tool = match.group(1).strip().lower()
-                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Check for complex workflow patterns
-        complex_workflow_patterns = [
-            r'\bcomplex\s+workflow\b',
-            r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
-            r'\bautomated\s+(?:build|test|deploy)\b',
-            r'\bend-to-end\s+workflow\b',
-            r'\bchain\s+of\s+commands\b',
-            r'\bmulti-step\s+operation\s+across\b',
-            r'\bpipeline\s+using\b',
-            r'\bseries\s+of\s+tools\b',
-        ]
-        
-        for pattern in complex_workflow_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.COMPLEX_WORKFLOW
-        
-        # Check for common CLI tools explicitly mentioned
-        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
-        tool_words = request.lower().split()
-        for tool in common_tools:
-            if tool in tool_words:
-                # Make sure it's a standalone word, not part of another word
-                # Check the positions where the tool appears
-                positions = [i for i, word in enumerate(tool_words) if word == tool]
-                for pos in positions:
-                    # Check if it's a command (usually preceded by use, run, with, etc.)
-                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
-                        return RequestType.UNIVERSAL_CLI
-                
-                # If tool is the first word in the request, it's likely a direct usage
-                if tool_words[0] == tool:
-                    return RequestType.UNIVERSAL_CLI
-        
-        # Also check for complexity indicators combined with multiple tool mentions
-        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
-                            if tool in request.lower())
-        has_complex_indicators = any(indicator in request.lower() for indicator in 
-                                    ["pipeline", "sequence", "then", "after", "followed"])
     
-        if tool_mentions >= 2 and has_complex_indicators:
-            return RequestType.COMPLEX_WORKFLOW
-
-
-        # Check for code generation first (highest priority)
-        for pattern in code_generation_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_GENERATION
-        
-        # Check for feature addition
-        for pattern in feature_addition_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.FEATURE_ADDITION
-        
-        # Check for toolchain operations
-        for pattern in toolchain_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.TOOLCHAIN_OPERATION
-        
-        # Check for code refinement
-        for pattern in refinement_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_REFINEMENT
-        
-        # Check for architecture analysis
-        for pattern in architecture_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_ARCHITECTURE
- 
-        
-        # Check for workflow definition
-        for pattern in workflow_def_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.WORKFLOW_DEFINITION
-        
-        # Check for workflow execution
-        for pattern in workflow_exec_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.WORKFLOW_EXECUTION
-
-        # Check for Docker operations first
-        for pattern in docker_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.TOOLCHAIN_OPERATION
-
-        # Check for code generation (high priority)
-        for pattern in code_generation_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_GENERATION
-        
-        # Check for feature addition
-        for pattern in feature_addition_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.FEATURE_ADDITION
-        
-        # Check for toolchain operations
-        for pattern in toolchain_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.TOOLCHAIN_OPERATION
-        
-        # Check for code refinement
-        for pattern in refinement_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_REFINEMENT
-        
-        # Check for architecture analysis
-        for pattern in architecture_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.CODE_ARCHITECTURE
-
-        for pattern in complex_workflow_patterns:
-            if re.search(pattern, request, re.IGNORECASE):
-                return RequestType.COMPLEX_WORKFLOW
-        
-                    
-        # Check for file content analysis/manipulation
-        file_mentions = re.search(r'\b(?:file|code|script|document)\b', request, re.IGNORECASE)
-        if file_mentions:
-            for pattern in file_content_patterns:
+            # CI/CD patterns
+            ci_cd_patterns = [
+                r'\bset\s*up\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration|deployment)(?:\s+pipeline)?\b',
+                r'\bcreate\s+(?:a\s+)?(?:ci|cd|ci/cd|cicd|continuous integration)(?:\s+pipeline)?\b',
+                r'\bci/cd\s+(?:pipeline|setup|configuration)\b',
+                r'\bpipeline\s+(?:setup|configuration|for)\b',
+                r'\bgithub\s+actions\b',
+                r'\bgitlab\s+ci\b',
+                r'\bjenkins(?:file)?\b',
+                r'\btravis\s+ci\b',
+                r'\bcircle\s+ci\b',
+                r'\b(?:automate|automation)\s+(?:build|test|deploy)\b',
+            ]
+            
+            # First check for CI/CD patterns since they're more specific
+            for pattern in ci_cd_patterns:
                 if re.search(pattern, request, re.IGNORECASE):
-                    return RequestType.FILE_CONTENT
+                    return RequestType.CI_CD_PIPELINE
+            
+            # Then check for Universal CLI patterns
+            universal_cli_patterns = [
+                r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
+                r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
+                r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
+            ]
+            
+            for pattern in universal_cli_patterns:
+                match = re.search(pattern, request, re.IGNORECASE)
+                if match:
+                    tool = match.group(1).strip().lower()
+                    if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
+                        return RequestType.UNIVERSAL_CLI
+            
+            # Check for complex workflow patterns
+            complex_workflow_patterns = [
+                r'\bcomplex\s+workflow\b',
+                r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
+                r'\bautomated\s+(?:build|test|deploy)\b',
+                r'\bend-to-end\s+workflow\b',
+                r'\bchain\s+of\s+commands\b',
+                r'\bmulti-step\s+operation\s+across\b',
+                r'\bpipeline\s+using\b',
+                r'\bseries\s+of\s+tools\b',
+            ]
+            
+            for pattern in complex_workflow_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.COMPLEX_WORKFLOW
+            
+            # Check for common CLI tools explicitly mentioned
+            common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
+            tool_words = request.lower().split()
+            for tool in common_tools:
+                if tool in tool_words:
+                    # Make sure it's a standalone word, not part of another word
+                    # Check the positions where the tool appears
+                    positions = [i for i, word in enumerate(tool_words) if word == tool]
+                    for pos in positions:
+                        # Check if it's a command (usually preceded by use, run, with, etc.)
+                        if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
+                            return RequestType.UNIVERSAL_CLI
+                    
+                    # If tool is the first word in the request, it's likely a direct usage
+                    if tool_words[0] == tool:
+                        return RequestType.UNIVERSAL_CLI
+            
+            # Also check for complexity indicators combined with multiple tool mentions
+            tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
+                               if tool in request.lower())
+            has_complex_indicators = any(indicator in request.lower() for indicator in 
+                                       ["pipeline", "sequence", "then", "after", "followed"])
         
-        # Check for multi-step operation
-        complexity_indicators = sum(bool(re.search(pattern, request, re.IGNORECASE)) for pattern in multi_step_patterns)
-        if complexity_indicators >= 1 or len(request.split()) > 15:
-            # Complex requests or longer instructions often imply multi-step operations
-            return RequestType.MULTI_STEP
-        
-        # Default to single command
-        return RequestType.COMMAND
+            if tool_mentions >= 2 and has_complex_indicators:
+                return RequestType.COMPLEX_WORKFLOW
+    
+            # Check for code generation first (highest priority)
+            for pattern in code_generation_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_GENERATION
+            
+            # Check for feature addition
+            for pattern in feature_addition_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.FEATURE_ADDITION
+            
+            # Check for toolchain operations
+            for pattern in toolchain_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.TOOLCHAIN_OPERATION
+            
+            # Check for code refinement
+            for pattern in refinement_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_REFINEMENT
+            
+            # Check for architecture analysis
+            for pattern in architecture_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_ARCHITECTURE
+     
+            # Check for workflow definition
+            for pattern in workflow_def_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.WORKFLOW_DEFINITION
+            
+            # Check for workflow execution
+            for pattern in workflow_exec_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.WORKFLOW_EXECUTION
+    
+            # Check for Docker operations first
+            for pattern in docker_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.TOOLCHAIN_OPERATION
+    
+            # Check for code generation (high priority)
+            for pattern in code_generation_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_GENERATION
+            
+            # Check for feature addition
+            for pattern in feature_addition_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.FEATURE_ADDITION
+            
+            # Check for toolchain operations
+            for pattern in toolchain_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.TOOLCHAIN_OPERATION
+            
+            # Check for code refinement
+            for pattern in refinement_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_REFINEMENT
+            
+            # Check for architecture analysis
+            for pattern in architecture_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.CODE_ARCHITECTURE
+    
+            for pattern in complex_workflow_patterns:
+                if re.search(pattern, request, re.IGNORECASE):
+                    return RequestType.COMPLEX_WORKFLOW
+                    
+            # Check for file content analysis/manipulation
+            file_mentions = re.search(r'\b(?:file|code|script|document)\b', request, re.IGNORECASE)
+            if file_mentions:
+                for pattern in file_content_patterns:
+                    if re.search(pattern, request, re.IGNORECASE):
+                        return RequestType.FILE_CONTENT
+            
+            # Check for multi-step operation
+            complexity_indicators = sum(bool(re.search(pattern, request, re.IGNORECASE)) for pattern in multi_step_patterns)
+            if complexity_indicators >= 1 or len(request.split()) > 15:
+                # Complex requests or longer instructions often imply multi-step operations
+                return RequestType.MULTI_STEP
+            
+            # Default to single command
+            return RequestType.COMMAND
 
 
     async def _process_code_generation_request(
