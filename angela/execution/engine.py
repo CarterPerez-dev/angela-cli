@@ -5,12 +5,16 @@ Engine for safely executing commands.
 import asyncio
 import shlex
 import subprocess
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
+
 
 from angela.utils.logging import get_logger
-from angela.intent.models import ActionPlan
 from angela.core.registry import registry
 
+
+if TYPE_CHECKING:
+    from angela.intent.models import ActionPlan
+    
 logger = get_logger(__name__)
 
 class ExecutionEngine:
@@ -42,14 +46,19 @@ class ExecutionEngine:
         # If safety checks are requested, perform them
         if check_safety:
             # Get check_command_safety function from registry to avoid circular import
-            check_command_safety = registry.get("check_command_safety")
-            
+            # (Assuming 'check_command_safety' is a key for a function in the registry)
+            check_command_safety_func = registry.get("check_command_safety") # Renamed for clarity
+
+            if not check_command_safety_func:
+                self._logger.error("Safety check function 'check_command_safety' not found in registry.")
+                return "", "Safety check function not configured", 1 # Or raise an error
+
             # Check if the command is safe to execute
-            is_safe = await check_command_safety(command, dry_run)
+            is_safe = await check_command_safety_func(command, dry_run) # Use the retrieved function
             if not is_safe:
                 self._logger.warning(f"Command execution cancelled due to safety concerns: {command}")
                 return "", "Command execution cancelled due to safety concerns", 1
-            
+
             # For dry runs, return simulated results
             if dry_run:
                 self._logger.info(f"DRY RUN: Would execute command: {command}")
@@ -80,9 +89,9 @@ class ExecutionEngine:
             # Record the operation for potential rollback
             if not dry_run and process.returncode == 0:
                 # Get rollback_manager from registry to avoid circular import
-                rollback_manager = registry.get("rollback_manager")
-                if rollback_manager:
-                    await rollback_manager.record_operation(
+                rollback_manager_instance = registry.get("rollback_manager")
+                if rollback_manager_instance:
+                    await rollback_manager_instance.record_operation(
                         operation_type="execute_command",
                         params={"command": command},
                         backup_path=None  # Commands don't have direct file backups
