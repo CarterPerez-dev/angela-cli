@@ -1,3 +1,4 @@
+# angela/shell/completion.py
 """
 AI-powered contextual auto-completion for Angela CLI.
 """
@@ -418,24 +419,22 @@ class CompletionHandler:
         try:
             # Build a prompt for the AI
             prompt = f"""
-You are suggesting auto-completions for the Angela CLI's "{command}" command. 
+You are suggesting auto-completions for the Angela CLI's "{command}" command.
 The user has typed: "{command} {partial}"
-
 Context information:
-- Project type: {context.get('project_type', 'unknown')}
-- Recent files: {', '.join(context.get('recent_files', [])[:3])}
-- Recent commands: {', '.join(context.get('recent_commands', [])[:3])}
-- Last failed command: {context.get('last_failed_command', 'none')}
-
+Project type: {context.get('project_type', 'unknown')}
+Recent files: {', '.join(context.get('recent_files', [])[:3])}
+Recent commands: {', '.join(context.get('recent_commands', [])[:3])}
+Last failed command: {context.get('last_failed_command', 'none')}
 Suggest 3-5 natural language completions that would be helpful continuations of what the user is typing.
 Each completion should be the FULL text that would follow "{command} ", not just the part after "{partial}".
 Completions should be relevant to the current context and project type.
-
 Respond with ONLY a JSON array of strings, like:
-["completion 1", "completion 2", "completion 3"]
+["completion 1", "completion 2", "completion 3"
 """
             
-            # Call the AI
+    
+
             api_request = GeminiRequest(
                 prompt=prompt,
                 max_tokens=200,
@@ -451,15 +450,25 @@ Respond with ONLY a JSON array of strings, like:
             # Try to find JSON in the response
             json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
             if json_match:
-                completions = json.loads(json_match.group(0))
-                return completions
+                try:
+                    completions = json.loads(json_match.group(0))
+                    if isinstance(completions, list): # Ensure it's a list
+                        return completions
+                    else:
+                        self._logger.warning(f"AI completion response was valid JSON but not a list: {json_match.group(0)}")
+                        return []
+                except json.JSONDecodeError as e:
+                    self._logger.error(f"Error decoding AI completions JSON: {str(e)} - Response part: {json_match.group(0)}")
+                    return []
             
-            # If we couldn't parse JSON, return empty list
+            # If we couldn't parse JSON or find a match, return empty list
+            self._logger.debug(f"No valid JSON array found in AI completion response: {response.text}")
             return []
             
         except Exception as e:
             self._logger.error(f"Error getting AI completions: {str(e)}")
             return []
+
     
     def _build_completion_context(self) -> Dict[str, Any]:
         """

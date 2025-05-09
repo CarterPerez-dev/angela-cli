@@ -1,3 +1,4 @@
+# angela/intent/planner.py
 """
 Task planning and goal decomposition for Angela CLI.
 

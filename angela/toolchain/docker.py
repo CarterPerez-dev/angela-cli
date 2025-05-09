@@ -1,3 +1,4 @@
+# angela/toolchain/docker.py
 """
 Docker toolchain integration for Angela CLI.
 
@@ -2585,127 +2586,100 @@ class DockerIntegration:
         if not services_info["success"]:
             return services_info
         
-        services = services_info["services"]
+        detected_services_map = services_info["services"] # Renamed to avoid conflict
         
         # Generate docker-compose.yml content
-        services_content = ""
-        networks_content = "networks:\n  app-network:\n    driver: bridge\n"
-        volumes_content = "volumes:\n"
+        compose_services_dict: Dict[str, Any] = {} # Use a dictionary to build services
+        compose_networks_dict: Dict[str, Any] = {"app-network": {"driver": "bridge"}}
+        compose_volumes_dict: Dict[str, Any] = {}
         
-        # Check if Dockerfile exists
-        dockerfile_exists = (project_dir / "Dockerfile").exists()
-        
-        # Generate app service
-        app_service = services.get("app", {})
-        app_ports = app_service.get("ports", [8080])
-        
-        ports_str = ""
-        if app_ports:
-            ports_str = "    ports:\n"
-            for port in app_ports:
-                ports_str += f"      - '{port}:{port}'\n"
-        
-        # Environment variables
-        environment_str = ""
-        
-        # Volumes
-        volumes_str = ""
-        
-        # Networks
-        networks_str = "    networks:\n      - app-network\n"
-        
-        # Depends on (empty for app service)
-        depends_on_str = ""
+        # Check if Dockerfile exists for the main app
+        app_dockerfile_exists = (project_dir / "Dockerfile").exists()
         
         # App service
-        if dockerfile_exists:
-            services_content += SERVICE_TEMPLATE.format(
-                service_name="app",
-                image="app:latest",
-                context=".",
-                dockerfile="Dockerfile",
-                ports=ports_str,
-                environment=environment_str,
-                volumes=volumes_str,
-                depends_on=depends_on_str,
-                networks=networks_str
-            )
+        app_service_config = detected_services_map.get("app", {})
+        app_service_name = "app" # Default app service name
         
+        if app_service_config:
+            app_entry: Dict[str, Any] = {}
+            if app_dockerfile_exists:
+                app_entry["build"] = {
+                    "context": ".",
+                    "dockerfile": "Dockerfile"
+                }
+                # If building, image name is usually not set here, or set to what it will be tagged as
+            elif app_service_config.get("image"): # If no Dockerfile, but image specified
+                app_entry["image"] = app_service_config["image"]
+
+            if not app_entry.get("build") and not app_entry.get("image"):
+                self._logger.warning("App service has neither Dockerfile nor explicit image. Skipping app service in compose.")
+            else:
+                app_ports_list = app_service_config.get("ports", [8080] if app_dockerfile_exists else [])
+                if app_ports_list:
+                    app_entry["ports"] = [f"{p}:{p}" for p in app_ports_list]
+                
+                app_entry["networks"] = ["app-network"]
+                # Add other app_service_config like environment, volumes if defined
+                if app_service_config.get("environment"):
+                    app_entry["environment"] = app_service_config.get("environment")
+                if app_service_config.get("volumes"):
+                    app_entry["volumes"] = app_service_config.get("volumes")
+                
+                compose_services_dict[app_service_name] = app_entry
+
         # Generate database services
+        depends_on_list_for_app = []
         if include_databases:
             databases = services_info.get("databases", {})
-            depends_on_list = []
-            
             for db_name, db_info in databases.items():
-                # Add volume for database
-                volumes_content += f"  {db_name}_data:\n"
+                db_entry: Dict[str, Any] = {"image": db_info["image"]}
                 
-                # Add database service
-                db_ports = ""
                 if db_info.get("ports"):
-                    db_ports = "    ports:\n"
-                    for port in db_info["ports"]:
-                        db_ports += f"      - '{port}'\n"
+                    db_entry["ports"] = db_info["ports"] # Assuming they are already in "HOST:CONTAINER" format
                 
-                db_volumes = ""
-                if db_info.get("volumes"):
-                    db_volumes = "    volumes:\n"
-                    for volume in db_info["volumes"]:
-                        db_volumes += f"      - {volume}\n"
-                
-                db_environment = ""
+                db_volume_definitions = db_info.get("volumes", [])
+                if db_volume_definitions:
+                    db_entry["volumes"] = db_volume_definitions
+                    for vol_def in db_volume_definitions:
+                        # Extract volume name if it's a named volume definition like "mydata:/data/db"
+                        vol_name_match = re.match(r"([^:]+):", vol_def)
+                        if vol_name_match:
+                            compose_volumes_dict[vol_name_match.group(1)] = {} # Empty definition for named volume
+
                 if db_info.get("environment"):
-                    db_environment = "    environment:\n"
-                    for key, value in db_info["environment"].items():
-                        db_environment += f"      - {key}={value}\n"
+                    db_entry["environment"] = db_info["environment"]
                 
-                db_networks = "    networks:\n      - app-network\n"
-                
-                services_content += SERVICE_TEMPLATE.format(
-                    service_name=db_name,
-                    image=db_info["image"],
-                    context=".",
-                    dockerfile="Dockerfile",
-                    ports=db_ports,
-                    environment=db_environment,
-                    volumes=db_volumes,
-                    depends_on="",
-                    networks=db_networks
-                )
-                
-                # Add to depends_on list for app service
-                depends_on_list.append(db_name)
-            
-            # Update app service with depends_on if needed
-            if depends_on_list and dockerfile_exists:
-                depends_on_str = "    depends_on:\n"
-                for dep in depends_on_list:
-                    depends_on_str += f"      - {dep}\n"
-                
-                # Replace app service with updated version
-                services_content = services_content.replace(
-                    "app:\n    image: app:latest",
-                    f"app:\n    image: app:latest\n{depends_on_str}"
-                )
+                if db_info.get("command"): # For Redis example
+                    db_entry["command"] = db_info["command"]
+
+                db_entry["networks"] = ["app-network"]
+                compose_services_dict[db_name] = db_entry
+                depends_on_list_for_app.append(db_name)
         
-        # Combine all sections
-        compose_content = DOCKER_COMPOSE_TEMPLATE.format(
-            services=services_content,
-            networks=networks_content,
-            volumes=volumes_content
-        )
+        # Update app service with depends_on if needed
+        if app_service_name in compose_services_dict and depends_on_list_for_app:
+            compose_services_dict[app_service_name]["depends_on"] = depends_on_list_for_app
+        
+        # Final compose structure
+        final_compose_structure: Dict[str, Any] = {"version": '3.8'} # Use a common recent version
+        if compose_services_dict:
+            final_compose_structure["services"] = compose_services_dict
+        if compose_networks_dict:
+            final_compose_structure["networks"] = compose_networks_dict
+        if compose_volumes_dict:
+            final_compose_structure["volumes"] = compose_volumes_dict
         
         # Write docker-compose.yml
         try:
             with open(output_file, 'w') as f:
-                f.write(compose_content)
+                yaml.dump(final_compose_structure, f, sort_keys=False, default_flow_style=False)
             
             return {
                 "success": True,
                 "message": f"docker-compose.yml generated successfully at {output_file}",
                 "compose_file_path": str(output_file),
-                "services_included": list(services.keys()),
-                "content": compose_content
+                "services_included": list(compose_services_dict.keys()),
+                "content": yaml.dump(final_compose_structure, sort_keys=False, default_flow_style=False)
             }
         except Exception as e:
             self._logger.exception(f"Error writing docker-compose.yml: {str(e)}")

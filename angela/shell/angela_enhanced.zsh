@@ -125,20 +125,24 @@ angela() {
 }
 
 # ZSH completion function for angela
+# ZSH completion function for angela
 _angela_completion() {
     local curcontext="$curcontext" state line
     typeset -A opt_args
     
-    # Get dynamic completions from Angela
-    local completions=$(angela --completions "${words[@]:1}" 2>/dev/null)
+    # Get dynamic completions from Angela (expected: one completion candidate per line)
+    local -a compl_array
+    compl_array=("${(@f)$(angela --completions "${words[@]:1}" 2>/dev/null)}")
     
-    # If completions were returned, use them
-    if [[ -n "$completions" ]]; then
-        _arguments '*: :(('"$completions"'))'
+    # If completions were returned as an array, use them
+    if (( ${#compl_array[@]} > 0 )); then
+        # Pass the array of completions. Each element is a candidate.
+        # The '*: :(...)' tells _arguments to offer these for any argument.
+        _arguments '*: :($compl_array)'
         return
     fi
     
-    # Fallback static completions
+    # Fallback static completions if dynamic ones fail or return empty
     _arguments \
         '1: :(init status shell files workflows generate rollback fix explain help-with)' \
         '*::arg:->args'

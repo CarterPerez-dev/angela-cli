@@ -1,3 +1,4 @@
+# angela/execution/filesystem.py
 """
 File system operations for Angela CLI.
 

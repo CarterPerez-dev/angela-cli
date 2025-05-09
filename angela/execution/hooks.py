@@ -1,3 +1,4 @@
+# angela/execution/hooks.py
 """
 Execution hooks for file operations and command execution.
 

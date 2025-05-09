@@ -25,6 +25,7 @@ from angela.toolchain.ci_cd import ci_cd_integration
 from angela.review.diff_manager import diff_manager
 from angela.review.feedback import feedback_manager
 from angela.context import context_manager
+from angela.context.enhancer import context_enhancer
 from angela.generation.refiner import interactive_refiner
 from angela.generation.context_manager import generation_context_manager
 from angela.generation.engine import CodeFile

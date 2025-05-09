@@ -1,3 +1,4 @@
+# angela/execution/rollback.py
 """
 Enhanced rollback functionality for Angela CLI operations.
 

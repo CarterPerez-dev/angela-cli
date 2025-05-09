@@ -1,3 +1,4 @@
+# angela/safety/preview.py
 """
 Preview generator for command execution.
 

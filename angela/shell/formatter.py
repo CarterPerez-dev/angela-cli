@@ -1,3 +1,4 @@
+# angela/shell/formatter.py
 """
 Rich terminal formatting for Angela CLI.
 
@@ -21,10 +22,6 @@ from rich.layout import Layout
 from rich.tree import Tree
 from rich import box
 
-terminal_formatter.display_advanced_plan = display_advanced_plan
-terminal_formatter.display_execution_results = display_execution_results
-terminal_formatter.display_step_details = display_step_details
-terminal_formatter.display_step_error = display_step_error
 
 from angela.utils.logging import get_logger
 

@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Union
 import yaml
 import json
-
+import re
+ 
 from angela.utils.logging import get_logger
 from angela.context import context_manager
 
@@ -191,12 +192,8 @@ class CiCdIntegration:
         if not workflows_dir.exists():
             os.makedirs(workflows_dir, exist_ok=True)
         
-        # Get configuration settings
-        settings = {}
-        if custom_settings:
-            settings.update(custom_settings)
-        
         # Set default settings based on project type
+        workflow: Dict[str, Any] = {} # Ensure workflow is initialized
         if project_type == "python":
             workflow = {
                 "name": "Python CI",
@@ -343,15 +340,33 @@ class CiCdIntegration:
                 }
             }
         # Add other project types as needed
-        
+        else: # Default empty workflow if project_type is not recognized
+             workflow = {"name": f"{project_type} CI", "on": {}, "jobs": {}}
+    
+    
         # Update with custom settings
-        if settings:
+        if custom_settings:
             # Use recursive update function (not shown) or libraries
-            # This is a simplified approach
-            if "jobs" in settings and "build" in settings["jobs"] and "steps" in settings["jobs"]["build"]:
-                # Append custom steps
-                workflow["jobs"]["build"]["steps"].extend(settings["jobs"]["build"]["steps"])
-        
+            # This is a simplified approach, ensure keys exist before extending
+            if (workflow and "jobs" in workflow and "build" in workflow["jobs"] and "steps" in workflow["jobs"]["build"] and
+                isinstance(workflow["jobs"]["build"]["steps"], list) and
+                "jobs" in custom_settings and isinstance(custom_settings["jobs"], dict) and
+                "build" in custom_settings["jobs"] and isinstance(custom_settings["jobs"]["build"], dict) and
+                "steps" in custom_settings["jobs"]["build"] and isinstance(custom_settings["jobs"]["build"]["steps"], list)):
+                workflow["jobs"]["build"]["steps"].extend(custom_settings["jobs"]["build"]["steps"])
+            # Add more robust merging if needed, or update specific parts carefully
+            # For example, to merge the entire custom_settings:
+            # from collections.abc import MutableMapping
+            # def deep_update(d, u):
+            #     for k, v in u.items():
+            #         if isinstance(v, MutableMapping):
+            #             d[k] = deep_update(d.get(k, {}), v)
+            #         else:
+            #             d[k] = v
+            #     return d
+            # deep_update(workflow, custom_settings)
+    
+    
         # Write the workflow file
         workflow_file = workflows_dir / f"{project_type}-ci.yml"
         try:
@@ -391,11 +406,7 @@ class CiCdIntegration:
         """
         self._logger.info(f"Generating GitLab CI configuration for {project_type}")
         
-        # Get configuration settings
-        settings = {}
-        if custom_settings:
-            settings.update(custom_settings)
-        
+        config: Dict[str, Any] = {} # Ensure config is initialized
         # Set default settings based on project type
         if project_type == "python":
             config = {
@@ -467,16 +478,40 @@ class CiCdIntegration:
                 }
             }
         # Add other project types as needed
+        else: # Default empty config if project_type is not recognized
+            config = {"image": "alpine", "stages": ["build", "test"], "build": {"script": ["echo 'No build defined'"]}}
+
         
         # Update with custom settings
-        if settings:
-            # Use recursive update function or libraries
-            # This is a simplified approach
-            for key, value in settings.items():
-                if isinstance(value, dict) and key in config and isinstance(config[key], dict):
-                    config[key].update(value)
+        if custom_settings:
+            # A more robust deep merge is generally needed for complex configs.
+            # This simplified approach attempts to merge dictionaries and lists.
+            for key, value in custom_settings.items():
+                if key in config:
+                    if isinstance(config[key], dict) and isinstance(value, dict):
+                        # Recursively update dictionaries if both are dicts
+                        # For a true deep merge, a helper function would be better.
+                        # This is a shallow update for the top-level dict value.
+                        # A proper deep merge:
+                        # from collections.abc import MutableMapping
+                        # def deep_update(d, u):
+                        #     for k_u, v_u in u.items():
+                        #         if isinstance(v_u, MutableMapping):
+                        #             d[k_u] = deep_update(d.get(k_u, {}), v_u)
+                        #         else:
+                        #             d[k_u] = v_u
+                        #     return d
+                        # if isinstance(config[key], dict) and isinstance(value, dict):
+                        #    deep_update(config[key], value)
+                        # else:
+                        #    config[key] = value # or handle list merging etc.
+                        config[key].update(value) # Simple update, might not be deep enough
+                    elif isinstance(config[key], list) and isinstance(value, list):
+                        config[key].extend(value) # Extend lists
+                    else:
+                        config[key] = value # Overwrite if types don't match for merge/extend
                 else:
-                    config[key] = value
+                    config[key] = value # Add new key
         
         # Write the config file
         config_file = path / ".gitlab-ci.yml"
@@ -645,11 +680,7 @@ pipeline {
         """
         self._logger.info(f"Generating Travis CI configuration for {project_type}")
         
-        # Get configuration settings
-        settings = {}
-        if custom_settings:
-            settings.update(custom_settings)
-        
+        config: Dict[str, Any] = {} # Ensure config is initialized
         # Set default settings based on project type
         if project_type == "python":
             config = {
@@ -682,14 +713,23 @@ pipeline {
                 ]
             }
         # Add other project types as needed
+        else: # Default empty config if project_type is not recognized
+            config = {"language": "generic", "script": ["echo 'No script defined'"]}
+
         
         # Update with custom settings
-        if settings:
-            for key, value in settings.items():
-                if isinstance(value, list) and key in config and isinstance(config[key], list):
-                    config[key].extend(value)
+        if custom_settings:
+            for key, value in custom_settings.items():
+                if key in config:
+                    if isinstance(config[key], list) and isinstance(value, list):
+                        config[key].extend(value) # Extend lists
+                    elif isinstance(config[key], dict) and isinstance(value, dict):
+                        # A proper deep merge would be better here.
+                        config[key].update(value) # Simple update for dicts
+                    else:
+                        config[key] = value # Overwrite if types don't match for merge/extend
                 else:
-                    config[key] = value
+                    config[key] = value # Add new key
         
         # Write the config file
         config_file = path / ".travis.yml"
@@ -735,11 +775,7 @@ pipeline {
         if not circleci_dir.exists():
             os.makedirs(circleci_dir, exist_ok=True)
         
-        # Get configuration settings
-        settings = {}
-        if custom_settings:
-            settings.update(custom_settings)
-        
+        config: Dict[str, Any] = {} # Ensure config is initialized
         # Set default settings based on project type
         if project_type == "python":
             config = {
@@ -839,13 +875,36 @@ pipeline {
                 }
             }
         # Add other project types as needed
+        else: # Default empty config if project_type is not recognized
+            config = {"version": 2.1, "jobs": {}, "workflows": {}}
+
         
         # Update with custom settings
-        if settings:
+        if custom_settings:
             # This is a simplified approach; in a real implementation, 
             # we'd need more sophisticated merging
-            if "jobs" in settings and "build-and-test" in settings["jobs"] and "steps" in settings["jobs"]["build-and-test"]:
-                config["jobs"]["build-and-test"]["steps"].extend(settings["jobs"]["build-and-test"]["steps"])
+            if (config and "jobs" in config and "build-and-test" in config["jobs"] and 
+                isinstance(config["jobs"]["build-and-test"], dict) and 
+                "steps" in config["jobs"]["build-and-test"] and 
+                isinstance(config["jobs"]["build-and-test"]["steps"], list) and
+                "jobs" in custom_settings and isinstance(custom_settings["jobs"], dict) and
+                "build-and-test" in custom_settings["jobs"] and 
+                isinstance(custom_settings["jobs"]["build-and-test"], dict) and
+                "steps" in custom_settings["jobs"]["build-and-test"] and 
+                isinstance(custom_settings["jobs"]["build-and-test"]["steps"], list)):
+                config["jobs"]["build-and-test"]["steps"].extend(custom_settings["jobs"]["build-and-test"]["steps"])
+            # Add more robust merging if needed
+            # For example, to merge the entire custom_settings:
+            # from collections.abc import MutableMapping
+            # def deep_update(d, u):
+            #     for k, v in u.items():
+            #         if isinstance(v, MutableMapping):
+            #             d[k] = deep_update(d.get(k, {}), v)
+            #         else:
+            #             d[k] = v
+            #     return d
+            # deep_update(config, custom_settings)
+
         
         # Write the config file
         config_file = circleci_dir / "config.yml"
@@ -866,7 +925,6 @@ pipeline {
                 "platform": "circle_ci",
                 "project_type": project_type
             }
-
 
     async def create_complete_pipeline(
         self,

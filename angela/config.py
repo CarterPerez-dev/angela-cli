@@ -1,3 +1,4 @@
+# angela/config.py
 """
 Configuration management for Angela CLI.
 Uses TOML format for configuration files.

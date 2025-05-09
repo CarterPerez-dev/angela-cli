@@ -1,3 +1,4 @@
+# angela/constants.py
 """
 Constants for the Angela CLI application.
 """

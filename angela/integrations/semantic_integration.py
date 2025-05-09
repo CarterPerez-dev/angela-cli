@@ -1,3 +1,4 @@
+# angela/integrations/semantic_integration.py
 """
 Semantic integration module for Angela CLI.
 

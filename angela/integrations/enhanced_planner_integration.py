@@ -1,3 +1,4 @@
+# angela/integrations/enhanced_planner_integration.py
 """
 Integration for the Enhanced Task Planner into Angela's Orchestration system.
 

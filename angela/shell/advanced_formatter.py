@@ -1,3 +1,4 @@
+# angela/shell/advanced_formatter.py
 """
 Terminal formatter extensions for displaying advanced task plans.
 
@@ -247,9 +248,10 @@ async def display_execution_results(
             
             # Format output based on step type
             output = ""
-            step_type = result.get("type", "")
+            # Assuming PlanStepType is an Enum and result["type"] is a string matching an enum value
+            step_type_str = result.get("type", "") 
             
-            if step_type == PlanStepType.COMMAND:
+            if step_type_str == PlanStepType.COMMAND.value:
                 # Get first few lines of stdout
                 stdout = result.get("stdout", "").strip()
                 if stdout:
@@ -257,7 +259,7 @@ async def display_execution_results(
                     output = lines[0]
                     if len(lines) > 1:
                         output += f"... (+{len(lines)-1} lines)"
-            elif step_type == PlanStepType.CODE:
+            elif step_type_str == PlanStepType.CODE.value:
                 # Show execution result or console output
                 if "result" in result:
                     output = f"Result: {result['result']}"
@@ -266,15 +268,15 @@ async def display_execution_results(
                     output = lines[0]
                     if len(lines) > 1:
                         output += f"... (+{len(lines)-1} lines)"
-            elif step_type == PlanStepType.FILE:
+            elif step_type_str == PlanStepType.FILE.value:
                 # Show operation result
                 output = result.get("message", "")
-            elif step_type == PlanStepType.DECISION:
+            elif step_type_str == PlanStepType.DECISION.value:
                 # Show condition result
                 condition_result = result.get("condition_result", False)
                 output = f"Condition: [green]True[/green]" if condition_result else "Condition: [red]False[/red]"
                 output += f" → {result.get('next_branch', '')}"
-            elif step_type == PlanStepType.API:
+            elif step_type_str == PlanStepType.API.value:
                 # Show status code and response summary
                 status_code = result.get("status_code", 0)
                 output = f"Status: {status_code}"
@@ -287,7 +289,7 @@ async def display_execution_results(
                     if len(text) > 30:
                         text = text[:30] + "..."
                     output += f" Response: {text}"
-            elif step_type == PlanStepType.LOOP:
+            elif step_type_str == PlanStepType.LOOP.value:
                 # Show loop iteration count
                 iterations = result.get("iterations", 0)
                 output = f"Iterations: {iterations}"
@@ -296,10 +298,24 @@ async def display_execution_results(
             exec_time = result.get("execution_time", 0)
             time_text = f"{exec_time:.2f}"
             
-            # Add row
+            # Determine display string for step_type for the table
+            # This part of the original code correctly handles if step_type_str is an enum or string for display
+            display_step_type = step_type_str 
+            try:
+                # If step_type_str matches an enum value, display the value
+                # This assumes PlanStepType can be iterated or accessed by value
+                # For simplicity, we'll just use step_type_str, assuming it's descriptive enough
+                # Or, if PlanStepType was passed around as enum members:
+                # actual_enum_member = result.get("type_enum_member_if_available") 
+                # display_step_type = str(actual_enum_member.value) if isinstance(actual_enum_member, PlanStepType) else str(step_type_str)
+                pass # Using step_type_str directly for the table is often fine.
+            except: # Be careful with bare except
+                pass
+
+
             table.add_row(
                 step_id,
-                str(step_type.value) if isinstance(step_type, PlanStepType) else str(step_type),
+                display_step_type, # Use the string type identifier for display
                 status,
                 output,
                 time_text
@@ -322,11 +338,12 @@ async def display_execution_results(
             if step_id == failed_step:
                 continue  # Already displayed
                 
-            step_type = result.get("type", "")
+            step_type_str = result.get("type", "")
             
             # Show all API responses, loop results, and code outputs with results
-            if step_type == PlanStepType.API or step_type == PlanStepType.LOOP or (
-                step_type == PlanStepType.CODE and ("result" in result or "output" in result)):
+            if step_type_str == PlanStepType.API.value or \
+               step_type_str == PlanStepType.LOOP.value or \
+               (step_type_str == PlanStepType.CODE.value and ("result" in result or "output" in result)): # Check "output" key for code output
                 console.print(f"\n[bold cyan]Step Details: {step_id}[/bold cyan]")
                 await display_step_details(step_id, result, plan)
     
@@ -372,15 +389,19 @@ async def display_step_details(
         result: The step's execution result
         plan: Optional plan for context
     """
-    step_type = result.get("type", "")
+    # Get the step type as a string from the result
+    step_type_str = result.get("type", "")
     
     # Get step description from plan if available
     description = ""
     if plan and step_id in plan.steps:
         description = plan.steps[step_id].description
-    
-    # Format output based on step type
-    if step_type == PlanStepType.COMMAND:
+        # If description is available, print it for context
+        if description:
+            console.print(f"[bold]Description:[/bold] {description}")
+
+    # Format output based on step type string
+    if step_type_str == PlanStepType.COMMAND.value:
         # Show command and output
         console.print(f"[bold]Command:[/bold] {result.get('command', '')}")
         
@@ -404,12 +425,15 @@ async def display_step_details(
             )
             console.print(Panel(syntax, title="Error Output", border_style="red"))
     
-    elif step_type == PlanStepType.CODE:
+    elif step_type_str == PlanStepType.CODE.value:
         # Show code and output
         if "code" in result:
             lang = "python"  # Default to Python
             if plan and step_id in plan.steps:
-                lang = getattr(plan.steps[step_id], "language", "python")
+                # Ensure plan.steps[step_id] exists and has 'language' attribute
+                step_details = plan.steps.get(step_id)
+                if step_details:
+                    lang = getattr(step_details, "language", "python")
             
             syntax = Syntax(
                 result["code"],
@@ -437,10 +461,15 @@ async def display_step_details(
             if "traceback" in result:
                 console.print(Panel(result["traceback"], title="Traceback", border_style="red"))
     
-    elif step_type == PlanStepType.FILE:
+    elif step_type_str == PlanStepType.FILE.value:
         # Show file operation details
         console.print(f"[bold]File Path:[/bold] {result.get('file_path', '')}")
-        console.print(f"[bold]Operation:[/bold] {getattr(plan.steps[step_id], 'operation', 'read/write') if plan and step_id in plan.steps else 'read/write'}")
+        operation = "read/write" # Default operation
+        if plan and step_id in plan.steps:
+            step_details = plan.steps.get(step_id)
+            if step_details:
+                operation = getattr(step_details, 'operation', 'read/write')
+        console.print(f"[bold]Operation:[/bold] {operation}")
         
         if "content" in result:
             # For read operations
@@ -450,7 +479,7 @@ async def display_step_details(
             
             syntax = Syntax(
                 content,
-                "text",
+                "text", # Assuming text, could be improved if file type is known
                 theme="monokai",
                 line_numbers=True,
                 word_wrap=True
@@ -460,27 +489,28 @@ async def display_step_details(
         if "message" in result:
             console.print(f"[bold]Result:[/bold] {result['message']}")
     
-    elif step_type == PlanStepType.DECISION:
+    elif step_type_str == PlanStepType.DECISION.value:
         # Show decision details
         console.print(f"[bold]Condition:[/bold] {result.get('condition', '')}")
         condition_result = result.get("condition_result", False)
         console.print(f"[bold]Evaluated:[/bold] {'[green]True[/green]' if condition_result else '[red]False[/red]'}")
         
         if plan and step_id in plan.steps:
-            step = plan.steps[step_id]
-            if condition_result and step.true_branch:
-                console.print(f"[bold]True Branch:[/bold] {', '.join(step.true_branch)}")
-            elif not condition_result and step.false_branch:
-                console.print(f"[bold]False Branch:[/bold] {', '.join(step.false_branch)}")
+            step = plan.steps.get(step_id)
+            if step:
+                if condition_result and step.true_branch:
+                    console.print(f"[bold]True Branch taken:[/bold] {', '.join(step.true_branch)}")
+                elif not condition_result and step.false_branch:
+                    console.print(f"[bold]False Branch taken:[/bold] {', '.join(step.false_branch)}")
     
-    elif step_type == PlanStepType.API:
+    elif step_type_str == PlanStepType.API.value:
         # Show API call details
         console.print(f"[bold]URL:[/bold] {result.get('url', '')}")
         console.print(f"[bold]Method:[/bold] {result.get('method', 'GET')}")
         console.print(f"[bold]Status Code:[/bold] {result.get('status_code', 0)}")
         
         # Show headers
-        if "headers" in result:
+        if "headers" in result and isinstance(result["headers"], dict):
             header_table = Table(title="Response Headers", box=box.SIMPLE)
             header_table.add_column("Header", style="cyan")
             header_table.add_column("Value", style="green")
@@ -508,11 +538,11 @@ async def display_step_details(
             text = result["text"]
             
             # Try to detect content type
-            is_json = text.strip().startswith('{') and text.strip().endswith('}')
-            is_xml = text.strip().startswith('<') and text.strip().endswith('>')
-            is_html = '<html' in text.lower() and '</html>' in text.lower()
+            is_json_like = text.strip().startswith('{') and text.strip().endswith('}')
+            is_xml_like = text.strip().startswith('<') and text.strip().endswith('>')
+            is_html_like = '<html' in text.lower() and '</html>' in text.lower()
             
-            syntax_type = "json" if is_json else "xml" if is_xml or is_html else "text"
+            syntax_type = "json" if is_json_like else "xml" if is_xml_like or is_html_like else "text"
             
             syntax = Syntax(
                 text,
@@ -523,12 +553,17 @@ async def display_step_details(
             )
             console.print(Panel(syntax, title="Response Body", border_style="green"))
     
-    elif step_type == PlanStepType.LOOP:
+    elif step_type_str == PlanStepType.LOOP.value:
         # Show loop details
-        console.print(f"[bold]Loop Items:[/bold] {getattr(plan.steps[step_id], 'loop_items', '') if plan and step_id in plan.steps else ''}")
-        console.print(f"[bold]Iterations:[/bold] {result.get('iterations', 0)}")
+        loop_items_desc = ""
+        if plan and step_id in plan.steps:
+            step_details = plan.steps.get(step_id)
+            if step_details:
+                loop_items_desc = getattr(step_details, 'loop_items', '')
+        console.print(f"[bold]Loop Items Description:[/bold] {loop_items_desc}")
+        console.print(f"[bold]Iterations Executed:[/bold] {result.get('iterations', 0)}")
         
-        if "loop_results" in result:
+        if "loop_results" in result and isinstance(result["loop_results"], list):
             loop_results = result["loop_results"]
             
             # Create a table for iteration results
@@ -538,28 +573,46 @@ async def display_step_details(
             loop_table.add_column("Status", style="yellow")
             
             for iteration in loop_results:
+                if not isinstance(iteration, dict): continue # Skip malformed iteration results
+
                 # Format item based on type
                 item = iteration.get("item", "")
                 if isinstance(item, (dict, list)):
                     import json
                     item_str = json.dumps(item)
                     if len(item_str) > 30:
-                        item_str = item_str[:30] + "..."
+                        item_str = item_str[:27] + "..."
                 else:
                     item_str = str(item)
                     if len(item_str) > 30:
-                        item_str = item_str[:30] + "..."
+                        item_str = item_str[:27] + "..."
                 
                 # Format status
                 status = "[green]Success[/green]" if iteration.get("success", False) else "[red]Failed[/red]"
                 
                 loop_table.add_row(
-                    str(iteration.get("index", 0)),
+                    str(iteration.get("index", "?")), # Use '?' if index is missing
                     item_str,
                     status
                 )
             
-            console.print(loop_table)
+            if loop_table.rows:
+                console.print(loop_table)
+            else:
+                console.print("[italic]No iteration results to display.[/italic]")
+        else:
+            console.print("[italic]No loop iteration results available.[/italic]")
+    else:
+        # Fallback for unknown or unhandled step types
+        console.print(f"[yellow]Details for step type '{step_type_str}' are not specifically formatted.[/yellow]")
+        # Generic display of result dictionary for debugging
+        import json
+        try:
+            result_dump = json.dumps(result, indent=2, default=str) # Use default=str for non-serializable items
+            console.print(Panel(result_dump, title=f"Raw Result Data for Step {step_id}", border_style="yellow"))
+        except Exception as e:
+            console.print(f"[red]Could not serialize raw result data: {e}[/red]")
+            
 
 async def display_step_error(
     step_id: str,

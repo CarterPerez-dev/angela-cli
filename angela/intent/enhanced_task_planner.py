@@ -1,3 +1,4 @@
+# angela/intent/enhanced_task_planner.py
 """
 Enhanced execution system for complex task orchestration in Angela CLI.
 

@@ -472,7 +472,8 @@ class PackageManagerIntegration:
         path: Path,
         dependencies: List[str],
         dev_dependencies: Optional[List[str]] = None,
-        update_dependency_file: bool = True
+        update_dependency_file: bool = True # This param is not directly used by yarn add
+                                            # as it always updates package.json and yarn.lock
     ) -> Dict[str, Any]:
         """
         Install Node.js dependencies using yarn.
@@ -481,7 +482,7 @@ class PackageManagerIntegration:
             path: Path to the project
             dependencies: List of dependencies to install
             dev_dependencies: Optional list of development dependencies
-            update_dependency_file: Whether to update package.json
+            update_dependency_file: Whether to update package.json (yarn add does this by default)
             
         Returns:
             Dictionary with the installation result
@@ -499,7 +500,7 @@ class PackageManagerIntegration:
         
         # Initialize yarn project if package.json doesn't exist
         package_json = path / "package.json"
-        if not package_json.exists() and update_dependency_file:
+        if not package_json.exists(): # Yarn init creates package.json
             init_command = "yarn init -y"
             init_stdout, init_stderr, init_code = await execution_engine.execute_command(
                 init_command,
@@ -530,18 +531,14 @@ class PackageManagerIntegration:
             results["outputs"].append(install_stdout)
             
             if install_code != 0:
-                results["success"] 
-                
-                
-            if install_code != 0:
-                results["success"] = False
-                results["errors"].append(f"Failed to install dependencies: {install_stderr}")
-                return results
+                results["success"] = False # Fixed: Added = False
+                results["errors"].append(f"Failed to install dependencies: {install_stderr}") # Fixed: Added error reporting
+                return results # Fixed: Added early return
         
         # Install dev dependencies
         if dev_dependencies:
             dev_deps_str = " ".join(dev_dependencies)
-            dev_install_command = f"yarn add --dev {dev_deps_str}"
+            dev_install_command = f"yarn add --dev {dev_deps_str}" # or yarn add -D
             
             dev_stdout, dev_stderr, dev_code = await execution_engine.execute_command(
                 dev_install_command,
@@ -557,6 +554,9 @@ class PackageManagerIntegration:
                 results["errors"].append(f"Failed to install dev dependencies: {dev_stderr}")
                 return results
         
+        if update_dependency_file and package_json.exists():
+             results["updated_files"] = [str(package_json), str(path / "yarn.lock")]
+
         return results
     
     async def _install_poetry_dependencies(

@@ -1,3 +1,4 @@
+# angela/safety/confirmation.py
 """
 User confirmation interface for potentially risky operations.
 
