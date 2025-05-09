@@ -17,7 +17,7 @@ from .package_managers import package_manager_integration
 from .docker import docker_integration
 
 # Universal CLI translator
-from .unviversal_cli import universal_cli_translator
+from .universal_cli import universal_cli_translator  # Fixed typo in import
 
 # CI/CD integration
 from .ci_cd import ci_cd_integration

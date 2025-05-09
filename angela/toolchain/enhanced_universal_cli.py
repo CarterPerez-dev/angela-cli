@@ -1,3 +1,5 @@
+# angela/toolchain/enhanced_universal_cli.py
+
 """
 Enhanced Universal CLI Integration for Angela CLI.
 

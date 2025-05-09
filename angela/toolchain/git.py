@@ -1,4 +1,5 @@
 # angela/toolchain/git.py
+
 """
 Enhanced Git integration for Angela CLI.
 

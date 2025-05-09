@@ -1,3 +1,11 @@
+# angela/__init__.py
+"""
+Angela CLI: AI-powered command-line assistant integrated into your terminal shell.
+The main package initialization
+"""
+
+__version__ = '0.1.0'
+
 def init_application():
     """Initialize all application components."""
     # Import components here to avoid early imports during module loading
@@ -9,7 +17,7 @@ def init_application():
     from angela.generation.context_manager import generation_context_manager
     from angela.generation.refiner import interactive_refiner    
     from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
-
+    from angela.core.registry import registry  # Explicit import for clarity
     
     # This import might be missing, let's check if it exists
     try:
@@ -30,7 +38,6 @@ def init_application():
     registry.register("docker_integration", docker_integration)
     registry.register("generation_context_manager", generation_context_manager)
     registry.register("interactive_refiner", interactive_refiner)
-    
     
     # Apply integrations
     apply_enhanced_planner_integration()
