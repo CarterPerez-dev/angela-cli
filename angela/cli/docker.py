@@ -20,6 +20,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from angela.toolchain.docker import docker_integration
 from angela.context import context_manager
 from angela.utils.logging import get_logger
+from angela.execution.engine import execution_engine
 
 logger = get_logger(__name__)
 console = Console()

@@ -27,7 +27,8 @@ from angela.review.feedback import feedback_manager
 from angela.context import context_manager
 from angela.generation.refiner import interactive_refiner
 from angela.generation.context_manager import generation_context_manager
-
+from angela.generation.engine import CodeFile
+from angela.context.file_detector import detect_file_type
 
 app = typer.Typer(help="Code generation commands")
 console = Console()

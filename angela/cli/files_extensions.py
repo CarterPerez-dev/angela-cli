@@ -14,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import print as rich_print
 
+from angela.context.enhancer import context_enhancer
 from angela.context import context_manager, file_resolver, file_activity_tracker, ActivityType
 from angela.utils.logging import get_logger
 

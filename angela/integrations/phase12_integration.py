@@ -624,8 +624,7 @@ async def _init_phase12():
     except Exception as e:
         logger.error(f"Failed to initialize Phase 12 integration: {str(e)}")
 
-# Schedule initialization to run soon without blocking import
-import asyncio
+
 try:
     loop = asyncio.get_event_loop()
     if loop.is_running():

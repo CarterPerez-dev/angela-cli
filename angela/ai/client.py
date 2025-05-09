@@ -15,7 +15,7 @@ class GeminiRequest(BaseModel):
     """Model for a request to the Gemini API."""
     prompt: str
     temperature: float = GEMINI_TEMPERATURE
-    max_tokens: int = GEMINI_MAX_TOKENS
+    max_output_tokens: int = GEMINI_MAX_TOKENS
     
 class GeminiResponse(BaseModel):
     """Model for a response from the Gemini API."""

@@ -3,7 +3,6 @@ Configuration management for Angela CLI.
 Uses TOML format for configuration files.
 """
 import os
-import json # Keep json import for potential debugging or other uses if needed
 from pathlib import Path
 from typing import Dict, Any, Optional
 import sys
