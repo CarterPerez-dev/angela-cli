@@ -189,72 +189,72 @@ Focus on a clean separation of concerns, appropriate design patterns for {projec
 """
     return prompt
 
-async def _parse_architecture(self, response: str) -> ProjectArchitecture:
-    """
-    Parse the AI response to extract the architecture.
-    
-    Args:
-        response: AI response text
+    async def _parse_architecture(self, response: str) -> ProjectArchitecture:
+        """
+        Parse the AI response to extract the architecture.
         
-    Returns:
-        ProjectArchitecture object
-    """
-    try:
-        # Look for JSON block in the response
-        json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Try to find JSON without code blocks
-            json_match = re.search(r'({.*})', response, re.DOTALL)
+        Args:
+            response: AI response text
+            
+        Returns:
+            ProjectArchitecture object
+        """
+        try:
+            # Look for JSON block in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
             else:
-                # Assume the entire response is JSON
-                json_str = response
-        
-        # Parse the JSON
-        arch_data = json.loads(json_str)
-        
-        # Create ArchitectureComponent objects
-        components = []
-        for comp_data in arch_data.get("components", []):
-            components.append(ArchitectureComponent(
-                name=comp_data["name"],
-                description=comp_data["description"],
-                responsibilities=comp_data.get("responsibilities", []),
-                files=comp_data.get("files", []),
-                dependencies=comp_data.get("dependencies", [])
-            ))
-        
-        # Create ProjectArchitecture object
-        architecture = ProjectArchitecture(
-            components=components,
-            layers=arch_data.get("layers", []),
-            patterns=arch_data.get("patterns", []),
-            data_flow=arch_data.get("data_flow", [])
-        )
-        
-        return architecture
-        
-    except Exception as e:
-        self._logger.exception(f"Error parsing architecture: {str(e)}")
-        
-        # Create a minimal fallback architecture
-        fallback_component = ArchitectureComponent(
-            name="Core",
-            description="Core application functionality",
-            responsibilities=["Main application logic"],
-            files=[],
-            dependencies=[]
-        )
-        
-        return ProjectArchitecture(
-            components=[fallback_component],
-            layers=["Presentation", "Business Logic", "Data Access"],
-            patterns=["MVC"],
-            data_flow=["User input -> Core processing -> Storage"]
-        )
+                # Try to find JSON without code blocks
+                json_match = re.search(r'({.*})', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Assume the entire response is JSON
+                    json_str = response
+            
+            # Parse the JSON
+            arch_data = json.loads(json_str)
+            
+            # Create ArchitectureComponent objects
+            components = []
+            for comp_data in arch_data.get("components", []):
+                components.append(ArchitectureComponent(
+                    name=comp_data["name"],
+                    description=comp_data["description"],
+                    responsibilities=comp_data.get("responsibilities", []),
+                    files=comp_data.get("files", []),
+                    dependencies=comp_data.get("dependencies", [])
+                ))
+            
+            # Create ProjectArchitecture object
+            architecture = ProjectArchitecture(
+                components=components,
+                layers=arch_data.get("layers", []),
+                patterns=arch_data.get("patterns", []),
+                data_flow=arch_data.get("data_flow", [])
+            )
+            
+            return architecture
+            
+        except Exception as e:
+            self._logger.exception(f"Error parsing architecture: {str(e)}")
+            
+            # Create a minimal fallback architecture
+            fallback_component = ArchitectureComponent(
+                name="Core",
+                description="Core application functionality",
+                responsibilities=["Main application logic"],
+                files=[],
+                dependencies=[]
+            )
+            
+            return ProjectArchitecture(
+                components=[fallback_component],
+                layers=["Presentation", "Business Logic", "Data Access"],
+                patterns=["MVC"],
+                data_flow=["User input -> Core processing -> Storage"]
+            )
 
 def _build_plan_refinement_prompt(
     self, 

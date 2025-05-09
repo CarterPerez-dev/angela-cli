@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
 import json
 import re
-import logging
+import sys
 
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.utils.logging import get_logger
@@ -1495,55 +1495,54 @@ Ensure the structure follows best practices for {framework} projects.
             "framework": framework
         }
 
-def _infer_project_type(self, framework: str) -> str:
-    """
-    Infer project type from framework name.
-    
-    Args:
-        framework: Framework name
+    def _infer_project_type(self, framework: str) -> str:
+        """
+        Infer project type from framework name.
         
-    Returns:
-        Inferred project type
-    """
-    return self._framework_project_types.get(framework.lower(), "unknown")
+        Args:
+            framework: Framework name
+            
+        Returns:
+            Inferred project type
+        """
+        return self._framework_project_types.get(framework.lower(), "unknown")
 
-async def _generate_content(
-    self, 
-    template_path: str,
-    description: str,
-    options: Dict[str, Any]
-) -> str:
-    """
-    Generate content for a file based on a template path.
-    
-    Args:
-        template_path: Path to template relative to framework
-        description: Project description
-        options: Additional options
+    async def _generate_content(
+        self, 
+        template_path: str,
+        description: str,
+        options: Dict[str, Any]
+    ) -> str:
+        """
+        Generate content for a file based on a template path.
         
-    Returns:
-        Generated file content
-    """
-    self._logger.debug(f"Generating content for template: {template_path}")
-    
-    # Extract framework and file path
-    parts = template_path.split("/", 1)
-    if len(parts) < 2:
-        # Invalid template path
-        framework = "generic"
-        file_path = template_path
-    else:
-        framework = parts[0]
-        file_path = parts[1]
-    
-    return await self._generate_file_content(
-        framework,
-        file_path,
-        "Framework-specific file",
-        description,
-        options
-    )
-
+        Args:
+            template_path: Path to template relative to framework
+            description: Project description
+            options: Additional options
+            
+        Returns:
+            Generated file content
+        """
+        self._logger.debug(f"Generating content for template: {template_path}")
+        
+        # Extract framework and file path
+        parts = template_path.split("/", 1)
+        if len(parts) < 2:
+            # Invalid template path
+            framework = "generic"
+            file_path = template_path
+        else:
+            framework = parts[0]
+            file_path = parts[1]
+        
+        return await self._generate_file_content(
+            framework,
+            file_path,
+            "Framework-specific file",
+            description,
+            options
+        )
 
     async def generate_standard_project_structure(
         self, 
@@ -1743,7 +1742,7 @@ async def _generate_content(
                 # Add API route
                 files.extend([
                     {
-                        "path": "app/api/example/route" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"app/api/example/route{'.ts' if use_typescript else '.js'}",
                         "content": await self._generate_content("nextjs/enhanced/app/api/example/route.ts", description, options),
                         "purpose": "Example API route",
                         "language": "typescript" if use_typescript else "javascript"
@@ -2143,7 +2142,7 @@ async def _generate_content(
             files.extend([
                 {
                     "path": "Dockerfile",
-                    "content": await self._generate_content("django/enhanced/Dockerfile", description, {"project_name": project_name, **options}),
+                    "content": await self._generate_content("django/enhanced/Dockerfile", description, {"app_name": app_name, **options}),
                     "purpose": "Docker configuration",
                     "language": "dockerfile"
                 },
@@ -2388,26 +2387,30 @@ async def _generate_file_content(
     language_map = {
         ".py": "Python",
         ".js": "JavaScript",
-        ".ts": "TypeScript",
         ".jsx": "JavaScript (React)",
+        ".ts": "TypeScript",
         ".tsx": "TypeScript (React)",
+        ".java": "Java",
         ".html": "HTML",
         ".css": "CSS",
+        ".scss": "SCSS",
         ".json": "JSON",
-        ".java": "Java",
+        ".xml": "XML",
+        ".yaml": "YAML",
+        ".yml": "YAML",
+        ".md": "Markdown",
+        ".sql": "SQL",
         ".go": "Go",
         ".rs": "Rust",
-        ".vue": "Vue.js",
-        ".md": "Markdown",
-        ".yml": "YAML",
-        ".yaml": "YAML",
-        ".gradle": "Gradle",
-        ".properties": "Properties",
-        ".xml": "XML",
-        ".dockerfile": "Dockerfile",
-        ".sh": "Bash",
-        ".bat": "Batch",
-        ".ejs": "EJS template"
+        ".rb": "Ruby",
+        ".php": "PHP",
+        ".c": "C",
+        ".cpp": "C++",
+        ".h": "C/C++ Header",
+        ".cs": "C#",
+        ".swift": "Swift",
+        ".kt": "Kotlin",
+        ".vue": "Vue"
     }
     language = language_map.get(ext, "Unknown")
     

@@ -46,9 +46,7 @@ __all__ = [
     
     # Project planning
     'project_planner',
-    'ProjectArchitecture'
+    'ProjectArchitecture',
+    'generation_context_manager'
 ]
 
-# Add generation_context_manager to __all__ if available
-if _has_context_manager:
-    __all__.append('generation_context_manager')

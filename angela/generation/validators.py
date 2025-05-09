@@ -645,7 +645,7 @@ def validate_html(content: str, file_path: str) -> Tuple[bool, str]:
     
     Args:
         content: HTML code to validate
-        file_path: Path of the file
+        file_path: Path to the file
         
     Returns:
         Tuple of (is_valid, error_message)
@@ -685,7 +685,13 @@ def validate_html(content: str, file_path: str) -> Tuple[bool, str]:
         if tag_stack and tag_stack[-1] == tag_lower:
             tag_stack.pop()
         else:
-            return False, f"Unmatched closing tag: </
+            return False, f"Unmatched closing tag: </{ tag_lower }>"
+    
+    # Check if all tags were properly closed
+    if tag_stack:
+        return False, f"Unclosed tags: {', '.join(tag_stack)}"
+    
+    return True, ""
             
             
 def validate_css(content: str, file_path: str) -> Tuple[bool, str]:
