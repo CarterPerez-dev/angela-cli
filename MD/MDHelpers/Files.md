@@ -380,11 +380,12 @@
 
 127. `angela/__init__.py`
     Serves as the main entry point for the `angela` Python package, defining the `init_application` function. This function is responsible for initializing and registering all core services and components (like execution engines, safety validators, orchestrator, context enhancers) with the central service registry, ensuring they are available throughout the application.
-
+---
 # Project Tree
 ```
 .
 ├── Makefile
+├── QUICKSTART.md
 ├── README.md
 ├── angela
 │   ├── __init__.py
@@ -414,7 +415,6 @@
 │   ├── constants.py
 │   ├── context
 │   │   ├── __init__.py
-│   │   ├── context_manager.py
 │   │   ├── enhanced_file_activity.py
 │   │   ├── enhancer.py
 │   │   ├── file_activity.py
@@ -443,6 +443,7 @@
 │   ├── generation
 │   │   ├── __init__.py
 │   │   ├── architecture.py
+│   │   ├── context_manager.py
 │   │   ├── documentation.py
 │   │   ├── engine.py
 │   │   ├── frameworks.py
@@ -472,6 +473,7 @@
 │   │   ├── notification_handler.py
 │   │   └── proactive_assistant.py
 │   ├── orchestrator.py
+│   ├── repomix-output.xml
 │   ├── review
 │   │   ├── __init__.py
 │   │   ├── diff_manager.py
@@ -502,7 +504,7 @@
 │   │   ├── enhanced_universal_cli.py
 │   │   ├── git.py
 │   │   ├── package_managers.py
-│   │   └── unviversal_cli.py
+│   │   └── universal_cli.py
 │   ├── utils
 │   │   ├── __init__.py
 │   │   ├── enhanced_logging.py
@@ -511,11 +513,24 @@
 │       ├── __init__.py
 │       ├── manager.py
 │       └── sharing.py
+├── docs
+│   ├── Makefile
+│   ├── make.bat
+│   └── source
+│       ├── _static
+│       ├── _templates
+│       ├── conf.py
+│       ├── ext
+│       │   └── usage_examples.py
+│       └── index.rst
 ├── pyproject.toml
 ├── pytest.ini
 ├── requirements.txt
 ├── scripts
+│   ├── generate_docs.sh
+│   ├── install-quick.sh
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+
 ```

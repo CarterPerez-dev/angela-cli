@@ -1435,67 +1435,67 @@ Documentation
 Keep the structure focused on the core framework files, don't include optional or very specific files.
 Ensure the structure follows best practices for {framework} projects.
 """
-    try:
-        # Call AI service
-        api_request = GeminiRequest(
-            prompt=prompt,
-            max_tokens=4000,
-            temperature=0.2
-        )   
-        
-        response = await gemini_client.generate_text(api_request)
-        
-        # Extract JSON from the response
-        structure_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
-        if structure_match:
-            structure_json = structure_match.group(1)
-        else:
-            structure_json = response.text
-        
-        structure_data = json.loads(structure_json)
-        
-        # Generate content for each file
-        files = []
-        
-        for file_info in structure_data.get("files", []):
-            # Generate content for the file
-            content = await self._generate_file_content(
-                framework,
-                file_info["path"],
-                file_info["purpose"],
-                description,
-                options
+        try:
+            # Call AI service
+            api_request = GeminiRequest(
+                prompt=prompt,
+                max_tokens=4000,
+                temperature=0.2
             )
             
-            files.append(CodeFile(
-                path=file_info["path"],
-                content=content,
-                purpose=file_info["purpose"],
-                dependencies=[],
-                language=file_info.get("language")
-            ))
+            response = await gemini_client.generate_text(api_request)
         
-        return {
-            "success": True,
-            "framework": framework,
-            "files": files,
-            "project_type": structure_data.get("project_type", self._infer_project_type(framework))
-        }
-    
-    except json.JSONDecodeError as e:
-        self._logger.error(f"Error parsing AI response for {framework} project structure: {e}")
-        return {
-            "success": False,
-            "error": f"Could not generate {framework} project structure: Invalid JSON response",
-            "framework": framework
-        }
-    except Exception as e:
-        self._logger.error(f"Error generating {framework} project: {str(e)}", exc_info=True)
-        return {
-            "success": False,
-            "error": f"Could not generate {framework} project structure: {str(e)}",
-            "framework": framework
-        }
+        # Extract JSON from the response
+            structure_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if structure_match:
+                structure_json = structure_match.group(1)
+            else:
+                structure_json = response.text
+            
+            structure_data = json.loads(structure_json)
+            
+            # Generate content for each file
+            files = []
+            
+            for file_info in structure_data.get("files", []):
+                # Generate content for the file
+                content = await self._generate_file_content(
+                    framework,
+                    file_info["path"],
+                    file_info["purpose"],
+                    description,
+                    options
+                )
+                
+                files.append(CodeFile(
+                    path=file_info["path"],
+                    content=content,
+                    purpose=file_info["purpose"],
+                    dependencies=[],
+                    language=file_info.get("language")
+                ))
+            
+            return {
+                "success": True,
+                "framework": framework,
+                "files": files,
+                "project_type": structure_data.get("project_type", self._infer_project_type(framework))
+            }
+        
+        except json.JSONDecodeError as e:
+            self._logger.error(f"Error parsing AI response for {framework} project structure: {e}")
+            return {
+                "success": False,
+                "error": f"Could not generate {framework} project structure: Invalid JSON response",
+                "framework": framework
+            }
+        except Exception as e:
+            self._logger.error(f"Error generating {framework} project: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Could not generate {framework} project structure: {str(e)}",
+                "framework": framework
+            }
 
     def _infer_project_type(self, framework: str) -> str:
         """
@@ -2350,113 +2350,113 @@ Ensure the structure follows best practices for {framework} projects.
         }
 
 
-async def _generate_file_content(
-    self, 
-    framework: str,
-    file_path: str,
-    purpose: str,
-    description: str,
-    options: Dict[str, Any]
-) -> str:
+    async def _generate_file_content(
+        self, 
+        framework: str,
+        file_path: str,
+        purpose: str,
+        description: str,
+        options: Dict[str, Any]
+    ) -> str:
+        """
+        Generate content for a file using AI.
+        
+        Args:
+            framework: Framework name
+            file_path: Path to the file
+            purpose: Purpose of the file
+            description: Project description
+            options: Additional options
+            
+        Returns:
+            Generated file content
+        """
+        # Determine the programming language from the file extension
+        ext = Path(file_path).suffix.lower()
+        language_map = {
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".jsx": "JavaScript (React)",
+            ".ts": "TypeScript",
+            ".tsx": "TypeScript (React)",
+            ".java": "Java",
+            ".html": "HTML",
+            ".css": "CSS",
+            ".scss": "SCSS",
+            ".json": "JSON",
+            ".xml": "XML",
+            ".yaml": "YAML",
+            ".yml": "YAML",
+            ".md": "Markdown",
+            ".sql": "SQL",
+            ".go": "Go",
+            ".rs": "Rust",
+            ".rb": "Ruby",
+            ".php": "PHP",
+            ".c": "C",
+            ".cpp": "C++",
+            ".h": "C/C++ Header",
+            ".cs": "C#",
+            ".swift": "Swift",
+            ".kt": "Kotlin",
+            ".vue": "Vue"
+        }
+        language = language_map.get(ext, "Unknown")
+        
+        # Build the prompt
+        prompt = f"""
+    Generate content for a {language} file in a {framework} project.
+    File path: {file_path}
+    File purpose: {purpose}
+    Project description: "{description}"
+    Requirements:
+    
+    Generate complete, valid code for a {language} file
+    Ensure the code follows best practices for {framework} projects
+    Make the code clean, well-structured, and well-commented
+    Only include code relevant to the file's purpose and path
+    Match the style and idioms typically used in {framework} projects
+    
+    Only respond with the file content, nothing else.
     """
-    Generate content for a file using AI.
-    
-    Args:
-        framework: Framework name
-        file_path: Path to the file
-        purpose: Purpose of the file
-        description: Project description
-        options: Additional options
+        # Add language-specific instructions
+        if language == "Python":
+            prompt += "\nInclude appropriate imports and docstrings. Follow PEP 8 guidelines."
+        elif language in ["JavaScript", "TypeScript"]:
+            prompt += "\nUse modern ES6+ syntax. Include appropriate imports/exports."
+        elif language in ["JavaScript (React)", "TypeScript (React)"]:
+            prompt += "\nUse functional components with hooks. Include appropriate imports."
+        elif language == "Java":
+            prompt += "\nInclude appropriate package declaration, imports, and JavaDoc comments."
+        # Add framework-specific information
+        if framework == "react":
+            if "variant" in options and options["variant"] == "nextjs":
+                prompt += "\nThis is a Next.js project. Use Next.js-specific patterns and API."
+            else:
+                prompt += "\nThis is a Create React App project. Use appropriate React patterns."
+        elif framework == "django":
+            prompt += f"\nProject name: {options.get('project_name', 'django_project')}"
+            prompt += f"\nApp name: {options.get('app_name', 'main')}"
         
-    Returns:
-        Generated file content
-    """
-    # Determine the programming language from the file extension
-    ext = Path(file_path).suffix.lower()
-    language_map = {
-        ".py": "Python",
-        ".js": "JavaScript",
-        ".jsx": "JavaScript (React)",
-        ".ts": "TypeScript",
-        ".tsx": "TypeScript (React)",
-        ".java": "Java",
-        ".html": "HTML",
-        ".css": "CSS",
-        ".scss": "SCSS",
-        ".json": "JSON",
-        ".xml": "XML",
-        ".yaml": "YAML",
-        ".yml": "YAML",
-        ".md": "Markdown",
-        ".sql": "SQL",
-        ".go": "Go",
-        ".rs": "Rust",
-        ".rb": "Ruby",
-        ".php": "PHP",
-        ".c": "C",
-        ".cpp": "C++",
-        ".h": "C/C++ Header",
-        ".cs": "C#",
-        ".swift": "Swift",
-        ".kt": "Kotlin",
-        ".vue": "Vue"
-    }
-    language = language_map.get(ext, "Unknown")
-    
-    # Build the prompt
-    prompt = f"""
-Generate content for a {language} file in a {framework} project.
-File path: {file_path}
-File purpose: {purpose}
-Project description: "{description}"
-Requirements:
+        try:
+            # Call AI service
+            api_request = GeminiRequest(
+                prompt=prompt,
+                max_tokens=4000,
+                temperature=0.2
+            )
+            
+            response = await gemini_client.generate_text(api_request)
+            
+            # Extract code from the response
+            code_match = re.search(r'```(?:\w+)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if code_match:
+                return code_match.group(1)
+            
+            # No code block found, use the entire response
+            return response.text.strip()
+        except Exception as e:
+            self._logger.error(f"Error generating content for {file_path}: {str(e)}", exc_info=True)
+            return f"# Error generating content: {str(e)}\n# Please regenerate this file"
 
-Generate complete, valid code for a {language} file
-Ensure the code follows best practices for {framework} projects
-Make the code clean, well-structured, and well-commented
-Only include code relevant to the file's purpose and path
-Match the style and idioms typically used in {framework} projects
-
-Only respond with the file content, nothing else.
-"""
-    # Add language-specific instructions
-    if language == "Python":
-        prompt += "\nInclude appropriate imports and docstrings. Follow PEP 8 guidelines."
-    elif language in ["JavaScript", "TypeScript"]:
-        prompt += "\nUse modern ES6+ syntax. Include appropriate imports/exports."
-    elif language in ["JavaScript (React)", "TypeScript (React)"]:
-        prompt += "\nUse functional components with hooks. Include appropriate imports."
-    elif language == "Java":
-        prompt += "\nInclude appropriate package declaration, imports, and JavaDoc comments."
-    # Add framework-specific information
-    if framework == "react":
-        if "variant" in options and options["variant"] == "nextjs":
-            prompt += "\nThis is a Next.js project. Use Next.js-specific patterns and API."
-        else:
-            prompt += "\nThis is a Create React App project. Use appropriate React patterns."
-    elif framework == "django":
-        prompt += f"\nProject name: {options.get('project_name', 'django_project')}"
-        prompt += f"\nApp name: {options.get('app_name', 'main')}"
-    
-    try:
-        # Call AI service
-        api_request = GeminiRequest(
-            prompt=prompt,
-            max_tokens=4000,
-            temperature=0.2
-        )
-        
-        response = await gemini_client.generate_text(api_request)
-        
-        # Extract code from the response
-        code_match = re.search(r'```(?:\w+)?\s*(.*?)\s*```', response.text, re.DOTALL)
-        if code_match:
-            return code_match.group(1)
-        
-        # No code block found, use the entire response
-        return response.text.strip()
-    except Exception as e:
-        self._logger.error(f"Error generating content for {file_path}: {str(e)}", exc_info=True)
-        return f"# Error generating content: {str(e)}\n# Please regenerate this file"
-Global framework generator instance
 framework_generator = FrameworkGenerator()

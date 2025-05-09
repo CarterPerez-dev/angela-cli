@@ -126,9 +126,13 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │   │   └── shell_enhancement.md
 │   ├── MDHelpers
 │   │   ├── Files.md
+│   │   ├── Hierarchy.md
 │   │   ├── Info.md
 │   │   ├── analzyer_explainers.md
+│   │   ├── code_audit.md
 │   │   ├── context.md
+│   │   ├── dependency_map.md
+│   │   ├── fixing.md
 │   │   ├── planner_explainers.md
 │   │   └── tree.md
 │   ├── Next_Steps.md
@@ -142,6 +146,7 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │       ├── Phase6.md
 │       └── Phase7.md
 ├── Makefile
+├── QUICKSTART.md
 ├── README.md
 ├── angela
 │   ├── __init__.py
@@ -171,7 +176,6 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │   ├── constants.py
 │   ├── context
 │   │   ├── __init__.py
-│   │   ├── context_manager.py
 │   │   ├── enhanced_file_activity.py
 │   │   ├── enhancer.py
 │   │   ├── file_activity.py
@@ -200,6 +204,7 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │   ├── generation
 │   │   ├── __init__.py
 │   │   ├── architecture.py
+│   │   ├── context_manager.py
 │   │   ├── documentation.py
 │   │   ├── engine.py
 │   │   ├── frameworks.py
@@ -229,6 +234,7 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │   │   ├── notification_handler.py
 │   │   └── proactive_assistant.py
 │   ├── orchestrator.py
+│   ├── repomix-output.xml
 │   ├── review
 │   │   ├── __init__.py
 │   │   ├── diff_manager.py
@@ -259,7 +265,7 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │   │   ├── enhanced_universal_cli.py
 │   │   ├── git.py
 │   │   ├── package_managers.py
-│   │   └── unviversal_cli.py
+│   │   └── universal_cli.py
 │   ├── utils
 │   │   ├── __init__.py
 │   │   ├── enhanced_logging.py
@@ -268,10 +274,22 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │       ├── __init__.py
 │       ├── manager.py
 │       └── sharing.py
+├── docs
+│   ├── Makefile
+│   ├── make.bat
+│   └── source
+│       ├── _static
+│       ├── _templates
+│       ├── conf.py
+│       ├── ext
+│       │   └── usage_examples.py
+│       └── index.rst
 ├── pyproject.toml
 ├── pytest.ini
 ├── requirements.txt
 ├── scripts
+│   ├── generate_docs.sh
+│   ├── install-quick.sh
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
@@ -280,6 +298,7 @@ These 5 phases provide a structured approach to tackling the remaining challenge
     ├── commands.md
     ├── conftest.py
     ├── test_ai_client.py
+    ├── test_basic.py
     ├── test_context.py
     ├── test_context_enhancer.py
     ├── test_enhanced_planner.py
@@ -292,12 +311,17 @@ These 5 phases provide a structured approach to tackling the remaining challenge
     ├── test_frameworks.py
     ├── test_integration.py
     ├── test_integrations.py
+    ├── test_multi_step.py
     ├── test_orchestration.py
     ├── test_prompt_building.py
     ├── test_response_parsing.py
-    └── test_safety.py
+    ├── test_safety.py
+    └── usage_examples
+        ├── file_operations.py
+        └── git_operations.py
 
-24 directories, 156 files
+30 directories, 173 files
+
 
 ```
 

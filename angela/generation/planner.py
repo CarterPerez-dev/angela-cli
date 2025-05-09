@@ -730,651 +730,651 @@ For microservices architecture, consider:
         return project
     
     async def _determine_project_dependencies(
+            self, 
+            project_type: str, 
+            framework: Optional[str],
+            description: str
+        ) -> Dict[str, List[str]]:
+            """
+            Determine project dependencies based on type and framework.
+            
+            Args:
+                project_type: Type of project
+                framework: Optional framework
+                description: Project description
+                
+            Returns:
+                Dictionary with runtime and development dependencies
+            """
+            # Build prompt for dependency determination
+            prompt = f"""
+    As an expert software developer, determine the necessary dependencies for a {project_type} project{f' using {framework}' if framework else ''} based on this description:
+    
+    "{description}"
+    
+    Return a JSON object with runtime and development dependencies:
+    ```json
+    {{
+      "runtime": ["dep1", "dep2", ...],
+      "development": ["dev_dep1", "dev_dep2", ...]
+    }}
+    Include only the necessary dependencies for the core functionality described.
+    Use the latest stable versions and follow best practices for {project_type} projects.
+    """
+            # Call AI service
+            api_request = GeminiRequest(
+                prompt=prompt,
+                max_tokens=2000,
+                temperature=0.2
+            )
+            
+            self._logger.debug("Sending dependency determination request to AI service")
+            response = await gemini_client.generate_text(api_request)
+            
+            try:
+                # Extract JSON from response
+                json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Try to find JSON without code blocks
+                    json_match = re.search(r'({.*})', response.text, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(1)
+                    else:
+                        # Assume the entire response is JSON
+                        json_str = response.text
+                
+                # Parse JSON
+                dependencies = json.loads(json_str)
+                
+                # Ensure correct structure
+                if "runtime" not in dependencies:
+                    dependencies["runtime"] = []
+                if "development" not in dependencies:
+                    dependencies["development"] = []
+                
+                return dependencies
+                
+            except Exception as e:
+                self._logger.error(f"Error parsing dependencies: {str(e)}")
+                
+                # Return default dependencies based on project type and framework
+                if project_type == "python":
+                    if framework == "django":
+                        return {
+                            "runtime": ["django", "django-rest-framework", "psycopg2-binary"],
+                            "development": ["pytest", "pytest-django", "flake8", "black"]
+                        }
+                    elif framework == "flask":
+                        return {
+                            "runtime": ["flask", "flask-sqlalchemy", "flask-migrate", "flask-cors"],
+                            "development": ["pytest", "pytest-flask", "flake8", "black"]
+                        }
+                    elif framework == "fastapi":
+                        return {
+                            "runtime": ["fastapi", "uvicorn", "sqlalchemy", "pydantic"],
+                            "development": ["pytest", "black", "isort", "mypy"]
+                        }
+                    else:
+                        return {
+                            "runtime": ["requests", "pydantic"],
+                            "development": ["pytest", "black", "isort"]
+                        }
+                elif project_type == "node":
+                    if framework == "react":
+                        return {
+                            "runtime": ["react", "react-dom", "react-router-dom"],
+                            "development": ["@testing-library/react", "jest", "eslint", "prettier"]
+                        }
+                    elif framework == "express":
+                        return {
+                            "runtime": ["express", "cors", "mongoose", "dotenv"],
+                            "development": ["nodemon", "jest", "supertest", "eslint"]
+                        }
+                    else:
+                        return {
+                            "runtime": ["axios", "dotenv"],
+                            "development": ["jest", "eslint", "prettier"]
+                        }
+                else:
+                    return {
+                        "runtime": [],
+                        "development": []
+                    }
+
+    async def _create_files_for_component(
         self, 
-        project_type: str, 
-        framework: Optional[str],
-        description: str
-    ) -> Dict[str, List[str]]:
+        component: ArchitectureComponent,
+        project_type: str,
+        framework: Optional[str]
+    ) -> List[CodeFile]:
         """
-        Determine project dependencies based on type and framework.
+        Create CodeFile objects for a component based on its responsibilities.
+        
+        Args:
+            component: The architecture component
+            project_type: Type of project
+            framework: Optional framework
+            
+        Returns:
+            List of CodeFile objects
+        """
+        files = []
+        
+        # If component already has files defined, use those
+        if component.files:
+            for file_path in component.files:
+                files.append(CodeFile(
+                    path=file_path,
+                    content="",  # Content will be generated later
+                    purpose=f"Part of the {component.name} component: {component.description}",
+                    dependencies=[],
+                    language=self._get_language_from_file_path(file_path, project_type)
+                ))
+            
+            return files
+        
+        # Otherwise, generate files based on the component name and responsibilities
+        component_path = component.name.lower().replace(" ", "_")
+        
+        # Handle different project types
+        if project_type == "python":
+            # Create a Python package
+            files.append(CodeFile(
+                path=f"{component_path}/__init__.py",
+                content="",
+                purpose=f"Package initialization for {component.name}",
+                dependencies=[],
+                language="python"
+            ))
+            
+            # Add main module
+            files.append(CodeFile(
+                path=f"{component_path}/main.py",
+                content="",
+                purpose=f"Main module for {component.name}: {component.description}",
+                dependencies=[],
+                language="python"
+            ))
+            
+            # Add files based on responsibilities
+            for resp in component.responsibilities:
+                # Convert responsibility to a file name
+                resp_name = resp.lower().replace(" ", "_").replace("-", "_")
+                resp_name = re.sub(r'[^a-z0-9_]', '', resp_name)
+                
+                # Skip if too generic
+                if resp_name in ["main", "init", "core", "base"]:
+                    continue
+                
+                # Create file
+                files.append(CodeFile(
+                    path=f"{component_path}/{resp_name}.py",
+                    content="",
+                    purpose=f"Handles {resp} in the {component.name} component",
+                    dependencies=[f"{component_path}/__init__.py"],
+                    language="python"
+                ))
+                
+        elif project_type == "node":
+            if framework in ["react", "vue", "angular"]:
+                # Frontend component structure
+                component_path = f"src/components/{component_path}"
+                
+                if framework == "react":
+                    # React component
+                    files.append(CodeFile(
+                        path=f"{component_path}/index.js",
+                        content="",
+                        purpose=f"Main file for {component.name} React component",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+                    
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component.name.replace(' ', '')}.js",
+                        content="",
+                        purpose=f"{component.name} React component: {component.description}",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+                    
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component.name.replace(' ', '')}.css",
+                        content="",
+                        purpose=f"Styles for {component.name} React component",
+                        dependencies=[],
+                        language="css"
+                    ))
+                    
+                elif framework == "vue":
+                    # Vue component
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component.name.replace(' ', '')}.vue",
+                        content="",
+                        purpose=f"{component.name} Vue component: {component.description}",
+                        dependencies=[],
+                        language="vue"
+                    ))
+                    
+                elif framework == "angular":
+                    # Angular component
+                    component_selector = component.name.toLowerCase().replace(" ", "-")
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component_selector}.component.ts",
+                        content="",
+                        purpose=f"{component.name} Angular component: {component.description}",
+                        dependencies=[],
+                        language="typescript"
+                    ))
+                    
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component_selector}.component.html",
+                        content="",
+                        purpose=f"Template for {component.name} Angular component",
+                        dependencies=[],
+                        language="html"
+                    ))
+                    
+                    files.append(CodeFile(
+                        path=f"{component_path}/{component_selector}.component.css",
+                        content="",
+                        purpose=f"Styles for {component.name} Angular component",
+                        dependencies=[],
+                        language="css"
+                    ))
+            else:
+                # Backend Node.js structure
+                if "controller" in component.name.lower() or "route" in component.name.lower():
+                    # API controllers/routes
+                    files.append(CodeFile(
+                        path=f"src/routes/{component_path}.js",
+                        content="",
+                        purpose=f"{component.name}: {component.description}",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+                elif "model" in component.name.lower():
+                    # Database models
+                    files.append(CodeFile(
+                        path=f"src/models/{component_path}.js",
+                        content="",
+                        purpose=f"{component.name}: {component.description}",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+                elif "service" in component.name.lower():
+                    # Services
+                    files.append(CodeFile(
+                        path=f"src/services/{component_path}.js",
+                        content="",
+                        purpose=f"{component.name}: {component.description}",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+                else:
+                    # Generic module
+                    files.append(CodeFile(
+                        path=f"src/{component_path}/index.js",
+                        content="",
+                        purpose=f"Main file for {component.name}",
+                        dependencies=[],
+                        language="javascript"
+                    ))
+        
+        elif project_type == "java":
+            # Java package structure
+            base_package = "com.example.app"
+            component_package = component.name.toLowerCase().replace(" ", "")
+            
+            files.append(CodeFile(
+                path=f"src/main/java/{base_package.replace('.', '/')}/{component_package}/{component.name.replace(' ', '')}.java",
+                content="",
+                purpose=f"Main class for {component.name}: {component.description}",
+                dependencies=[],
+                language="java"
+            ))
+            
+            # Add files based on responsibilities
+            for resp in component.responsibilities:
+                # Convert responsibility to a class name
+                class_name = "".join(word.capitalize() for word in resp.split())
+                class_name = re.sub(r'[^a-zA-Z0-9]', '', class_name)
+                
+                # Skip if too generic
+                if class_name.lower() in ["main", "core", "base", "app"]:
+                    continue
+                
+                # Create file
+                files.append(CodeFile(
+                    path=f"src/main/java/{base_package.replace('.', '/')}/{component_package}/{class_name}.java",
+                    content="",
+                    purpose=f"Handles {resp} in the {component.name} component",
+                    dependencies=[],
+                    language="java"
+                ))
+        
+        return files
+    
+    def _get_language_from_file_path(self, file_path: str, project_type: str) -> Optional[str]:
+        """
+        Determine language from file path.
+        
+        Args:
+            file_path: Path to the file
+            project_type: Type of project
+            
+        Returns:
+            Language string or None
+        """
+        # Extract file extension
+        ext = Path(file_path).suffix.lower()
+        
+        # Map extensions to languages
+        if ext == ".py":
+            return "python"
+        elif ext in [".js", ".jsx"]:
+            return "javascript"
+        elif ext in [".ts", ".tsx"]:
+            return "typescript"
+        elif ext == ".java":
+            return "java"
+        elif ext == ".go":
+            return "go"
+        elif ext == ".rs":
+            return "rust"
+        elif ext == ".rb":
+            return "ruby"
+        elif ext == ".php":
+            return "php"
+        elif ext == ".html":
+            return "html"
+        elif ext == ".css":
+            return "css"
+        elif ext == ".vue":
+            return "vue"
+        elif ext == ".json":
+            return "json"
+        elif ext == ".md":
+            return "markdown"
+        elif ext == ".xml":
+            return "xml"
+        elif ext == ".yaml" or ext == ".yml":
+            return "yaml"
+        
+        # Fallback to project type
+        return project_type
+    
+    async def _add_standard_project_files(
+        self, 
+        project_type: str,
+        framework: Optional[str],
+        project_name: str
+    ) -> List[CodeFile]:
+        """
+        Add standard files for the project type.
         
         Args:
             project_type: Type of project
             framework: Optional framework
-            description: Project description
+            project_name: Name of the project
             
         Returns:
-            Dictionary with runtime and development dependencies
+            List of CodeFile objects
         """
-        # Build prompt for dependency determination
-        prompt = f"""
-As an expert software developer, determine the necessary dependencies for a {project_type} project{f' using {framework}' if framework else ''} based on this description:
-
-"{description}"
-
-Return a JSON object with runtime and development dependencies:
-```json
-{{
-  "runtime": ["dep1", "dep2", ...],
-  "development": ["dev_dep1", "dev_dep2", ...]
-}}
-Include only the necessary dependencies for the core functionality described.
-Use the latest stable versions and follow best practices for {project_type} projects.
-"""
-    # Call AI service
-    api_request = GeminiRequest(
-        prompt=prompt,
-        max_tokens=2000,
-        temperature=0.2
-    )
-    
-    self._logger.debug("Sending dependency determination request to AI service")
-    response = await gemini_client.generate_text(api_request)
-    
-    try:
-        # Extract JSON from response
-        json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Try to find JSON without code blocks
-            json_match = re.search(r'({.*})', response.text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1)
-            else:
-                # Assume the entire response is JSON
-                json_str = response.text
+        files = []
         
-        # Parse JSON
-        dependencies = json.loads(json_str)
+        # Common files for all projects
+        files.append(CodeFile(
+            path="README.md",
+            content="",
+            purpose="Project documentation",
+            dependencies=[],
+            language="markdown"
+        ))
         
-        # Ensure correct structure
-        if "runtime" not in dependencies:
-            dependencies["runtime"] = []
-        if "development" not in dependencies:
-            dependencies["development"] = []
+        files.append(CodeFile(
+            path=".gitignore",
+            content="",
+            purpose="Git ignore file",
+            dependencies=[],
+            language="gitignore"
+        ))
         
-        return dependencies
-        
-    except Exception as e:
-        self._logger.error(f"Error parsing dependencies: {str(e)}")
-        
-        # Return default dependencies based on project type and framework
+        # Project-specific files
         if project_type == "python":
-            if framework == "django":
-                return {
-                    "runtime": ["django", "django-rest-framework", "psycopg2-binary"],
-                    "development": ["pytest", "pytest-django", "flake8", "black"]
-                }
-            elif framework == "flask":
-                return {
-                    "runtime": ["flask", "flask-sqlalchemy", "flask-migrate", "flask-cors"],
-                    "development": ["pytest", "pytest-flask", "flake8", "black"]
-                }
-            elif framework == "fastapi":
-                return {
-                    "runtime": ["fastapi", "uvicorn", "sqlalchemy", "pydantic"],
-                    "development": ["pytest", "black", "isort", "mypy"]
-                }
-            else:
-                return {
-                    "runtime": ["requests", "pydantic"],
-                    "development": ["pytest", "black", "isort"]
-                }
-        elif project_type == "node":
-            if framework == "react":
-                return {
-                    "runtime": ["react", "react-dom", "react-router-dom"],
-                    "development": ["@testing-library/react", "jest", "eslint", "prettier"]
-                }
-            elif framework == "express":
-                return {
-                    "runtime": ["express", "cors", "mongoose", "dotenv"],
-                    "development": ["nodemon", "jest", "supertest", "eslint"]
-                }
-            else:
-                return {
-                    "runtime": ["axios", "dotenv"],
-                    "development": ["jest", "eslint", "prettier"]
-                }
-        else:
-            return {
-                "runtime": [],
-                "development": []
-            }
-
-async def _create_files_for_component(
-    self, 
-    component: ArchitectureComponent,
-    project_type: str,
-    framework: Optional[str]
-) -> List[CodeFile]:
-    """
-    Create CodeFile objects for a component based on its responsibilities.
-    
-    Args:
-        component: The architecture component
-        project_type: Type of project
-        framework: Optional framework
-        
-    Returns:
-        List of CodeFile objects
-    """
-    files = []
-    
-    # If component already has files defined, use those
-    if component.files:
-        for file_path in component.files:
             files.append(CodeFile(
-                path=file_path,
-                content="",  # Content will be generated later
-                purpose=f"Part of the {component.name} component: {component.description}",
-                dependencies=[],
-                language=self._get_language_from_file_path(file_path, project_type)
-            ))
-        
-        return files
-    
-    # Otherwise, generate files based on the component name and responsibilities
-    component_path = component.name.lower().replace(" ", "_")
-    
-    # Handle different project types
-    if project_type == "python":
-        # Create a Python package
-        files.append(CodeFile(
-            path=f"{component_path}/__init__.py",
-            content="",
-            purpose=f"Package initialization for {component.name}",
-            dependencies=[],
-            language="python"
-        ))
-        
-        # Add main module
-        files.append(CodeFile(
-            path=f"{component_path}/main.py",
-            content="",
-            purpose=f"Main module for {component.name}: {component.description}",
-            dependencies=[],
-            language="python"
-        ))
-        
-        # Add files based on responsibilities
-        for resp in component.responsibilities:
-            # Convert responsibility to a file name
-            resp_name = resp.lower().replace(" ", "_").replace("-", "_")
-            resp_name = re.sub(r'[^a-z0-9_]', '', resp_name)
-            
-            # Skip if too generic
-            if resp_name in ["main", "init", "core", "base"]:
-                continue
-            
-            # Create file
-            files.append(CodeFile(
-                path=f"{component_path}/{resp_name}.py",
+                path="requirements.txt",
                 content="",
-                purpose=f"Handles {resp} in the {component.name} component",
-                dependencies=[f"{component_path}/__init__.py"],
+                purpose="Python dependencies",
+                dependencies=[],
+                language="text"
+            ))
+            
+            files.append(CodeFile(
+                path="setup.py",
+                content="",
+                purpose="Python package setup",
+                dependencies=[],
                 language="python"
             ))
             
-    elif project_type == "node":
-        if framework in ["react", "vue", "angular"]:
-            # Frontend component structure
-            component_path = f"src/components/{component_path}"
+            if framework == "django":
+                files.append(CodeFile(
+                    path="manage.py",
+                    content="",
+                    purpose="Django management script",
+                    dependencies=[],
+                    language="python"
+                ))
+                
+                files.append(CodeFile(
+                    path=f"{project_name.lower().replace(' ', '_')}/settings.py",
+                    content="",
+                    purpose="Django settings",
+                    dependencies=[],
+                    language="python"
+                ))
+                
+                files.append(CodeFile(
+                    path=f"{project_name.lower().replace(' ', '_')}/urls.py",
+                    content="",
+                    purpose="Django URL configuration",
+                    dependencies=[],
+                    language="python"
+                ))
+                
+                files.append(CodeFile(
+                    path=f"{project_name.lower().replace(' ', '_')}/__init__.py",
+                    content="",
+                    purpose="Django project initialization",
+                    dependencies=[],
+                    language="python"
+                ))
+            
+            elif framework == "flask":
+                files.append(CodeFile(
+                    path="app.py",
+                    content="",
+                    purpose="Flask application entry point",
+                    dependencies=[],
+                    language="python"
+                ))
+                
+                files.append(CodeFile(
+                    path="config.py",
+                    content="",
+                    purpose="Flask configuration",
+                    dependencies=[],
+                    language="python"
+                ))
+            
+            elif framework == "fastapi":
+                files.append(CodeFile(
+                    path="main.py",
+                    content="",
+                    purpose="FastAPI application entry point",
+                    dependencies=[],
+                    language="python"
+                ))
+        
+        elif project_type == "node":
+            files.append(CodeFile(
+                path="package.json",
+                content="",
+                purpose="Node.js package configuration",
+                dependencies=[],
+                language="json"
+            ))
+            
+            files.append(CodeFile(
+                path=".env.example",
+                content="",
+                purpose="Example environment variables",
+                dependencies=[],
+                language="env"
+            ))
             
             if framework == "react":
-                # React component
                 files.append(CodeFile(
-                    path=f"{component_path}/index.js",
+                    path="src/index.js",
                     content="",
-                    purpose=f"Main file for {component.name} React component",
+                    purpose="React application entry point",
                     dependencies=[],
                     language="javascript"
                 ))
                 
                 files.append(CodeFile(
-                    path=f"{component_path}/{component.name.replace(' ', '')}.js",
+                    path="src/App.js",
                     content="",
-                    purpose=f"{component.name} React component: {component.description}",
+                    purpose="Main React component",
                     dependencies=[],
                     language="javascript"
                 ))
                 
                 files.append(CodeFile(
-                    path=f"{component_path}/{component.name.replace(' ', '')}.css",
+                    path="public/index.html",
                     content="",
-                    purpose=f"Styles for {component.name} React component",
-                    dependencies=[],
-                    language="css"
-                ))
-                
-            elif framework == "vue":
-                # Vue component
-                files.append(CodeFile(
-                    path=f"{component_path}/{component.name.replace(' ', '')}.vue",
-                    content="",
-                    purpose=f"{component.name} Vue component: {component.description}",
-                    dependencies=[],
-                    language="vue"
-                ))
-                
-            elif framework == "angular":
-                # Angular component
-                component_selector = component.name.toLowerCase().replace(" ", "-")
-                files.append(CodeFile(
-                    path=f"{component_path}/{component_selector}.component.ts",
-                    content="",
-                    purpose=f"{component.name} Angular component: {component.description}",
-                    dependencies=[],
-                    language="typescript"
-                ))
-                
-                files.append(CodeFile(
-                    path=f"{component_path}/{component_selector}.component.html",
-                    content="",
-                    purpose=f"Template for {component.name} Angular component",
+                    purpose="HTML entry point",
                     dependencies=[],
                     language="html"
                 ))
+            
+            elif framework == "express":
+                files.append(CodeFile(
+                    path="src/index.js",
+                    content="",
+                    purpose="Express application entry point",
+                    dependencies=[],
+                    language="javascript"
+                ))
                 
                 files.append(CodeFile(
-                    path=f"{component_path}/{component_selector}.component.css",
+                    path="src/app.js",
                     content="",
-                    purpose=f"Styles for {component.name} Angular component",
-                    dependencies=[],
-                    language="css"
-                ))
-        else:
-            # Backend Node.js structure
-            if "controller" in component.name.lower() or "route" in component.name.lower():
-                # API controllers/routes
-                files.append(CodeFile(
-                    path=f"src/routes/{component_path}.js",
-                    content="",
-                    purpose=f"{component.name}: {component.description}",
+                    purpose="Express application setup",
                     dependencies=[],
                     language="javascript"
                 ))
-            elif "model" in component.name.lower():
-                # Database models
+        
+        elif project_type == "java":
+            files.append(CodeFile(
+                path="pom.xml",
+                content="",
+                purpose="Maven project configuration",
+                dependencies=[],
+                language="xml"
+            ))
+            
+            base_package = "com.example.app"
+            
+            if framework == "spring":
                 files.append(CodeFile(
-                    path=f"src/models/{component_path}.js",
+                    path=f"src/main/java/{base_package.replace('.', '/')}/Application.java",
                     content="",
-                    purpose=f"{component.name}: {component.description}",
+                    purpose="Spring Boot application entry point",
                     dependencies=[],
-                    language="javascript"
+                    language="java"
                 ))
-            elif "service" in component.name.lower():
-                # Services
+                
                 files.append(CodeFile(
-                    path=f"src/services/{component_path}.js",
+                    path="src/main/resources/application.properties",
                     content="",
-                    purpose=f"{component.name}: {component.description}",
+                    purpose="Spring Boot configuration",
                     dependencies=[],
-                    language="javascript"
+                    language="properties"
                 ))
-            else:
-                # Generic module
-                files.append(CodeFile(
-                    path=f"src/{component_path}/index.js",
-                    content="",
-                    purpose=f"Main file for {component.name}",
-                    dependencies=[],
-                    language="javascript"
-                ))
+        
+        return files
     
-    elif project_type == "java":
-        # Java package structure
-        base_package = "com.example.app"
-        component_package = component.name.toLowerCase().replace(" ", "")
+    
+    
+    
+    async def _parse_refined_plan(
+        self, 
+        response: str, 
+        original_project: CodeProject
+    ) -> CodeProject:
+        """
+        Parse the AI response to extract the refined plan.
         
-        files.append(CodeFile(
-            path=f"src/main/java/{base_package.replace('.', '/')}/{component_package}/{component.name.replace(' ', '')}.java",
-            content="",
-            purpose=f"Main class for {component.name}: {component.description}",
-            dependencies=[],
-            language="java"
-        ))
-        
-        # Add files based on responsibilities
-        for resp in component.responsibilities:
-            # Convert responsibility to a class name
-            class_name = "".join(word.capitalize() for word in resp.split())
-            class_name = re.sub(r'[^a-zA-Z0-9]', '', class_name)
+        Args:
+            response: AI response text
+            original_project: The original project to refine
             
-            # Skip if too generic
-            if class_name.lower() in ["main", "core", "base", "app"]:
-                continue
-            
-            # Create file
-            files.append(CodeFile(
-                path=f"src/main/java/{base_package.replace('.', '/')}/{component_package}/{class_name}.java",
-                content="",
-                purpose=f"Handles {resp} in the {component.name} component",
-                dependencies=[],
-                language="java"
-            ))
-    
-    return files
-
-def _get_language_from_file_path(self, file_path: str, project_type: str) -> Optional[str]:
-    """
-    Determine language from file path.
-    
-    Args:
-        file_path: Path to the file
-        project_type: Type of project
-        
-    Returns:
-        Language string or None
-    """
-    # Extract file extension
-    ext = Path(file_path).suffix.lower()
-    
-    # Map extensions to languages
-    if ext == ".py":
-        return "python"
-    elif ext in [".js", ".jsx"]:
-        return "javascript"
-    elif ext in [".ts", ".tsx"]:
-        return "typescript"
-    elif ext == ".java":
-        return "java"
-    elif ext == ".go":
-        return "go"
-    elif ext == ".rs":
-        return "rust"
-    elif ext == ".rb":
-        return "ruby"
-    elif ext == ".php":
-        return "php"
-    elif ext == ".html":
-        return "html"
-    elif ext == ".css":
-        return "css"
-    elif ext == ".vue":
-        return "vue"
-    elif ext == ".json":
-        return "json"
-    elif ext == ".md":
-        return "markdown"
-    elif ext == ".xml":
-        return "xml"
-    elif ext == ".yaml" or ext == ".yml":
-        return "yaml"
-    
-    # Fallback to project type
-    return project_type
-
-async def _add_standard_project_files(
-    self, 
-    project_type: str,
-    framework: Optional[str],
-    project_name: str
-) -> List[CodeFile]:
-    """
-    Add standard files for the project type.
-    
-    Args:
-        project_type: Type of project
-        framework: Optional framework
-        project_name: Name of the project
-        
-    Returns:
-        List of CodeFile objects
-    """
-    files = []
-    
-    # Common files for all projects
-    files.append(CodeFile(
-        path="README.md",
-        content="",
-        purpose="Project documentation",
-        dependencies=[],
-        language="markdown"
-    ))
-    
-    files.append(CodeFile(
-        path=".gitignore",
-        content="",
-        purpose="Git ignore file",
-        dependencies=[],
-        language="gitignore"
-    ))
-    
-    # Project-specific files
-    if project_type == "python":
-        files.append(CodeFile(
-            path="requirements.txt",
-            content="",
-            purpose="Python dependencies",
-            dependencies=[],
-            language="text"
-        ))
-        
-        files.append(CodeFile(
-            path="setup.py",
-            content="",
-            purpose="Python package setup",
-            dependencies=[],
-            language="python"
-        ))
-        
-        if framework == "django":
-            files.append(CodeFile(
-                path="manage.py",
-                content="",
-                purpose="Django management script",
-                dependencies=[],
-                language="python"
-            ))
-            
-            files.append(CodeFile(
-                path=f"{project_name.lower().replace(' ', '_')}/settings.py",
-                content="",
-                purpose="Django settings",
-                dependencies=[],
-                language="python"
-            ))
-            
-            files.append(CodeFile(
-                path=f"{project_name.lower().replace(' ', '_')}/urls.py",
-                content="",
-                purpose="Django URL configuration",
-                dependencies=[],
-                language="python"
-            ))
-            
-            files.append(CodeFile(
-                path=f"{project_name.lower().replace(' ', '_')}/__init__.py",
-                content="",
-                purpose="Django project initialization",
-                dependencies=[],
-                language="python"
-            ))
-        
-        elif framework == "flask":
-            files.append(CodeFile(
-                path="app.py",
-                content="",
-                purpose="Flask application entry point",
-                dependencies=[],
-                language="python"
-            ))
-            
-            files.append(CodeFile(
-                path="config.py",
-                content="",
-                purpose="Flask configuration",
-                dependencies=[],
-                language="python"
-            ))
-        
-        elif framework == "fastapi":
-            files.append(CodeFile(
-                path="main.py",
-                content="",
-                purpose="FastAPI application entry point",
-                dependencies=[],
-                language="python"
-            ))
-    
-    elif project_type == "node":
-        files.append(CodeFile(
-            path="package.json",
-            content="",
-            purpose="Node.js package configuration",
-            dependencies=[],
-            language="json"
-        ))
-        
-        files.append(CodeFile(
-            path=".env.example",
-            content="",
-            purpose="Example environment variables",
-            dependencies=[],
-            language="env"
-        ))
-        
-        if framework == "react":
-            files.append(CodeFile(
-                path="src/index.js",
-                content="",
-                purpose="React application entry point",
-                dependencies=[],
-                language="javascript"
-            ))
-            
-            files.append(CodeFile(
-                path="src/App.js",
-                content="",
-                purpose="Main React component",
-                dependencies=[],
-                language="javascript"
-            ))
-            
-            files.append(CodeFile(
-                path="public/index.html",
-                content="",
-                purpose="HTML entry point",
-                dependencies=[],
-                language="html"
-            ))
-        
-        elif framework == "express":
-            files.append(CodeFile(
-                path="src/index.js",
-                content="",
-                purpose="Express application entry point",
-                dependencies=[],
-                language="javascript"
-            ))
-            
-            files.append(CodeFile(
-                path="src/app.js",
-                content="",
-                purpose="Express application setup",
-                dependencies=[],
-                language="javascript"
-            ))
-    
-    elif project_type == "java":
-        files.append(CodeFile(
-            path="pom.xml",
-            content="",
-            purpose="Maven project configuration",
-            dependencies=[],
-            language="xml"
-        ))
-        
-        base_package = "com.example.app"
-        
-        if framework == "spring":
-            files.append(CodeFile(
-                path=f"src/main/java/{base_package.replace('.', '/')}/Application.java",
-                content="",
-                purpose="Spring Boot application entry point",
-                dependencies=[],
-                language="java"
-            ))
-            
-            files.append(CodeFile(
-                path="src/main/resources/application.properties",
-                content="",
-                purpose="Spring Boot configuration",
-                dependencies=[],
-                language="properties"
-            ))
-    
-    return files
-
-
-
-
-async def _parse_refined_plan(
-    self, 
-    response: str, 
-    original_project: CodeProject
-) -> CodeProject:
-    """
-    Parse the AI response to extract the refined plan.
-    
-    Args:
-        response: AI response text
-        original_project: The original project to refine
-        
-    Returns:
-        Refined CodeProject
-    """
-    try:
-        # Look for JSON block in the response
-        json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            # Try to find JSON without code blocks
-            json_match = re.search(r'({.*})', response, re.DOTALL)
+        Returns:
+            Refined CodeProject
+        """
+        try:
+            # Look for JSON block in the response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
             else:
-                # Assume the entire response is JSON
-                json_str = response
-        
-        # Parse the JSON
-        plan_data = json.loads(json_str)
-        
-        # Create CodeFile objects
-        files = []
-        for file_data in plan_data.get("files", []):
-            # Check if this file existed in the original project
-            original_file = next((f for f in original_project.files if f.path == file_data["path"]), None)
+                # Try to find JSON without code blocks
+                json_match = re.search(r'({.*})', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(1)
+                else:
+                    # Assume the entire response is JSON
+                    json_str = response
             
-            files.append(CodeFile(
-                path=file_data["path"],
-                content=original_file.content if original_file else "",
-                purpose=file_data["purpose"],
-                dependencies=file_data.get("dependencies", []),
-                language=original_file.language if original_file else None
-            ))
-        
-        # Create CodeProject object
-        project = CodeProject(
-            name=plan_data.get("name", original_project.name),
-            description=plan_data.get("description", original_project.description),
-            root_dir=original_project.root_dir,
-            files=files,
-            dependencies=plan_data.get("dependencies", original_project.dependencies),
-            project_type=original_project.project_type,
-            structure_explanation=plan_data.get("structure_explanation", original_project.structure_explanation)
-        )
-        
-        return project
-        
-    except Exception as e:
-        self._logger.exception(f"Error parsing refined plan: {str(e)}")
-        
-        # Return the original project if parsing failed
-        return original_project
+            # Parse the JSON
+            plan_data = json.loads(json_str)
+            
+            # Create CodeFile objects
+            files = []
+            for file_data in plan_data.get("files", []):
+                # Check if this file existed in the original project
+                original_file = next((f for f in original_project.files if f.path == file_data["path"]), None)
+                
+                files.append(CodeFile(
+                    path=file_data["path"],
+                    content=original_file.content if original_file else "",
+                    purpose=file_data["purpose"],
+                    dependencies=file_data.get("dependencies", []),
+                    language=original_file.language if original_file else None
+                ))
+            
+            # Create CodeProject object
+            project = CodeProject(
+                name=plan_data.get("name", original_project.name),
+                description=plan_data.get("description", original_project.description),
+                root_dir=original_project.root_dir,
+                files=files,
+                dependencies=plan_data.get("dependencies", original_project.dependencies),
+                project_type=original_project.project_type,
+                structure_explanation=plan_data.get("structure_explanation", original_project.structure_explanation)
+            )
+            
+            return project
+            
+        except Exception as e:
+            self._logger.exception(f"Error parsing refined plan: {str(e)}")
+            
+            # Return the original project if parsing failed
+            return original_project
         
         
 project_planner = ProjectPlanner()

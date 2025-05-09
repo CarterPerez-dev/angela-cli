@@ -967,7 +967,7 @@ def create_framework_project(
         console.print(f"[bold red]Error generating {framework} project:[/bold red] {str(e)}")
 
 @app.command("refine-generated-project")
-def refine_generated_project(
+async def refine_generated_project(
     project_dir: str = typer.Argument(..., help="Directory of the generated project"),
     feedback: str = typer.Argument(..., help="Feedback for project improvement"),
     focus: Optional[List[str]] = typer.Option(None, help="Files to focus on (glob patterns supported)"),
@@ -1046,7 +1046,7 @@ def refine_generated_project(
         with console.status("[bold green]Analyzing project...[/bold green]"):
             # Try to detect project type
             from angela.toolchain.ci_cd import ci_cd_integration
-            detection_result = asyncio.run(ci_cd_integration.detect_project_type(project_dir))
+            detection_result = await ci_cd_integration.detect_project_type(project_dir)
             
             if detection_result["project_type"]:
                 project.project_type = detection_result["project_type"]
@@ -1065,11 +1065,11 @@ def refine_generated_project(
         console.print("\n[bold]Processing feedback...[/bold]")
         
         with console.status("[bold green]Generating improvements based on feedback...[/bold green]"):
-            refined_project, refinement_results = asyncio.run(interactive_refiner.process_refinement_feedback(
+            refined_project, refinement_results = await interactive_refiner.process_refinement_feedback(
                 feedback=feedback,
                 project=project,
                 focus_files=focus
-            ))
+            )
         
         # Display results
         console.print(f"\n[bold blue]Files analyzed: {len(refinement_results['results'])}[/bold blue]")
@@ -1128,10 +1128,10 @@ def refine_generated_project(
             console.print("\n[bold]Applying changes...[/bold]")
             
             with console.status("[bold green]Applying changes...[/bold green]"):
-                apply_result = asyncio.run(feedback_manager.apply_refinements(
+                apply_result = await feedback_manager.apply_refinements(
                     refinements=refinement_results,
                     backup=backup
-                ))
+                )
             
             if apply_result["files_changed"] > 0:
                 console.print(f"[green]Changes applied to {apply_result['files_changed']} files[/green]")
@@ -1169,10 +1169,6 @@ def group_files_by_directory(files: List[CodeFile]) -> Dict[str, List[CodeFile]]
         grouped[directory].append(file)
     
     return grouped
-
-
-
-
 
 
 @app.command("generate-tests")
