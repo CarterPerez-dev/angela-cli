@@ -117,6 +117,30 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 # Structure/Tree
 ```
 .
+├── MD
+│   ├── ImplemenationsMD
+│   │   ├── Phase_5_implementation.md
+│   │   ├── Phase_6_implementation.md
+│   │   ├── planner_implementation.md
+│   │   ├── rollback_implementation.md
+│   │   └── shell_enhancement.md
+│   ├── MDHelpers
+│   │   ├── Files.md
+│   │   ├── Info.md
+│   │   ├── analzyer_explainers.md
+│   │   ├── context.md
+│   │   ├── planner_explainers.md
+│   │   └── tree.md
+│   ├── Next_Steps.md
+│   └── PhasesMD
+│       ├── Phase1.md
+│       ├── Phase11.md
+│       ├── Phase2.md
+│       ├── Phase3.md
+│       ├── Phase4.md
+│       ├── Phase5.md
+│       ├── Phase6.md
+│       └── Phase7.md
 ├── Makefile
 ├── README.md
 ├── angela
@@ -246,12 +270,34 @@ These 5 phases provide a structured approach to tackling the remaining challenge
 │       └── sharing.py
 ├── pyproject.toml
 ├── pytest.ini
-├── repomix-output.xml
 ├── requirements.txt
 ├── scripts
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+└── tests
+    ├── __init__.py
+    ├── commands.md
+    ├── conftest.py
+    ├── test_ai_client.py
+    ├── test_context.py
+    ├── test_context_enhancer.py
+    ├── test_enhanced_planner.py
+    ├── test_enhanced_rollback.py
+    ├── test_execution.py
+    ├── test_file_activity.py
+    ├── test_file_detector.py
+    ├── test_file_resolver.py
+    ├── test_filesystem.py
+    ├── test_frameworks.py
+    ├── test_integration.py
+    ├── test_integrations.py
+    ├── test_orchestration.py
+    ├── test_prompt_building.py
+    ├── test_response_parsing.py
+    └── test_safety.py
+
+24 directories, 156 files
 
 ```
 

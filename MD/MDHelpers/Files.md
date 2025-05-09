@@ -1,4 +1,4 @@
-Okay, here are the 2-sentence explanations for each file in the codebase, providing maximum context within the limit:
+# 2-sentence explanations for each file in the /angela directory and its subdirectories
 
 1.  `angela/ai/analyzer.py`
     Defines the `ErrorAnalyzer` class to diagnose command execution errors by matching stderr against predefined patterns and historical data. It provides structured analysis and generates actionable fix suggestions based on error type, command structure, and file reference checks.
@@ -314,3 +314,208 @@ Okay, here are the 2-sentence explanations for each file in the codebase, provid
 
 105. `angela/orchestrator.py`
     Acts as the central coordinator, receiving user requests, determining the request type (`RequestType` enum), and dispatching tasks to appropriate modules (AI client, planners, execution engines, context managers, safety checkers). It integrates enhanced context, file resolution, adaptive execution, workflow management, code generation, and error handling to process user inputs effectively.
+    
+106. `angela/ai/semantic_analyzer.py`
+    Defines the `SemanticAnalyzer` class responsible for deep code understanding by parsing source files (e.g., Python, JavaScript) to extract entities like functions, classes, and their relationships. It uses language-specific parsers (like Python's `ast`) or LLM-based analysis to build a semantic model of the codebase, enabling features like entity usage tracking and code summarization.
+
+107. `angela/ai/prompts.py`
+    Serves as a centralized module for constructing and managing various prompt templates used to interact with the Gemini API. It defines base system instructions, few-shot examples, and specialized prompt structures for tasks like command generation, error analysis, code generation, and file operations, ensuring consistent and effective AI communication.
+
+108. `angela/ai/enhanced_prompts.py`
+    Extends the basic prompt engineering by incorporating richer contextual information, such as semantic code understanding from `SemanticAnalyzer` and detailed project state from `ProjectStateAnalyzer`. This module crafts more sophisticated prompts (e.g., `ENHANCED_SYSTEM_INSTRUCTIONS`, `SEMANTIC_CODE_CONTEXT`) to enable the LLM to generate highly context-aware and precise responses.
+
+109. `angela/cli/__init__.py`
+    Initializes the 'angela.cli' sub-package, which forms the command-line interface layer of the application. It aggregates and registers various Typer sub-command groups (like `files_app`, `workflows_app`, `generation_app`, `docker_app`) into the main `main_app`, making them accessible to the user.
+
+110. `angela/cli/docker.py`
+    Defines the user-facing CLI commands for Docker and Docker Compose interactions using Typer and Rich for formatted output. It provides commands like `ps`, `logs`, `build`, `run`, `compose-up`, and Dockerfile/compose generation, delegating the actual Docker interactions to the `angela.toolchain.docker.docker_integration` module.
+
+111. `angela/context/semantic_context_manager.py`
+    Implements the `SemanticContextManager` to act as a central hub for all semantic information within the Angela CLI. It integrates and orchestrates data from code analysis (`SemanticAnalyzer`), project state (`ProjectStateAnalyzer`), and file activity, providing a unified and rich contextual view for AI components and decision-making processes.
+
+112. `angela/context/project_state_analyzer.py`
+    Defines the `ProjectStateAnalyzer` class to provide a detailed, real-time understanding of the current project's status beyond basic type detection. It analyzes Git state (branch, changes), test status (framework, coverage), build health, pending migrations, dependency health (outdated packages), and code quality issues (linting, TODOs).
+
+113. `angela/generation/context_manager.py`
+    Implements the `GenerationContextManager` specifically designed to manage and track context *during multi-file code generation tasks*. It ensures coherence and consistency across newly generated files by registering shared entities (like API endpoints or database models), inter-file dependencies, and import statements relevant to the ongoing generation process.
+
+114. `angela/integrations/phase12_integration.py`
+    Orchestrates the most advanced, AGI-like capabilities of Angela-CLI by integrating Phase 12 components. It ties together the Universal CLI Translator, Complex Workflow Orchestration, CI/CD Pipeline Automation, and Proactive Assistance V2, enabling complex cross-tool workflows and intelligent automation.
+
+115. `angela/integrations/semantic_integration.py`
+    Provides the `SemanticIntegration` class to bridge various semantic analysis components (code analysis, project state, file activity) into the main application workflow. It enhances the core context system by making deep code understanding readily available to other modules for more informed decision-making and AI interactions.
+
+116. `angela/intent/complex_workflow_planner.py`
+    Defines the `ComplexWorkflowPlanner` which extends the `EnhancedTaskPlanner` to specifically orchestrate workflows spanning multiple, disparate CLI tools and services. It manages the planning, execution, and data flow (via `WorkflowStep`, `DataFlow` models) for these heterogeneous, end-to-end automation tasks.
+
+117. `angela/intent/semantic_task_planner.py`
+    Implements the `SemanticTaskPlanner` to elevate task planning by deeply integrating semantic code understanding from `SemanticAnalyzer` and project state from `ProjectStateAnalyzer`. This allows for improved intent decomposition for complex, ambiguous, or multi-stage user goals, including interactive clarification loops with the user.
+
+118. `angela/monitoring/proactive_assistant.py`
+    Defines the `ProactiveAssistant` class, which forms the core of Angela's proactive help system by monitoring system events, command history, and project state via the `event_bus` and `background_monitor`. It uses registered insight handlers (`_insight_handlers`) and pattern detectors (`_pattern_detectors`) to offer timely, contextual suggestions and warnings to the user.
+
+119. `angela/shell/angela.tmux`
+    Provides a Bash script designed to integrate Angela CLI functionalities within a Tmux (terminal multiplexer) session. It likely defines custom Tmux status bar elements to show Angela's status and sets up key bindings for quick invocation of Angela commands or sending pane content to Angela.
+
+120. `angela/shell/completion.py`
+    Implements the `CompletionHandler` to provide AI-powered, context-aware command-line auto-completion suggestions for Angela CLI commands. It leverages command history, project context, recent file activity, and potentially LLM interactions (`_get_ai_completions`) to offer relevant completions as the user types.
+
+121. `angela/shell/inline_feedback.py`
+    Defines the `InlineFeedback` class to enable Angela to provide messages, ask questions, or suggest commands directly within the active terminal session without disrupting the user's flow. It manages displaying these messages (e.g., with color-coding for type) and can handle user input for interactive prompts or command editing.
+
+122. `angela/toolchain/__init__.py`
+    Initializes the 'angela.toolchain' sub-package, which groups various modules responsible for integrating Angela CLI with external developer tools. This makes tool-specific integration classes like `GitIntegration`, `DockerIntegration`, and `PackageManagerIntegration` accessible.
+
+123. `angela/toolchain/cross_tool_workflow_engine.py`
+    Implements the `CrossToolWorkflowEngine` for orchestrating complex sequences of operations that span multiple, potentially unrelated, CLI tools and services. It manages the definition (`CrossToolWorkflow`, `CrossToolStep` models), execution, and data flow (`DataFlow` model) between these heterogeneous steps to achieve end-to-end automation.
+
+124. `angela/toolchain/docker.py`
+    Provides the backend `DockerIntegration` class, which encapsulates the logic for interacting with the Docker daemon and Docker Compose. It offers methods to list containers/images, start/stop/restart containers, build images, manage Docker Compose services, and generate Docker-related files (Dockerfiles, docker-compose.yml), serving as the core Docker interaction layer for other modules (like `angela/cli/docker.py`).
+
+125. `angela/toolchain/enhanced_universal_cli.py`
+    Defines the `EnhancedUniversalCLI` class, which acts as a more context-aware layer on top of the basic `UniversalCLITranslator`. It enriches translation requests with project-specific context (e.g., Git status for `git` commands, running containers for `docker` commands) to help the AI generate more accurate and relevant commands for arbitrary CLI tools.
+
+126. `angela/toolchain/unviversal_cli.py` (Assuming typo, should be `universal_cli.py`)
+    Implements the `UniversalCLITranslator`, responsible for the core task of translating natural language requests into commands for *arbitrary* CLI tools, even those not explicitly integrated. It likely achieves this by analyzing a tool's `--help` output and applying general knowledge of CLI conventions, potentially using an LLM to parse help text and map requests to command structures.
+
+127. `angela/__init__.py`
+    Serves as the main entry point for the `angela` Python package, defining the `init_application` function. This function is responsible for initializing and registering all core services and components (like execution engines, safety validators, orchestrator, context enhancers) with the central service registry, ensuring they are available throughout the application.
+
+# Project Tree
+```
+.
+├── Makefile
+├── README.md
+├── angela
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── ai
+│   │   ├── __init__.py
+│   │   ├── analyzer.py
+│   │   ├── client.py
+│   │   ├── confidence.py
+│   │   ├── content_analyzer.py
+│   │   ├── content_analyzer_extensions.py
+│   │   ├── enhanced_prompts.py
+│   │   ├── file_integration.py
+│   │   ├── intent_analyzer.py
+│   │   ├── parser.py
+│   │   ├── prompts.py
+│   │   └── semantic_analyzer.py
+│   ├── cli
+│   │   ├── __init__.py
+│   │   ├── docker.py
+│   │   ├── files.py
+│   │   ├── files_extensions.py
+│   │   ├── generation.py
+│   │   ├── main.py
+│   │   └── workflows.py
+│   ├── config.py
+│   ├── constants.py
+│   ├── context
+│   │   ├── __init__.py
+│   │   ├── context_manager.py
+│   │   ├── enhanced_file_activity.py
+│   │   ├── enhancer.py
+│   │   ├── file_activity.py
+│   │   ├── file_detector.py
+│   │   ├── file_resolver.py
+│   │   ├── history.py
+│   │   ├── manager.py
+│   │   ├── preferences.py
+│   │   ├── project_inference.py
+│   │   ├── project_state_analyzer.py
+│   │   ├── semantic_context_manager.py
+│   │   └── session.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── events.py
+│   │   └── registry.py
+│   ├── execution
+│   │   ├── __init__.py
+│   │   ├── adaptive_engine.py
+│   │   ├── engine.py
+│   │   ├── error_recovery.py
+│   │   ├── filesystem.py
+│   │   ├── hooks.py
+│   │   ├── rollback.py
+│   │   └── rollback_commands.py
+│   ├── generation
+│   │   ├── __init__.py
+│   │   ├── architecture.py
+│   │   ├── documentation.py
+│   │   ├── engine.py
+│   │   ├── frameworks.py
+│   │   ├── planner.py
+│   │   ├── refiner.py
+│   │   └── validators.py
+│   ├── integrations
+│   │   ├── __init__.py
+│   │   ├── enhanced_planner_integration.py
+│   │   ├── phase12_integration.py
+│   │   └── semantic_integration.py
+│   ├── intent
+│   │   ├── __init__.py
+│   │   ├── complex_workflow_planner.py
+│   │   ├── enhanced_task_planner.py
+│   │   ├── models.py
+│   │   ├── planner.py
+│   │   └── semantic_task_planner.py
+│   ├── interfaces
+│   │   ├── __init__.py
+│   │   ├── execution.py
+│   │   └── safety.py
+│   ├── monitoring
+│   │   ├── __init__.py
+│   │   ├── background.py
+│   │   ├── network_monitor.py
+│   │   ├── notification_handler.py
+│   │   └── proactive_assistant.py
+│   ├── orchestrator.py
+│   ├── review
+│   │   ├── __init__.py
+│   │   ├── diff_manager.py
+│   │   └── feedback.py
+│   ├── safety
+│   │   ├── __init__.py
+│   │   ├── adaptive_confirmation.py
+│   │   ├── classifier.py
+│   │   ├── confirmation.py
+│   │   ├── preview.py
+│   │   └── validator.py
+│   ├── shell
+│   │   ├── __init__.py
+│   │   ├── advanced_formatter.py
+│   │   ├── angela.bash
+│   │   ├── angela.tmux
+│   │   ├── angela.zsh
+│   │   ├── angela_enhanced.bash
+│   │   ├── angela_enhanced.zsh
+│   │   ├── completion.py
+│   │   ├── formatter.py
+│   │   └── inline_feedback.py
+│   ├── toolchain
+│   │   ├── __init__.py
+│   │   ├── ci_cd.py
+│   │   ├── cross_tool_workflow_engine.py
+│   │   ├── docker.py
+│   │   ├── enhanced_universal_cli.py
+│   │   ├── git.py
+│   │   ├── package_managers.py
+│   │   └── unviversal_cli.py
+│   ├── utils
+│   │   ├── __init__.py
+│   │   ├── enhanced_logging.py
+│   │   └── logging.py
+│   └── workflows
+│       ├── __init__.py
+│       ├── manager.py
+│       └── sharing.py
+├── pyproject.toml
+├── pytest.ini
+├── requirements.txt
+├── scripts
+│   ├── install.sh
+│   └── uninstall.sh
+├── setup.py
+```
