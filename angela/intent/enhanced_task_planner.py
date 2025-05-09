@@ -37,7 +37,7 @@ from angela.core.registry import registry
 # Reuse existing models from angela/intent/planner.py
 from angela.intent.planner import (
     PlanStep, TaskPlan, PlanStepType, AdvancedPlanStep, AdvancedTaskPlan,
-    task_planner
+    TaskPlanner, task_planner
 )
 
 logger = get_logger(__name__)
