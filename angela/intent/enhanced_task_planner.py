@@ -1,4 +1,5 @@
 # angela/intent/enhanced_task_planner.py
+
 """
 Enhanced execution system for complex task orchestration in Angela CLI.
 
@@ -94,16 +95,12 @@ class StepStatus(str, Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
 
-class EnhancedTaskPlanner:
+class CoreEnhancedTaskPlanner:
     """
-    Enhanced task planner with robust execution capabilities for complex steps.
+    Core implementation of enhanced task planning capabilities.
     
-    This class extends the original TaskPlanner with:
-    1. Full support for CODE, API, LOOP execution
-    2. Formal data flow mechanism between steps
-    3. Enhanced error handling with ErrorRecoveryManager integration
-    4. Comprehensive logging and debugging
-    5. Security measures for code execution
+    This class provides the actual implementation of advanced execution features
+    without causing recursion issues.
     """
     
     def __init__(self):
@@ -1282,7 +1279,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
             
             # Write variables to file (serializing complex objects to JSON)
             with open(variables_file, 'w') as f:
-                json.dump(context_vars, f)
+                json.dump(context_vars, f, default=str)
             
             # Add wrapper code to load variables and capture output
             wrapper_code = f'''
@@ -1448,7 +1445,7 @@ with open("{temp_dir / 'output.json'}", "w") as output_file:
             
             # Write variables to file (serializing complex objects to JSON)
             with open(variables_file, 'w') as f:
-                json.dump(context_vars, f)
+                json.dump(context_vars, f, default=str)
             
             # Add wrapper code to load variables and capture output
             wrapper_code = f'''
@@ -1532,28 +1529,26 @@ try {{
 console.log = originalLog;
 console.error = originalError;
 
-// Write outputs to file
-fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, (key, value) => {{
-    // Handle circular references
+// Define a replacer function to handle circular references
+const seen = new WeakSet();
+function replacer(key, value) {{
     if (typeof value === 'object' && value !== null) {{
         if (seen.has(value)) {{
             return '[Circular]';
         }}
         seen.add(value);
-    }}
-    return value;
-}}, 2));
-
-function replacer(key, value) {{
-    if (typeof value === 'object' && value !== null) {{
-        return Object.fromEntries(
-            Object.entries(value)
-                .filter(([k, v]) => typeof v !== 'function')
-        );
+        
+        // Filter out function properties
+        if (Object.prototype.toString.call(value) === '[object Object]') {{
+            return Object.fromEntries(
+                Object.entries(value).filter(([k, v]) => typeof v !== 'function')
+            );
+        }}
     }}
     return value;
 }}
 
+// Write outputs to file
 fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer, 2));
 '''
             
@@ -2081,7 +2076,95 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                     compare_value = False
                 elif value.isdigit():
                     compare_value = int(value)
-                elif re.match(r'^-?\d+(\.\d+)?$', value):
+                elif re.match(r'^-?\d+(\.\d+)?
+
+
+# Now define the EnhancedTaskPlanner class that uses the core implementation
+class EnhancedTaskPlanner(TaskPlanner):
+    """
+    Enhanced TaskPlanner with support for advanced execution capabilities.
+    
+    This class extends the original TaskPlanner with advanced execution capabilities
+    while avoiding the infinite recursion problem.
+    """
+    
+    def __init__(self):
+        """Initialize the enhanced task planner."""
+        super().__init__()
+        # Create a CoreEnhancedTaskPlanner instance instead of recursively creating
+        # another EnhancedTaskPlanner
+        self._core_planner = CoreEnhancedTaskPlanner()
+        self._logger = logger
+    
+    async def execute_plan(
+        self, 
+        plan: Union[TaskPlan, AdvancedTaskPlan], 
+        dry_run: bool = False,
+        transaction_id: Optional[str] = None,
+        initial_variables: Optional[Dict[str, Any]] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Execute a task plan with full support for all step types.
+        
+        Args:
+            plan: The plan to execute
+            dry_run: Whether to simulate execution without making changes
+            transaction_id: ID of the transaction this execution belongs to
+            initial_variables: Initial variables for data flow
+            
+        Returns:
+            List of execution results for each step or execution result dict
+        """
+        if isinstance(plan, AdvancedTaskPlan):
+            # Use the core planner for advanced plans
+            return await self._core_planner.execute_advanced_plan(
+                plan, dry_run, transaction_id, initial_variables
+            )
+        else:
+            # Use the original execution for basic plans
+            return await super()._execute_basic_plan(plan, dry_run, transaction_id)
+    
+    async def plan_task(
+        self, 
+        request: str, 
+        context: Dict[str, Any],
+        complexity: str = "auto"
+    ) -> Union[TaskPlan, AdvancedTaskPlan]:
+        """
+        Plan a task by breaking it down into actionable steps.
+        
+        Enhanced version that can generate advanced task plans directly
+        from natural language requests.
+        
+        Args:
+            request: The high-level goal description
+            context: Context information
+            complexity: Planning complexity level ("simple", "advanced", or "auto")
+            
+        Returns:
+            Either a basic TaskPlan or an advanced AdvancedTaskPlan based on complexity
+        """
+        self._logger.info(f"Planning task: {request} (complexity: {complexity})")
+        
+        # Determine planning complexity if auto
+        if complexity == "auto":
+            complexity = await self._determine_complexity(request)
+            self._logger.info(f"Determined complexity: {complexity}")
+        
+        # Use the appropriate planning strategy
+        if complexity == "advanced":
+            # Use core planner for advanced planning
+            return await self._core_planner.plan_advanced_task(request, context)
+        else:
+            # Use basic planning for simple tasks
+            return await super()._create_basic_plan(request, context)
+
+# Create an instance of the enhanced task planner
+enhanced_task_planner = EnhancedTaskPlanner()
+
+# Replace the global task_planner with the enhanced version
+task_planner = enhanced_task_planner
+, value):
                     compare_value = float(value)
                 else:
                     # Try to resolve variables in the value
@@ -2184,7 +2267,7 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
         
         try:
             # Get timeout if specified
-            timeout = 30
+            timeout = getattr(step, "timeout", 30)
             
             # Get headers if specified
             headers = getattr(step, "api_headers", {})
@@ -2193,7 +2276,7 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
             params = getattr(step, "api_params", {})
             
             # Get payload if specified
-            payload = step.api_payload if hasattr(step, "api_payload") else None
+            payload = getattr(step, "api_payload", None)
             
             # Create a client session
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=timeout)) as session:
@@ -2291,7 +2374,7 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
         Returns:
             Dictionary with execution results
         """
-        if not step.loop_items or not step.loop_body:
+        if not hasattr(step, "loop_items") or not hasattr(step, "loop_body"):
             return {
                 "success": False,
                 "error": "Missing loop_items or loop_body for loop step"
@@ -2353,39 +2436,52 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                         "loop_first": i == 0,
                         "loop_last": i == len(loop_items) - 1
                     },
-                    parent_context=context,
+                    parent_context=context.dict(),
                     execution_path=context.execution_path + [f"{step.id}[{i}]"]
                 )
                 
                 # Execute each step in the loop body
                 iteration_results = {}
                 
-                for step_id in step.loop_body:
-                    # For simplicity in this implementation, assume step_id refers to a step in the plan
+                for body_step_id in step.loop_body:
+                    # For simplicity in this implementation, assume body_step_id refers to a step in the plan
                     # A more complete implementation would handle nested execution
+                    body_step = None
                     
-                    # Record iteration result
-                    loop_results.append({
-                        "index": i,
-                        "item": item,
-                        "success": True,  # Simplified for this implementation
-                        "results": {}  # Simplified for this implementation
-                    })
+                    # Check if the step is available in the parent plan
+                    from angela.intent.planner import task_planner
+                    if hasattr(task_planner, "_current_plan") and task_planner._current_plan:
+                        if hasattr(task_planner._current_plan, "steps"):
+                            if isinstance(task_planner._current_plan.steps, dict) and body_step_id in task_planner._current_plan.steps:
+                                body_step = task_planner._current_plan.steps[body_step_id]
                     
-                    # Extract variables from this iteration to pass back to parent context
-                    for var_name, var_value in iteration_context.variables.items():
-                        if var_name not in context.variables and not var_name.startswith("loop_"):
-                            # Set the variable in the parent context
-                            self._set_variable(var_name, var_value, iteration_id)
+                    if body_step:
+                        # Execute the step
+                        iter_result = await self._execute_advanced_step(body_step, iteration_context)
+                        iteration_results[body_step_id] = iter_result
+                
+                # Record iteration result
+                loop_results.append({
+                    "index": i,
+                    "item": item,
+                    "success": all(r.get("success", False) for r in iteration_results.values()),
+                    "results": iteration_results
+                })
+                
+                # Extract variables from this iteration to pass back to parent context
+                for var_name, var_value in iteration_context.variables.items():
+                    if var_name not in context.variables and not var_name.startswith("loop_"):
+                        # Set the variable in the parent context
+                        self._set_variable(var_name, var_value, iteration_id)
                 
             # Prepare the result
             result = {
-                "success": True,  # Simplified; in a complete implementation, we'd check all iterations
+                "success": all(r.get("success", False) for r in loop_results),
                 "loop_results": loop_results,
                 "iterations": len(loop_results),
                 "outputs": {
                     **iteration_outputs,
-                    f"{step.id}_success": True,
+                    f"{step.id}_success": all(r.get("success", False) for r in loop_results),
                     f"{step.id}_iterations": len(loop_results)
                 }
             }
@@ -2416,7 +2512,95 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
             List of items to loop over
         """
         # Check if loop_items is a variable reference
-        var_match = re.match(r'\${([^}]+)}$', loop_items_expr)
+        var_match = re.match(r'\${([^}]+)}
+
+
+# Now define the EnhancedTaskPlanner class that uses the core implementation
+class EnhancedTaskPlanner(TaskPlanner):
+    """
+    Enhanced TaskPlanner with support for advanced execution capabilities.
+    
+    This class extends the original TaskPlanner with advanced execution capabilities
+    while avoiding the infinite recursion problem.
+    """
+    
+    def __init__(self):
+        """Initialize the enhanced task planner."""
+        super().__init__()
+        # Create a CoreEnhancedTaskPlanner instance instead of recursively creating
+        # another EnhancedTaskPlanner
+        self._core_planner = CoreEnhancedTaskPlanner()
+        self._logger = logger
+    
+    async def execute_plan(
+        self, 
+        plan: Union[TaskPlan, AdvancedTaskPlan], 
+        dry_run: bool = False,
+        transaction_id: Optional[str] = None,
+        initial_variables: Optional[Dict[str, Any]] = None
+    ) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Execute a task plan with full support for all step types.
+        
+        Args:
+            plan: The plan to execute
+            dry_run: Whether to simulate execution without making changes
+            transaction_id: ID of the transaction this execution belongs to
+            initial_variables: Initial variables for data flow
+            
+        Returns:
+            List of execution results for each step or execution result dict
+        """
+        if isinstance(plan, AdvancedTaskPlan):
+            # Use the core planner for advanced plans
+            return await self._core_planner.execute_advanced_plan(
+                plan, dry_run, transaction_id, initial_variables
+            )
+        else:
+            # Use the original execution for basic plans
+            return await super()._execute_basic_plan(plan, dry_run, transaction_id)
+    
+    async def plan_task(
+        self, 
+        request: str, 
+        context: Dict[str, Any],
+        complexity: str = "auto"
+    ) -> Union[TaskPlan, AdvancedTaskPlan]:
+        """
+        Plan a task by breaking it down into actionable steps.
+        
+        Enhanced version that can generate advanced task plans directly
+        from natural language requests.
+        
+        Args:
+            request: The high-level goal description
+            context: Context information
+            complexity: Planning complexity level ("simple", "advanced", or "auto")
+            
+        Returns:
+            Either a basic TaskPlan or an advanced AdvancedTaskPlan based on complexity
+        """
+        self._logger.info(f"Planning task: {request} (complexity: {complexity})")
+        
+        # Determine planning complexity if auto
+        if complexity == "auto":
+            complexity = await self._determine_complexity(request)
+            self._logger.info(f"Determined complexity: {complexity}")
+        
+        # Use the appropriate planning strategy
+        if complexity == "advanced":
+            # Use core planner for advanced planning
+            return await self._core_planner.plan_advanced_task(request, context)
+        else:
+            # Use basic planning for simple tasks
+            return await super()._create_basic_plan(request, context)
+
+# Create an instance of the enhanced task planner
+enhanced_task_planner = EnhancedTaskPlanner()
+
+# Replace the global task_planner with the enhanced version
+task_planner = enhanced_task_planner
+, loop_items_expr)
         if var_match:
             var_name = var_match.group(1)
             var_value = self._get_variable_value(var_name, context)
@@ -2533,7 +2717,9 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                 # Add outputs from recovery
                 if "outputs" not in result:
                     result["outputs"] = {}
-                result["outputs"].update(recovery_result["outputs"])
+                
+                if "outputs" in recovery_result:
+                    result["outputs"].update(recovery_result["outputs"])
                 
                 return result
             else:
@@ -2554,19 +2740,23 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                 "recovery_error": str(e)
             }
 
-# Extend the existing TaskPlanner with the enhanced functionality
+
+# Now define the EnhancedTaskPlanner class that uses the core implementation
 class EnhancedTaskPlanner(TaskPlanner):
     """
     Enhanced TaskPlanner with support for advanced execution capabilities.
     
-    This class extends the original TaskPlanner with the capabilities
-    from the EnhancedTaskPlanner.
+    This class extends the original TaskPlanner with advanced execution capabilities
+    while avoiding the infinite recursion problem.
     """
     
     def __init__(self):
         """Initialize the enhanced task planner."""
         super().__init__()
-        self._enhanced_planner = EnhancedTaskPlanner()
+        # Create a CoreEnhancedTaskPlanner instance instead of recursively creating
+        # another EnhancedTaskPlanner
+        self._core_planner = CoreEnhancedTaskPlanner()
+        self._logger = logger
     
     async def execute_plan(
         self, 
@@ -2588,8 +2778,8 @@ class EnhancedTaskPlanner(TaskPlanner):
             List of execution results for each step or execution result dict
         """
         if isinstance(plan, AdvancedTaskPlan):
-            # Use the enhanced execution for advanced plans
-            return await self._enhanced_planner.execute_advanced_plan(
+            # Use the core planner for advanced plans
+            return await self._core_planner.execute_advanced_plan(
                 plan, dry_run, transaction_id, initial_variables
             )
         else:
@@ -2625,8 +2815,8 @@ class EnhancedTaskPlanner(TaskPlanner):
         
         # Use the appropriate planning strategy
         if complexity == "advanced":
-            # Use enhanced advanced planning
-            return await self._enhanced_planner.plan_advanced_task(request, context)
+            # Use core planner for advanced planning
+            return await self._core_planner.plan_advanced_task(request, context)
         else:
             # Use basic planning for simple tasks
             return await super()._create_basic_plan(request, context)
