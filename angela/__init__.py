@@ -6,8 +6,41 @@ The main package initialization
 
 __version__ = '0.1.0'
 
+def check_dependencies():
+    """Check if all required dependencies are installed and warn if any are missing."""
+    missing_deps = []
+    
+    # List of critical packages to check (package_name, import_name)
+    dependencies = [
+        ("pydantic", "pydantic"),
+        ("python-dotenv", "dotenv"),
+        ("prompt_toolkit", "prompt_toolkit"),
+        ("typer", "typer"),
+        ("rich", "rich"),
+        ("tomli", "tomli"),
+        ("loguru", "loguru"),
+        ("google-generativeai", "google.generativeai"),
+        ("aiohttp", "aiohttp"),
+        ("PyYAML", "yaml"),
+    ]
+    
+    for pkg_name, import_name in dependencies:
+        try:
+            __import__(import_name)
+        except ImportError:
+            missing_deps.append(pkg_name)
+    
+    if missing_deps:
+        import sys
+        print(f"\033[31mWarning: Missing dependencies: {', '.join(missing_deps)}\033[0m", file=sys.stderr)
+        print(f"\033[31mTo install missing dependencies: pip install {' '.join(missing_deps)}\033[0m", file=sys.stderr)
+        print(f"\033[31mOr reinstall Angela with all dependencies: pip install -e .\033[0m", file=sys.stderr)
+
 def init_application():
     """Initialize all application components."""
+    # Check dependencies first
+    check_dependencies()
+    
     # Import components here to avoid early imports during module loading
     from angela.execution.engine import execution_engine
     from angela.execution.adaptive_engine import adaptive_engine
@@ -20,7 +53,6 @@ def init_application():
     from angela.integrations.semantic_integration import semantic_integration
     from angela.core.registry import registry
     from angela.context.enhancer import context_enhancer
-    
     # Register core services
     registry.register("execution_engine", execution_engine)
     registry.register("adaptive_engine", adaptive_engine)
