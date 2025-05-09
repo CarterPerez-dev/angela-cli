@@ -7,7 +7,7 @@ dependency detection, and file activity tracking to provide a richer context
 for AI interactions.
 """
 import asyncio
-from typing import Dict, Any, Optional, List, Set
+from typing import Dict, Any, Optional, List, Set, Callable, Awaitable
 from pathlib import Path
 
 from angela.context import context_manager
@@ -29,6 +29,7 @@ class ContextEnhancer:
         self._logger = logger
         self._project_info_cache = {}  # Cache project info by path
         self._file_activity_cache = {}  # Cache recent file activity
+        self._enhancers: List[Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]] = []
     
     async def enrich_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -247,6 +248,87 @@ class ContextEnhancer:
         self._logger.debug("Clearing context enhancer cache")
         self._project_info_cache.clear()
         self._file_activity_cache.clear()
+
+
+
+    def register_enhancer(self, enhancer_func: Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]) -> None:
+        """
+        Register a context enhancer function.
+        
+        Args:
+            enhancer_func: Async function that takes a context dict and returns an enhanced context dict
+        """
+        self._logger.debug(f"Registering context enhancer: {enhancer_func.__name__ if hasattr(enhancer_func, '__name__') else 'anonymous'}")
+        self._enhancers.append(enhancer_func)
+
+
+
+    async def enhance_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Enhance the context with additional information.
+        
+        Args:
+            context: The base context dictionary
+            
+        Returns:
+            Enhanced context with additional information
+        """
+        enhanced_context = dict(context)  # Create a copy of the original context
+        
+        try:
+            # Add project information if available
+            project_root = context.get("project_root")
+            if project_root:
+                from angela.context.project_inference import project_inference
+                
+                # Get project info (cached or fresh inference)
+                project_info = await project_inference.get_project_info(project_root)
+                if project_info:
+                    enhanced_context["enhanced_project"] = project_info
+            
+            # Add recent file activity
+            from angela.context.file_activity import file_activity_tracker
+            
+            recent_files = {
+                "accessed": file_activity_tracker.get_recently_accessed_files(),
+                "modified": file_activity_tracker.get_recently_modified_files(),
+                "created": file_activity_tracker.get_recently_created_files(),
+            }
+            enhanced_context["recent_files"] = recent_files
+            
+            # Get most active files
+            most_active = file_activity_tracker.get_most_active_files()
+            enhanced_context["active_files"] = most_active
+            
+            # Add file resolver information if available
+            if "requested_file" in context:
+                from angela.context.file_resolver import file_resolver
+                
+                resolved_files = await file_resolver.resolve_file_references(
+                    context.get("cwd", ""),
+                    context.get("project_root", ""),
+                    [context["requested_file"]]
+                )
+                
+                if resolved_files:
+                    enhanced_context["resolved_files"] = resolved_files
+            
+            # Run all registered enhancers
+            for enhancer in self._enhancers:
+                try:
+                    result = await enhancer(enhanced_context)
+                    if result:
+                        enhanced_context.update(result)
+                except Exception as e:
+                    self._logger.error(f"Error in enhancer {enhancer.__name__ if hasattr(enhancer, '__name__') else 'anonymous'}: {str(e)}")
+            
+            return enhanced_context
+            
+        except Exception as e:
+            self._logger.error(f"Error enhancing context: {str(e)}")
+            # Return the original context if enhancement fails
+            return enhanced_context
+
 
 # Global context enhancer instance
 context_enhancer = ContextEnhancer()
