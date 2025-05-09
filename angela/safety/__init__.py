@@ -55,14 +55,79 @@ async def check_command_safety(command: str, dry_run: bool = False) -> bool:
     
     return True
 
+
+# Add this after the check_command_safety function
+async def check_operation_safety(operation_type: str, params: dict, dry_run: bool = False) -> bool:
+    """
+    Check if an operation is safe to execute and obtain user confirmation if needed.
+    
+    Args:
+        operation_type: The type of operation (e.g., 'create_file', 'delete_directory').
+        params: Parameters for the operation.
+        dry_run: Whether this is a dry run (show preview without executing).
+        
+    Returns:
+        True if the operation is safe and confirmed, False otherwise.
+    """
+    # Step 1: Validate basic safety constraints
+    is_valid, error_message = validate_operation(operation_type, params)
+    if not is_valid:
+        logger.warning(f"Operation validation failed: {error_message}")
+        return False
+    
+    # Step 2: For command operations, use the command safety check
+    if operation_type == 'execute_command':
+        return await check_command_safety(params.get('command', ''), dry_run)
+    
+    # Step 3: For file operations, analyze the risk level
+    # Default to MEDIUM risk for most operations
+    from angela.constants import RISK_LEVELS
+    risk_level = RISK_LEVELS["MEDIUM"]
+    risk_reason = f"File operation: {operation_type}"
+    
+    # Adjust risk level based on operation type
+    if operation_type in ['delete_file', 'delete_directory']:
+        risk_level = RISK_LEVELS["HIGH"]
+        risk_reason = f"Destructive file operation: {operation_type}"
+    elif operation_type in ['create_file', 'create_directory']:
+        risk_level = RISK_LEVELS["LOW"]
+        risk_reason = f"File creation: {operation_type}"
+    
+    # Step 4: Create an impact analysis
+    impact = {
+        "operations": [operation_type],
+        "affected_files": [params.get('path')] if 'path' in params else [],
+        "affected_dirs": [params.get('path')] if operation_type.endswith('directory') and 'path' in params else [],
+        "destructive": operation_type.startswith('delete'),
+        "creates_files": operation_type.startswith('create'),
+        "modifies_files": operation_type in ['write_file', 'move_file', 'copy_file']
+    }
+    
+    # Step 5: Get user confirmation based on risk level
+    confirmed = await get_confirmation(
+        command=f"{operation_type}: {params}",
+        risk_level=risk_level,
+        risk_reason=risk_reason,
+        impact=impact,
+        preview=None,  # No preview for file operations
+        dry_run=dry_run
+    )
+    
+    if not confirmed:
+        logger.info(f"Operation cancelled by user: {operation_type} {params}")
+        return False
+    
+    return True
+    
 # Import these here to avoid circular imports since they're used within the function
 from angela.utils.logging import get_logger
 logger = get_logger(__name__)
 
-# Make these available to modules that import from this package
 __all__ = [
     'check_command_safety',
+    'check_operation_safety', 
     'validate_command_safety',
+    'validate_operation',     
     'classify_command_risk',
     'analyze_command_impact',
     'generate_preview',
@@ -77,3 +142,4 @@ __all__ = [
 from angela.core.registry import registry
 registry.register("check_command_safety", check_command_safety)
 registry.register("validate_command_safety", validate_command_safety)
+registry.register("check_operation_safety", check_operation_safety)
