@@ -64,7 +64,10 @@ class RequestType(Enum):
     CODE_REFINEMENT = "code_refinement" # Refine/improve existing code
     CODE_ARCHITECTURE = "code_architecture" # Analyze or enhance architecture
     UNKNOWN = "unknown"                # Unknown request type
+    UNIVERSAL_CLI = "universal_cli"  # Request to use the Universal CLI Translator
+    COMPLEX_WORKFLOW = "complex_workflow"  # Complex workflow involving multiple tools
     
+        
 class Orchestrator:
     """Main orchestration service for Angela CLI."""
     
@@ -295,7 +298,25 @@ class Orchestrator:
                 r'\bredesign\s+(?:the\s+)?(?:architecture|structure)\b',
                 r'\bproject\s+structure\b',
             ]
-        
+
+           universal_cli_patterns = [
+               r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
+               r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
+               r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
+           ]
+           
+           # Add patterns for complex workflows
+           complex_workflow_patterns = [
+               r'\bcomplex\s+workflow\b',
+               r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
+               r'\bautomated\s+(?:build|test|deploy)\b',
+               r'\bend-to-end\s+workflow\b',
+               r'\bchain\s+of\s+commands\b',
+               r'\bmulti-step\s+operation\s+across\b',
+               r'\bpipeline\s+using\b',
+               r'\bseries\s+of\s+tools\b',
+           ]
+       
         # Check for code generation first (highest priority)
         for pattern in code_generation_patterns:
             if re.search(pattern, request, re.IGNORECASE):
@@ -362,7 +383,44 @@ class Orchestrator:
             if re.search(pattern, request, re.IGNORECASE):
                 return RequestType.CODE_ARCHITECTURE
 
+        for pattern in complex_workflow_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.COMPLEX_WORKFLOW
         
+        # Check for Universal CLI patterns
+        for pattern in universal_cli_patterns:
+            match = re.search(pattern, request, re.IGNORECASE)
+            if match:
+                tool = match.group(1).strip().lower()
+                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Check for common CLI tools explicitly mentioned
+        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
+        tool_words = request.lower().split()
+        for tool in common_tools:
+            if tool in tool_words:
+                # Make sure it's a standalone word, not part of another word
+                # Check the positions where the tool appears
+                positions = [i for i, word in enumerate(tool_words) if word == tool]
+                for pos in positions:
+                    # Check if it's a command (usually preceded by use, run, with, etc.)
+                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
+                        return RequestType.UNIVERSAL_CLI
+                
+                # If tool is the first word in the request, it's likely a direct usage
+                if tool_words[0] == tool:
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Also check for complexity indicators combined with multiple tool mentions
+        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
+                            if tool in request.lower())
+        has_complex_indicators = any(indicator in request.lower() for indicator in 
+                                    ["pipeline", "sequence", "then", "after", "followed"])
+    
+        if tool_mentions >= 2 and has_complex_indicators:
+            return RequestType.COMPLEX_WORKFLOW
+                    
         # Check for file content analysis/manipulation
         file_mentions = re.search(r'\b(?:file|code|script|document)\b', request, re.IGNORECASE)
         if file_mentions:
@@ -2830,6 +2888,300 @@ Include only the JSON object with no additional text.
         """
         # Execute the file operation
         return await execute_file_operation(operation, parameters, dry_run=dry_run)
+
+
+    async def _determine_request_type(
+        self, 
+        request: str, 
+        context: Dict[str, Any]
+    ) -> RequestType:
+        """
+        Determine the type of request.
+        
+        Args:
+            request: The user request
+            context: Context information
+            
+        Returns:
+            RequestType enum value
+        """
+        # ... (existing code)
+        
+        # Add new patterns for Universal CLI requests
+        universal_cli_patterns = [
+            r'\buse\s+(?:the\s+)?(.+?)\s+(?:cli|command|tool)\b',
+            r'\brun\s+(?:a\s+)?(.+?)\s+command\b',
+            r'\b(?:execute|with)\s+(?:the\s+)?(.+?)\s+tool\b',
+        ]
+        
+        # Add patterns for complex workflows
+        complex_workflow_patterns = [
+            r'\bcomplex\s+workflow\b',
+            r'\bcomplete\s+(?:ci/cd|cicd|pipeline)\b',
+            r'\bautomated\s+(?:build|test|deploy)\b',
+            r'\bend-to-end\s+workflow\b',
+            r'\bchain\s+of\s+commands\b',
+            r'\bmulti-step\s+operation\s+across\b',
+            r'\bpipeline\s+using\b',
+            r'\bseries\s+of\s+tools\b',
+        ]
+        
+        # Check for complex workflow patterns
+        for pattern in complex_workflow_patterns:
+            if re.search(pattern, request, re.IGNORECASE):
+                return RequestType.COMPLEX_WORKFLOW
+        
+        # Check for Universal CLI patterns
+        for pattern in universal_cli_patterns:
+            match = re.search(pattern, request, re.IGNORECASE)
+            if match:
+                tool = match.group(1).strip().lower()
+                if tool not in ["angela", "workflow"]:  # Exclude Angela's own commands
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Check for common CLI tools explicitly mentioned
+        common_tools = ["git", "docker", "aws", "kubectl", "terraform", "npm", "pip", "yarn"]
+        tool_words = request.lower().split()
+        for tool in common_tools:
+            if tool in tool_words:
+                # Make sure it's a standalone word, not part of another word
+                # Check the positions where the tool appears
+                positions = [i for i, word in enumerate(tool_words) if word == tool]
+                for pos in positions:
+                    # Check if it's a command (usually preceded by use, run, with, etc.)
+                    if pos > 0 and tool_words[pos-1] in ["use", "run", "with", "using", "execute"]:
+                        return RequestType.UNIVERSAL_CLI
+                
+                # If tool is the first word in the request, it's likely a direct usage
+                if tool_words[0] == tool:
+                    return RequestType.UNIVERSAL_CLI
+        
+        # Also check for complexity indicators combined with multiple tool mentions
+        tool_mentions = sum(1 for tool in ["git", "docker", "aws", "kubernetes", "npm", "pip"] 
+                            if tool in request.lower())
+        has_complex_indicators = any(indicator in request.lower() for indicator in 
+                                    ["pipeline", "sequence", "then", "after", "followed"])
+    
+        if tool_mentions >= 2 and has_complex_indicators:
+            return RequestType.COMPLEX_WORKFLOW
+        
+
+    
+
+    async def _process_universal_cli_request(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a request using the Universal CLI Translator.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the command
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing universal CLI request: {request}")
+        
+        # Import here to avoid circular imports
+        from angela.toolchain.universal_cli import universal_cli_translator
+        
+        # Translate the request into a command
+        translation = await universal_cli_translator.translate_request(request, context)
+        
+        if not translation.get("success"):
+            return {
+                "request": request,
+                "type": "universal_cli",
+                "context": context,
+                "error": translation.get("error", "Failed to translate request"),
+                "response": f"I couldn't translate your request into a command: {translation.get('error', 'Unknown error')}"
+            }
+        
+        # Create result structure
+        result = {
+            "request": request,
+            "type": "universal_cli",
+            "context": context,
+            "command": translation["command"],
+            "tool": translation["tool"],
+            "subcommand": translation.get("subcommand", ""),
+            "explanation": translation.get("explanation", "")
+        }
+        
+        # Execute the command if requested
+        if execute or dry_run:
+            execution_result = await self.execute_command(
+                command=translation["command"],
+                natural_request=request,
+                explanation=translation.get("explanation", ""),
+                dry_run=dry_run
+            )
+            
+            result["execution"] = execution_result
+        
+        return result
+    
+    async def _process_complex_workflow(
+        self, 
+        request: str, 
+        context: Dict[str, Any], 
+        execute: bool, 
+        dry_run: bool
+    ) -> Dict[str, Any]:
+        """
+        Process a complex workflow request involving multiple tools.
+        
+        Args:
+            request: The user request
+            context: Context information
+            execute: Whether to execute the workflow
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with processing results
+        """
+        self._logger.info(f"Processing complex workflow: {request}")
+        
+        # Use the enhanced task planner for complex workflows
+        from angela.intent.enhanced_task_planner import enhanced_task_planner
+        from angela.shell.formatter import terminal_formatter
+        from angela.execution.rollback import rollback_manager
+        
+        # Generate a complex plan
+        plan = await enhanced_task_planner.plan_advanced_task(request, context, max_steps=30)
+        
+        # Create result structure
+        result = {
+            "request": request,
+            "type": "complex_workflow",
+            "context": context,
+            "plan": {
+                "id": plan.id,
+                "goal": plan.goal,
+                "description": plan.description,
+                "steps": [
+                    {
+                        "id": step_id,
+                        "type": step.type,
+                        "description": step.description,
+                        "command": step.command,
+                        "dependencies": step.dependencies,
+                        "risk": step.estimated_risk
+                    }
+                    for step_id, step in plan.steps.items()
+                ],
+                "entry_points": plan.entry_points,
+                "step_count": len(plan.steps)
+            }
+        }
+        
+        # Execute the plan if requested
+        if execute or dry_run:
+            # Display the plan with rich formatting
+            await terminal_formatter.display_advanced_plan(plan)
+            
+            # Get confirmation for plan execution
+            confirmed = await self._confirm_advanced_plan(plan, dry_run)
+            
+            if confirmed or dry_run:
+                # Execute the plan with transaction support
+                transaction_id = None
+                if not dry_run:
+                    transaction_id = await rollback_manager.start_transaction(f"Complex workflow: {request[:50]}...")
+                
+                # Set up variables for cross-step communication if needed
+                initial_variables = {
+                    "request": request,
+                    "workflow_type": "complex",
+                    "started_at": datetime.now().isoformat(),
+                }
+                
+                # Add context variables that might be useful
+                if context.get("project_root"):
+                    initial_variables["project_root"] = str(context["project_root"])
+                if context.get("project_type"):
+                    initial_variables["project_type"] = context["project_type"]
+                
+                execution_results = await enhanced_task_planner.execute_advanced_plan(
+                    plan, 
+                    dry_run=dry_run,
+                    transaction_id=transaction_id,
+                    initial_variables=initial_variables
+                )
+                
+                result["execution_results"] = execution_results
+                result["success"] = execution_results.get("success", False)
+                
+                # Update transaction status
+                if transaction_id:
+                    status = "completed" if result["success"] else "failed"
+                    await rollback_manager.end_transaction(transaction_id, status)
+            else:
+                result["cancelled"] = True
+                result["success"] = False
+        
+        return result
+    
+    async def _confirm_advanced_plan(self, plan, dry_run: bool) -> bool:
+        """
+        Get confirmation to execute an advanced plan.
+        
+        Args:
+            plan: The advanced task plan
+            dry_run: Whether this is a dry run
+            
+        Returns:
+            True if confirmed, False otherwise
+        """
+        if dry_run:
+            # No confirmation needed for dry run
+            return True
+        
+        # Check if any steps are high risk
+        has_high_risk = any(step.estimated_risk >= 3 for step in plan.steps.values())
+        
+        # Import here to avoid circular imports
+        from rich.console import Console
+        from rich.panel import Panel
+        from prompt_toolkit.shortcuts import yes_no_dialog
+        
+        console = Console()
+        
+        if has_high_risk:
+            # Use a more prominent warning for high-risk plans
+            console.print(Panel(
+                "⚠️  [bold red]This plan includes HIGH RISK operations[/bold red] ⚠️\n"
+                "Some of these steps could make significant changes to your system.",
+                border_style="red",
+                expand=False
+            ))
+        
+        # Show complexity warning for advanced plans
+        console.print(Panel(
+            "[bold yellow]This is an advanced workflow with complex execution flow.[/bold yellow]\n"
+            "It includes multiple tools and dependencies between steps.",
+            border_style="yellow",
+            expand=False
+        ))
+        
+        # Get confirmation
+        confirmed = yes_no_dialog(
+            title="Confirm Advanced Workflow Execution",
+            text=f"Do you want to execute this {len(plan.steps)}-step workflow?",
+        ).run()
+        
+        return confirmed
+
+
+
+
 
 
     async def execute_command(

@@ -179,6 +179,7 @@ Located at `angela/generation/frameworks.py`, this file provides specialized gen
 │   │   └── semantic_integration.py
 │   ├── intent
 │   │   ├── __init__.py
+│   │   ├── complex_workflow_planner.py
 │   │   ├── enhanced_task_planner.py
 │   │   ├── models.py
 │   │   ├── planner.py
@@ -191,7 +192,8 @@ Located at `angela/generation/frameworks.py`, this file provides specialized gen
 │   │   ├── __init__.py
 │   │   ├── background.py
 │   │   ├── network_monitor.py
-│   │   └── notification_handler.py
+│   │   ├── notification_handler.py
+│   │   └── proactive_assistant.py
 │   ├── orchestrator.py
 │   ├── review
 │   │   ├── __init__.py
@@ -220,7 +222,8 @@ Located at `angela/generation/frameworks.py`, this file provides specialized gen
 │   │   ├── ci_cd.py
 │   │   ├── docker.py
 │   │   ├── git.py
-│   │   └── package_managers.py
+│   │   ├── package_managers.py
+│   │   └── unviversal_cli.py
 │   ├── utils
 │   │   ├── __init__.py
 │   │   ├── enhanced_logging.py
@@ -237,4 +240,7 @@ Located at `angela/generation/frameworks.py`, this file provides specialized gen
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+
+24 directories, 151 files
+
 ```
