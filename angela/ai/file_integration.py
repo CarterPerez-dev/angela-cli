@@ -1,3 +1,4 @@
+# angela/ai/file_integration.py
 """
 Integration module for AI-powered file operations.
 

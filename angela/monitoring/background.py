@@ -1,3 +1,4 @@
+# angela/monitoring/background.py
 """
 Background monitoring and proactive suggestions for Angela CLI.
 

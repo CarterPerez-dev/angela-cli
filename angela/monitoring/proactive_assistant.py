@@ -1,3 +1,4 @@
+# angela/monitoring/proactive_assistant.py
 """
 Proactive Assistance V2 for Angela CLI.
 

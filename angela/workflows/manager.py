@@ -1,3 +1,4 @@
+# angela/workflows/manager.py
 """
 Workflow management for Angela CLI.
 

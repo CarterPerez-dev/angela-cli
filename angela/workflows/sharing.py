@@ -1,6 +1,3 @@
-Let's also create an implementation plan for the workflow sharing and importing:
-
-```python
 # angela/workflows/sharing.py
 
 import os

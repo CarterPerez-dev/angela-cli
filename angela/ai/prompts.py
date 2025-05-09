@@ -1,3 +1,4 @@
+# angela/ai/prompts.py
 """
 Prompt engineering for Angela CLI.
 

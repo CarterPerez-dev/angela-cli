@@ -1,3 +1,4 @@
+# angela/ai/content_analyzer.py
 """
 File content analysis and manipulation for Angela CLI.
 

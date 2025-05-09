@@ -1,3 +1,4 @@
+# angela/ai/semantic_analyzer.py
 """
 Semantic code analysis for Angela CLI.
 

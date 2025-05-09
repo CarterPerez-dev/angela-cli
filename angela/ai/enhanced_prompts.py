@@ -1,3 +1,4 @@
+# angela/ai/enhanced_prompts.py
 """
 Enhanced prompt engineering for Angela CLI with semantic awareness.
 
