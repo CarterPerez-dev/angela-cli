@@ -11,10 +11,13 @@ generation capabilities for creating and managing software projects through:
 - Code validation and refinement capabilities
 """
 
-# Export the main components from each module
+# First import the models to avoid circular imports
+from .models import CodeFile, CodeProject
+
+# Then import other components
 from .architecture import architectural_analyzer, analyze_project_architecture
 from .documentation import documentation_generator
-from .engine import code_generation_engine, CodeFile, CodeProject
+from .engine import code_generation_engine
 from .frameworks import framework_generator
 from .validators import validate_code
 from .refiner import interactive_refiner
@@ -23,6 +26,10 @@ from .context_manager import generation_context_manager
 
 # Define the public API
 __all__ = [
+    # Models
+    'CodeFile',
+    'CodeProject',
+    
     # Architecture analysis
     'architectural_analyzer',
     'analyze_project_architecture',
@@ -32,8 +39,6 @@ __all__ = [
     
     # Code generation
     'code_generation_engine',
-    'CodeFile',
-    'CodeProject',
     
     # Framework generators
     'framework_generator',
@@ -49,4 +54,3 @@ __all__ = [
     'ProjectArchitecture',
     'generation_context_manager'
 ]
-

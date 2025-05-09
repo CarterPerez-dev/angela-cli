@@ -37,6 +37,13 @@ if ! command -v pip3 &> /dev/null; then
     exit 1
 fi
 
+# Check if sphinx is installed
+info "Checking for Sphinx documentation generator..."
+if ! python3 -c "import sphinx" &> /dev/null; then
+    info "Installing Sphinx for documentation..."
+    pip3 install sphinx sphinx_rtd_theme
+fi
+
 # Clone the repository
 info "Downloading Angela CLI..."
 cd "$TMP_DIR"
@@ -86,6 +93,10 @@ if [ -n "$RC_FILE" ]; then
     fi
 fi
 
+# Build documentation
+info "Building documentation..."
+bash scripts/generate_docs.sh
+
 # Set up API key
 read -p "Would you like to set up your Gemini API key now? (y/n) " -n 1 -r
 echo
@@ -97,4 +108,5 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 success "✅ Angela CLI installed successfully!"
+info "Documentation available at: ~/.local/lib/angela/docs/build/html/index.html"
 info "To get started, try: angela \"help me with git commands\""

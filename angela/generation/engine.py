@@ -11,9 +11,10 @@ from typing import Dict, Any, List, Optional, Tuple, Union, Set
 import json
 import re
 import time
-from pydantic import BaseModel, Field
 import sys
 
+# Import models from the new models module instead of defining them here
+from angela.generation.models import CodeFile, CodeProject
 from angela.generation.context_manager import generation_context_manager
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.context import context_manager
@@ -23,24 +24,6 @@ from angela.execution.filesystem import create_directory, create_file, write_fil
 from angela.generation.validators import validate_code
 
 logger = get_logger(__name__)
-
-class CodeFile(BaseModel):
-    """Model for a code file to be generated."""
-    path: str = Field(..., description="Relative path to the file")
-    content: str = Field(..., description="Content of the file")
-    purpose: str = Field(..., description="Purpose/description of the file")
-    dependencies: List[str] = Field(default_factory=list, description="Paths of files this depends on")
-    language: Optional[str] = Field(None, description="Programming language of the file")
-
-class CodeProject(BaseModel):
-    """Model for a complete code project to be generated."""
-    name: str = Field(..., description="Name of the project")
-    description: str = Field(..., description="Description of the project")
-    root_dir: str = Field(..., description="Root directory for the project")
-    files: List[CodeFile] = Field(..., description="List of files to generate")
-    dependencies: Dict[str, List[str]] = Field(default_factory=dict, description="External dependencies")
-    project_type: str = Field(..., description="Type of project (e.g., python, node)")
-    structure_explanation: str = Field(..., description="Explanation of the project structure")
 
 class CodeGenerationEngine:
     """

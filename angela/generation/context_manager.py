@@ -13,7 +13,7 @@ import re
 from collections import defaultdict
 
 from angela.utils.logging import get_logger
-from angela.generation.engine import CodeFile
+from angela.generation.models import CodeFile
 from angela.ai.client import gemini_client, GeminiRequest
 from angela.context.file_detector import detect_file_type
 

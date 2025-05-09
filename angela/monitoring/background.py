@@ -44,6 +44,7 @@ class BackgroundMonitor:
         self._suggestions = set()  # To avoid repeating the same suggestions
         self._last_suggestion_time = datetime.now() - timedelta(hours=1)  # Ensure initial delay has passed
         self._suggestion_cooldown = timedelta(minutes=5)  # Minimum time between suggestions
+        self._insight_callbacks = []  # Add this line to store callbacks
     
     def start_monitoring(self):
         """Start background monitoring tasks."""
@@ -169,8 +170,15 @@ class BackgroundMonitor:
                                     "untracked_count": untracked_count,
                                     "deleted_count": deleted_count,
                                     "timestamp": datetime.now().isoformat()
-                                })                               
-                                
+                                })        
+                                                       
+                                await self._notify_insight_callbacks("git_status", {
+                                    "suggestion": suggestion,
+                                    "modified_count": modified_count,
+                                    "untracked_count": untracked_count,
+                                    "deleted_count": deleted_count,
+                                    "timestamp": datetime.now().isoformat()
+                                })                                
                                 
                 
                 # Wait before checking again
@@ -265,6 +273,14 @@ class BackgroundMonitor:
                             "disk_usage": disk_usage,
                             "timestamp": datetime.now().isoformat()
                         })
+
+
+                        await self._notify_insight_callbacks("disk_space_low", {
+                            "suggestion": suggestion,
+                            "disk_usage": disk_usage,
+                            "timestamp": datetime.now().isoformat()
+                        })
+
                         
                 last_values["disk_usage"] = disk_usage
                 
@@ -383,7 +399,15 @@ class BackgroundMonitor:
                     "error_message": error_msg,
                     "timestamp": datetime.now().isoformat()
                 })
-        
+
+                await self._notify_insight_callbacks("python_syntax_error", {
+                    "suggestion": suggestion,
+                    "file_path": str(file_path),
+                    "error_message": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                })
+
+  
         # Check with flake8 if available
         flake8_result = await self._run_command(f"flake8 {file_path}")
         
@@ -542,6 +566,42 @@ class BackgroundMonitor:
         """
         now = datetime.now()
         return (now - self._last_suggestion_time) >= self._suggestion_cooldown
+
+    def register_insight_callback(self, callback):
+        """
+        Register a callback function to be called when an insight is generated.
+        
+        Args:
+            callback: Async function to call with insight_type and insight_data
+        """
+        self._logger.debug(f"Registering insight callback: {callback.__name__}")
+        self._insight_callbacks.append(callback)
+    
+    def unregister_insight_callback(self, callback):
+        """
+        Unregister a previously registered callback function.
+        
+        Args:
+            callback: The callback function to unregister
+        """
+        if callback in self._insight_callbacks:
+            self._logger.debug(f"Unregistering insight callback: {callback.__name__}")
+            self._insight_callbacks.remove(callback)
+    
+    async def _notify_insight_callbacks(self, insight_type, insight_data):
+        """
+        Notify all registered callbacks about a new insight.
+        
+        Args:
+            insight_type: Type of insight
+            insight_data: Insight data
+        """
+        for callback in self._insight_callbacks:
+            try:
+                await callback(insight_type, insight_data)
+            except Exception as e:
+                self._logger.error(f"Error in insight callback: {str(e)}")
+
 
 # Global background monitor instance
 background_monitor = BackgroundMonitor()

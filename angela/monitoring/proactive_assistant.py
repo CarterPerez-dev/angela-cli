@@ -482,6 +482,8 @@ class ProactiveAssistant:
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
     
+        await self._notify_insight_callbacks("javascript_syntax_error", insight_data)    
+    
     async def _handle_test_failure_insight(self, insight_data: Dict[str, Any]):
         """
         Handle test failure insights.
@@ -530,6 +532,9 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+  
+        await self._notify_insight_callbacks("test_failure", insight_data)  
+  
     
     async def _handle_build_failure_insight(self, insight_data: Dict[str, Any]):
         """
@@ -561,6 +566,8 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+
+        await self._notify_insight_callbacks("build_failure", insight_data)
     
     async def _handle_deployment_issue_insight(self, insight_data: Dict[str, Any]):
         """
@@ -592,6 +599,9 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+
+        await self._notify_insight_callbacks("deployment_issue", insight_data)
+
     
     async def _handle_network_issue_insight(self, insight_data: Dict[str, Any]):
         """
@@ -623,6 +633,8 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+        
+        await self._notify_insight_callbacks("network_issue", insight_data)
     
     async def _handle_security_alert_insight(self, insight_data: Dict[str, Any]):
         """
@@ -662,6 +674,8 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+
+        await self._notify_insight_callbacks("security_alert", insight_data)
     
     async def _handle_performance_issue_insight(self, insight_data: Dict[str, Any]):
         """
@@ -693,6 +707,9 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+
+
+        await self._notify_insight_callbacks("performance_issue", insight_data)
     
     async def _handle_dependency_update_insight(self, insight_data: Dict[str, Any]):
         """
@@ -724,6 +741,9 @@ class ProactiveAssistant:
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
         self._last_suggestion_time = datetime.now()
+
+        await self._notify_insight_callbacks("dependency_update", insight_data)
+
     
     async def _handle_missing_dependency_pattern(self, command: str, output: str, return_code: int):
         """
