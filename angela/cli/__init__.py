@@ -9,7 +9,7 @@ from angela.cli.main import app as main_app
 from angela.cli.files import app as files_app
 from angela.cli.workflows import app as workflows_app
 from angela.cli.generation import app as generation_app
-from angela.cli.rollback_commands import app as rollback_app
+from angela.execution.rollback_commands import app as rollback_app
 from angela.cli.docker import app as docker_app
 
 # Add subcommands to the main app

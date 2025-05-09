@@ -14,7 +14,7 @@ import importlib
 import inspect
 
 from angela.utils.logging import get_logger
-from angela.generation.engine import CodeFile
+from angela.generation.models import CodeFile
 from angela.context import context_manager
 
 logger = get_logger(__name__)

@@ -28,6 +28,7 @@ from .enhanced_universal_cli import enhanced_universal_cli
 # Cross-tool workflow engine
 from .cross_tool_workflow_engine import cross_tool_workflow_engine
 
+from .test_frameworks import test_framework_integration
 # Define the public API
 __all__ = [
     'git_integration',
@@ -36,5 +37,6 @@ __all__ = [
     'universal_cli_translator',
     'ci_cd_integration',
     'enhanced_universal_cli',
-    'cross_tool_workflow_engine'
+    'cross_tool_workflow_engine',
+    'test_framework_integration'
 ]
