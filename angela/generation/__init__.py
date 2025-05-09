@@ -19,15 +19,7 @@ from .frameworks import framework_generator
 from .validators import validate_code
 from .refiner import interactive_refiner
 from .planner import project_planner, ProjectArchitecture
-
-# Try to import generation_context_manager
-# Note: context_manager.py is referenced by several modules but wasn't visible
-# in the provided files. Attempting to import it conditionally.
-try:
-    from .context_manager import generation_context_manager
-    _has_context_manager = True
-except ImportError:
-    _has_context_manager = False
+from .context_manager import generation_context_manager
 
 # Define the public API
 __all__ = [
