@@ -823,110 +823,171 @@ Make the README user-friendly, comprehensive, and professional.
         return dir_docs
     
     async def _parse_js_file(
-        self, 
-        file_path: str, 
-        content: str, 
-        is_typescript: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Parse JavaScript/TypeScript file for documentation.
-        
-        Args:
-            file_path: Path to the file
-            content: File content
-            is_typescript: Whether the file is TypeScript
+            self, 
+            file_path: str, 
+            content: str, 
+            is_typescript: bool = False
+        ) -> Dict[str, Any]:
+            """
+            Parse JavaScript/TypeScript file for documentation.
             
-        Returns:
-            Dictionary with parsed documentation
-        """
-        # Basic structure
-        doc_info = {
-            "file_description": "",
-            "classes": {},
-            "functions": {}
-        }
-        
-        if is_typescript:
-            doc_info["interfaces"] = {}
-        
-        # Extract file description from initial comment block
-        file_comment_match = re.search(r'/\*\*(.*?)\*/', content, re.DOTALL)
-        if file_comment_match:
-            doc_info["file_description"] = self._parse_js_comment(file_comment_match.group(1))
-        
-        # Extract classes
-        class_pattern = r'(?:export\s+)?class\s+(\w+)(?:\s+extends\s+\w+)?(?:\s+implements\s+[\w,\s]+)?\s*{([^}]*\/\*\*.*?\*\/)?'
-        for match in re.finditer(class_pattern, content, re.DOTALL):
-            class_name = match.group(1)
-            class_content = match.group(0)
-            
-            # Extract class comment
-            class_comment_match = re.search(r'/\*\*(.*?)\*/', class_content, re.DOTALL)
-            class_description = self._parse_js_comment(class_comment_match.group(1)) if class_comment_match else ""
-            
-            # Extract methods
-            methods = {}
-            method_pattern = r'(?:public|private|protected)?\s*(\w+)\s*\(([^)]*)\)(?:\s*:\s*[\w<>[\],\s]+)?(?:\s*{)?(?:\s*/\*\*(.*?)\*\/)?'
-            for method_match in re.finditer(method_pattern, class_content, re.DOTALL):
-                method_name = method_match.group(1)
-                method_signature = method_match.group(2).strip()
-                method_comment = method_match.group(3) if method_match.group(3) else ""
+            Args:
+                file_path: Path to the file
+                content: File content
+                is_typescript: Whether the file is TypeScript
                 
-                methods[method_name] = {
-                    "signature": f"({method_signature})",
-                    "description": self._parse_js_comment(method_comment)
-                }
-            
-            doc_info["classes"][class_name] = {
-                "description": class_description,
-                "methods": methods
+            Returns:
+                Dictionary with parsed documentation
+            """
+            doc_info = {
+                "file_description": "",
+                "classes": {},
+                "functions": {}
             }
-        
-        # Extract functions
-        function_pattern = r'(?:export\s+)?(?:function|const|let|var)\s+(\w+)\s*(?:=\s*(?:function)?\s*)?(?:\([^)]*\))(?:\s*:\s*[\w<>[\],\s]+)?(?:\s*=>)?(?:\s*{)?(?:\s*/\*\*(.*?)\*\/)?'
-        for match in re.finditer(function_pattern, content, re.DOTALL):
-            func_name = match.group(1)
-            func_comment = match.group(2) if match.group(2) else ""
+            if is_typescript:
+                doc_info["interfaces"] = {}
+    
+            # Helper to find matching brace
+            def find_matching_brace(text_content: str, start_index: int) -> int:
+                open_braces = 0
+                for i in range(start_index, len(text_content)):
+                    if text_content[i] == '{':
+                        open_braces += 1
+                    elif text_content[i] == '}':
+                        open_braces -= 1
+                        if open_braces == 0:
+                            return i
+                return -1 # Not found
+    
+            # Extract file description from initial comment block
+            # Regex for JSDoc: captures comment text, handling * at line starts
+            jsdoc_block_pattern = r'\s*/\*\*((?:[^*]|\*(?!/))*?)\*/'
+    
+            file_comment_match = re.match(jsdoc_block_pattern, content, re.DOTALL)
+            if file_comment_match:
+                doc_info["file_description"] = self._parse_js_comment(file_comment_match.group(1))
             
-            # Determine signature (simplified)
-            func_signature_match = re.search(r'\(([^)]*)\)', match.group(0))
-            func_signature = func_signature_match.group(1) if func_signature_match else ""
+            # Regex patterns with preceding JSDoc capture group
+            # Group 1: JSDoc, Group 2: Modifiers (export, async etc), Group 3: Name, Group 4: Params/Signature, Group 5: Body start
+            base_element_prefix = r'(?:export\s+)?(?:default\s+)?'
             
-            doc_info["functions"][func_name] = {
-                "signature": f"({func_signature})",
-                "description": self._parse_js_comment(func_comment)
-            }
-        
-        # Extract TypeScript interfaces
-        if is_typescript:
-            interface_pattern = r'(?:export\s+)?interface\s+(\w+)(?:\s+extends\s+[\w,\s]+)?\s*{([^}]*)}'
-            for match in re.finditer(interface_pattern, content, re.DOTALL):
-                interface_name = match.group(1)
-                interface_content = match.group(2)
+            # Class: JSDoc (1), 'export class' etc (2), Name (3), Extends/Implements (4), { (5)
+            class_pattern_str = jsdoc_block_pattern + r'?\s*' + \
+                                r'(' + base_element_prefix + r'class)\s+([A-Za-z_]\w*)' + \
+                                r'((?:\s+extends\s+[\w.]+)?(?:\s+implements\s+[\w.,\s<>]+)?)?\s*({)'
+            
+            # Method: JSDoc (1), Modifiers (static, async, get, set) (2), Name (may include *) (3), Params (4), Body start or ; (5)
+            method_pattern_str = jsdoc_block_pattern + r'?\s*' + \
+                                 r'(public\s+|private\s+|protected\s+|static\s+|get\s+|set\s+|async\s+)*' + \
+                                 r'(\*?\s*[A-Za-z_]\w*)\s*\(([^)]*)\)' + \
+                                 r'(?:\s*:\s*[\w<>\[\],\s|&]+)?\s*(?:{|;)' # Match { or ; for abstract methods
+    
+            # Function: JSDoc (1), 'export function' or 'const name =' (2), Name (3), Params (4), Body start (5)
+            # This covers: function foo() {}, const foo = function() {}, const foo = () => {}
+            function_pattern_str = jsdoc_block_pattern + r'?\s*' + \
+                                   r'(?:' + base_element_prefix + r'(?:function(?:\s*\*)?|async\s+function(?:\s*\*)?)\s+([A-Za-z_]\w*)' + \
+                                   r'|' + base_element_prefix + r'(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?(?:function(?:\s*\*)?)?' + \
+                                   r')\s*\(([^)]*)\)' + \
+                                   r'(?:\s*:\s*[\w<>\[\],\s|&]+)?\s*(?:=>\s*(?:{|[\w(])|{)'
+    
+    
+            # Interface (TS): JSDoc (1), 'export interface' (2), Name (3), Extends (4), { (5)
+            interface_pattern_str = jsdoc_block_pattern + r'?\s*' + \
+                                    r'(' + base_element_prefix + r'interface)\s+([A-Za-z_]\w*)' + \
+                                    r'((?:\s+extends\s+[\w.,\s<>]+)?)?\s*({)'
+            
+            # Interface Property (TS): JSDoc (1), Name (2), Optional (?) (3), Type (4)
+            ts_property_pattern_str = jsdoc_block_pattern + r'?\s*' + \
+                                      r'([A-Za-z_]\w*)\s*(\?)?\s*:\s*([\w<>\[\],\s|&]+)(?:;|\n|,)'
+    
+    
+            # Extract Classes and their Methods
+            for class_match in re.finditer(class_pattern_str, content, re.DOTALL | re.MULTILINE):
+                class_jsdoc = class_match.group(1)
+                class_name = class_match.group(3)
                 
-                # Extract interface comment
-                interface_comment_match = re.search(r'/\*\*(.*?)\*/', match.group(0), re.DOTALL)
-                interface_description = self._parse_js_comment(interface_comment_match.group(1)) if interface_comment_match else ""
+                class_body_start_offset = class_match.end(5) # Start of class body content (after '{')
+                class_body_end_offset = find_matching_brace(content, class_body_start_offset)
+    
+                if class_body_end_offset == -1:
+                    self._logger.debug(f"Could not find matching brace for class {class_name} in {file_path}")
+                    continue
                 
-                # Extract properties
-                properties = {}
-                property_pattern = r'(\w+)(?:\?)?:\s*([\w<>[\],\s|]+)(?:;)?\s*(?://\s*(.*))?'
-                for prop_match in re.finditer(property_pattern, interface_content):
-                    prop_name = prop_match.group(1)
-                    prop_type = prop_match.group(2).strip()
-                    prop_comment = prop_match.group(3) if prop_match.group(3) else ""
+                class_body_content = content[class_body_start_offset:class_body_end_offset]
+                
+                methods = {}
+                for method_match in re.finditer(method_pattern_str, class_body_content, re.DOTALL | re.MULTILINE):
+                    method_jsdoc = method_match.group(1)
+                    # Group 2 are modifiers like 'async', 'static'
+                    method_name = method_match.group(3).replace('*', '').strip() # remove generator *
+                    method_params_str = method_match.group(4)
                     
-                    properties[prop_name] = {
-                        "type": prop_type,
-                        "description": prop_comment.strip()
+                    methods[method_name] = {
+                        "signature": f"({method_params_str.strip()})",
+                        "description": self._parse_js_comment(method_jsdoc) if method_jsdoc else ""
                     }
                 
-                doc_info["interfaces"][interface_name] = {
-                    "description": interface_description,
-                    "properties": properties
+                doc_info["classes"][class_name] = {
+                    "description": self._parse_js_comment(class_jsdoc) if class_jsdoc else "",
+                    "methods": methods
                 }
-        
-        return doc_info
+    
+            # Extract Functions (top-level)
+            for func_match in re.finditer(function_pattern_str, content, re.DOTALL | re.MULTILINE):
+                func_jsdoc = func_match.group(1)
+                # Name can be in group 3 (for 'function name()') or group 4 (for 'const name =')
+                func_name = func_match.group(3) if func_match.group(3) else func_match.group(4)
+                if not func_name: continue # Should not happen with current regex logic
+    
+                func_params_str = func_match.group(5)
+                
+                # Avoid matching methods inside classes again if class parsing is imperfect
+                # This is a heuristic: if a function looks like it's inside a known class, skip.
+                is_likely_method = False
+                for class_name_iter in doc_info["classes"]:
+                    if f"class {class_name_iter}" in content[:func_match.start()]: # Simplified check
+                        # A more robust check would involve checking if func_match.start() is within parsed class bounds
+                        pass # This check needs to be more robust or might be removed if class parsing is good enough.
+    
+                if not is_likely_method:
+                     doc_info["functions"][func_name] = {
+                        "signature": f"({func_params_str.strip()})",
+                        "description": self._parse_js_comment(func_jsdoc) if func_jsdoc else ""
+                    }
+    
+            # Extract TypeScript Interfaces and their Properties
+            if is_typescript:
+                for interface_match in re.finditer(interface_pattern_str, content, re.DOTALL | re.MULTILINE):
+                    interface_jsdoc = interface_match.group(1)
+                    interface_name = interface_match.group(3)
+                    
+                    interface_body_start_offset = interface_match.end(5) # Start of interface body (after '{')
+                    interface_body_end_offset = find_matching_brace(content, interface_body_start_offset)
+    
+                    if interface_body_end_offset == -1:
+                        self._logger.debug(f"Could not find matching brace for interface {interface_name} in {file_path}")
+                        continue
+                    
+                    interface_body_content = content[interface_body_start_offset:interface_body_end_offset]
+                    
+                    properties = {}
+                    for prop_match in re.finditer(ts_property_pattern_str, interface_body_content, re.DOTALL | re.MULTILINE):
+                        prop_jsdoc = prop_match.group(1)
+                        prop_name = prop_match.group(2)
+                        # prop_optional = prop_match.group(3) # '?'
+                        prop_type = prop_match.group(4).strip()
+                        
+                        properties[prop_name] = {
+                            "type": prop_type,
+                            "description": self._parse_js_comment(prop_jsdoc) if prop_jsdoc else ""
+                        }
+                    
+                    doc_info["interfaces"][interface_name] = {
+                        "description": self._parse_js_comment(interface_jsdoc) if interface_jsdoc else "",
+                        "properties": properties
+                    }
+            
+            return doc_info
     
     def _parse_js_comment(self, comment: str) -> str:
         """

@@ -358,7 +358,7 @@ def add_feature(
         console.print(f"[bold red]Error adding feature:[/bold red] {str(e)}")
 
 @app.command("refine-code")
-def refine_code(
+async def refine_code(
     feedback: str = typer.Argument(..., help="Feedback for code improvement"),
     file_path: str = typer.Argument(..., help="Path to the file to refine"),
     apply: bool = typer.Option(False, help="Apply the changes"),
@@ -391,12 +391,12 @@ def refine_code(
         console.print("\n[bold]Processing feedback...[/bold]")
         
         with console.status("[bold green]Generating improvements...[/bold green]"):
-            result = asyncio.run(feedback_manager.process_feedback(
+            result = await feedback_manager.process_feedback(
                 feedback=feedback,
                 original_code=original_code,
                 file_path=str(file),
                 context=context
-            ))
+            )
         
         # Display diff
         console.print("\n[bold blue]Code changes:[/bold blue]")
@@ -431,10 +431,10 @@ def refine_code(
             }
             
             with console.status("[bold green]Applying changes...[/bold green]"):
-                apply_result = asyncio.run(feedback_manager.apply_refinements(
+                apply_result = await feedback_manager.apply_refinements(
                     refinements=refinements,
                     backup=backup
-                ))
+                )
             
             if apply_result["files_changed"] > 0:
                 console.print("[green]Changes applied successfully[/green]")

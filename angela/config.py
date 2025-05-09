@@ -38,7 +38,7 @@ from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 from angela.constants import CONFIG_DIR, CONFIG_FILE
-
+CONFIG_DIR = Path.home() / ".angela"
 
 # --- Configuration Models ---
 
@@ -68,6 +68,7 @@ class ConfigManager:
     def __init__(self):
         """Initializes the ConfigManager with default settings."""
         self._config: AppConfig = AppConfig()
+        self.CONFIG_DIR = CONFIG_DIR
         self._load_environment()
         self._ensure_config_dir()
         # Note: Loading from file happens via the global instance later
@@ -94,7 +95,7 @@ class ConfigManager:
             print(f"Configuration file not found at '{CONFIG_FILE}'. Saving default configuration.")
             self.save_config() # Save default TOML config
             return
-
+    
         if not _TOML_LOAD_AVAILABLE:
             print(f"Warning: Cannot load TOML config file '{CONFIG_FILE}'.")
             if sys.version_info < (3, 11):
@@ -104,37 +105,46 @@ class ConfigManager:
                  print("       Reason: Could not import the built-in 'tomllib' module.") # Should be unlikely
             print("       Using default configuration and environment variables.")
             return
-
+    
         try:
             print(f"Loading configuration from: {CONFIG_FILE}") # Debugging info
             with open(CONFIG_FILE, "rb") as f: # TOML requires binary read mode
                 config_data = tomllib.load(f)
-
+    
             # Update configuration with loaded data, using Pydantic validation
             if "api" in config_data and isinstance(config_data["api"], dict):
                 self._config.api = ApiConfig(**config_data["api"])
-
+    
             if "user" in config_data and isinstance(config_data["user"], dict):
                  # Pydantic will handle Path conversion from string during validation
                  self._config.user = UserConfig(**config_data["user"])
-
+    
             if "debug" in config_data:
                 # Explicitly check type for robustness
                 if isinstance(config_data["debug"], bool):
                      self._config.debug = config_data["debug"]
                 else:
                      print(f"Warning: Invalid type for 'debug' in {CONFIG_FILE}. Expected boolean, got {type(config_data['debug'])}. Ignoring.")
-
+    
         except _TOML_READ_ERROR_TYPE as e:
              print(f"Error decoding TOML configuration file ({CONFIG_FILE}): {e}")
              print("       Please check the file syntax. Using default configuration and environment variables.")
              print("       Resetting configuration to default.")
              self._config = AppConfig()
              self._load_environment()
-        except Exception as e:
-            print(f"Unexpected error loading configuration from {CONFIG_FILE}: {e}")
+        except FileNotFoundError as e:
+            print(f"Configuration file not found: {e}")
             print("       Using default configuration and environment variables.")
-            print("       Resetting configuration to default.")
+            self._config = AppConfig()
+            self._load_environment()
+        except PermissionError as e:
+            print(f"Permission error accessing configuration file: {e}")
+            print("       Using default configuration and environment variables.")
+            self._config = AppConfig()
+            self._load_environment()
+        except IOError as e:
+            print(f"I/O error accessing configuration file: {e}")
+            print("       Using default configuration and environment variables.")
             self._config = AppConfig()
             self._load_environment()
 

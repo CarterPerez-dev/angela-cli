@@ -2530,9 +2530,10 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                 result["recovery_applied"] = True
                 result["recovery_strategy"] = recovery_result.get("recovery_strategy")
                 
-                    if "outputs" not in result:
-                        result["outputs"] = {}
-                    result["outputs"].update(recovery_result["outputs"])
+                # Add outputs from recovery
+                if "outputs" not in result:
+                    result["outputs"] = {}
+                result["outputs"].update(recovery_result["outputs"])
                 
                 return result
             else:

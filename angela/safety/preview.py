@@ -346,7 +346,7 @@ async def preview_grep(command: str, tokens: List[str]) -> str:
         else:
             # Try to count occurrences in file
             try:
-                with open(path_obj, 'r', errors='replace') as f:
+                with open(path_obj, 'r', encoding='utf-8', errors='replace') as f:
                     content = f.read()
                     count = len(re.findall(pattern, content))
                     result.append(f"Will search for '{pattern}' in {file_path} "

@@ -157,37 +157,37 @@ class ProjectPlanner:
             Prompt string for the AI service
         """
         prompt = f"""
-As an experienced software architect, design a high-level architecture for a {project_type} project based on this description:
-
-"{description}"
-
-Analyze the requirements and create a comprehensive architecture that is:
-- Modular and maintainable
-- Follows SOLID principles
-- Anticipates future changes/extensions
-- Accounts for scalability and performance
-
-Your response should be a JSON object with this structure:
-
-```json
-{{
-  "components": [
+    As an experienced software architect, design a high-level architecture for a {project_type} project based on this description:
+    
+    "{description}"
+    
+    Analyze the requirements and create a comprehensive architecture that is:
+    - Modular and maintainable
+    - Follows SOLID principles
+    - Anticipates future changes/extensions
+    - Accounts for scalability and performance
+    
+    Your response should be a JSON object with this structure:
+    
+    ```json
     {{
-      "name": "component_name",
-      "description": "what this component does",
-      "responsibilities": ["resp1", "resp2", ...],
-      "files": ["expected/path/to/file.ext", ...],
-      "dependencies": ["other_component_names", ...]
-    }},
-    ...
-  ],
-  "layers": ["Layer1", "Layer2", ...],
-  "patterns": ["Design patterns used in the architecture"],
-  "data_flow": ["Descriptions of data flow between components"]
-}}
-Focus on a clean separation of concerns, appropriate design patterns for {project_type}, and efficient data flow.
-"""
-    return prompt
+      "components": [
+        {{
+          "name": "component_name",
+          "description": "what this component does",
+          "responsibilities": ["resp1", "resp2", ...],
+          "files": ["expected/path/to/file.ext", ...],
+          "dependencies": ["other_component_names", ...]
+        }},
+        ...
+      ],
+      "layers": ["Layer1", "Layer2", ...],
+      "patterns": ["Design patterns used in the architecture"],
+      "data_flow": ["Descriptions of data flow between components"]
+    }}
+    Focus on a clean separation of concerns, appropriate design patterns for {project_type}, and efficient data flow.
+    """
+        return prompt
 
     async def _parse_architecture(self, response: str) -> ProjectArchitecture:
         """

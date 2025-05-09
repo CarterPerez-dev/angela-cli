@@ -44,6 +44,7 @@ class WorkflowStepType(str, Enum):
     CUSTOM_CODE = "custom_code"      # Custom code execution
     NOTIFICATION = "notification"    # Send notification
     VALIDATION = "validation"        # Validate a condition
+    FILE = "file"                    # File operation
 
 class WorkflowVariable(BaseModel):
     """Model for a variable in a workflow."""

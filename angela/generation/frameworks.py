@@ -1790,7 +1790,7 @@ Ensure the structure follows best practices for {framework} projects.
                 # Add API route
                 files.extend([
                     {
-                        "path": "pages/api/example" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"pages/api/example{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("nextjs/enhanced/pages/api/example.ts", description, options),
                         "purpose": "Example API endpoint",
                         "language": "typescript" if use_typescript else "javascript"
@@ -1816,7 +1816,7 @@ Ensure the structure follows best practices for {framework} projects.
             # Add utilities
             files.extend([
                 {
-                    "path": "lib/utils" + (use_typescript ? ".ts" : ".js"),
+                    "path": f"lib/utils{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                     "content": await self._generate_content("nextjs/enhanced/lib/utils.ts", description, options),
                     "purpose": "Utility functions",
                     "language": "typescript" if use_typescript else "javascript"
@@ -1843,7 +1843,7 @@ Ensure the structure follows best practices for {framework} projects.
                         "language": "typescript" if use_typescript else "javascript"
                     },
                     {
-                        "path": "jest.config" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"jest.config{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("nextjs/enhanced/jest.config.ts", description, options),
                         "purpose": "Jest configuration",
                         "language": "typescript" if use_typescript else "javascript"
@@ -1900,7 +1900,7 @@ Ensure the structure follows best practices for {framework} projects.
             # Core application files
             files.extend([
                 {
-                    "path": "src/index" + (use_typescript ? ".tsx" : ".jsx"),
+                    "path": f"src/index{'.tsx' if use_typescript else '.jsx'}", # Fixed JavaScript ternary
                     "content": await self._generate_content("react/enhanced/src/index" + ext, description, options),
                     "purpose": "Application entry point",
                     "language": "typescript" if use_typescript else "javascript"
@@ -1946,7 +1946,7 @@ Ensure the structure follows best practices for {framework} projects.
                         "language": "typescript" if use_typescript else "javascript"
                     },
                     {
-                        "path": "src/routes" + (use_typescript ? ".tsx" : ".jsx"),
+                        "path": "src/routes" + ext,
                         "content": await self._generate_content("react/enhanced/src/routes" + ext, description, options),
                         "purpose": "Route definitions",
                         "language": "typescript" if use_typescript else "javascript"
@@ -1957,13 +1957,13 @@ Ensure the structure follows best practices for {framework} projects.
             if state_management == "redux":
                 files.extend([
                     {
-                        "path": "src/store/index" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"src/store/index{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("react/enhanced/src/store/index.ts", description, options),
                         "purpose": "Redux store configuration",
                         "language": "typescript" if use_typescript else "javascript"
                     },
                     {
-                        "path": "src/store/slices/counterSlice" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"src/store/slices/counterSlice{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("react/enhanced/src/store/slices/counterSlice.ts", description, options),
                         "purpose": "Example Redux slice",
                         "language": "typescript" if use_typescript else "javascript"
@@ -1972,13 +1972,13 @@ Ensure the structure follows best practices for {framework} projects.
             elif state_management == "mobx":
                 files.extend([
                     {
-                        "path": "src/stores/RootStore" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"src/stores/RootStore{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("react/enhanced/src/stores/RootStore.ts", description, options),
                         "purpose": "MobX root store",
                         "language": "typescript" if use_typescript else "javascript"
                     },
                     {
-                        "path": "src/stores/CounterStore" + (use_typescript ? ".ts" : ".js"),
+                        "path": f"src/stores/CounterStore{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                         "content": await self._generate_content("react/enhanced/src/stores/CounterStore.ts", description, options),
                         "purpose": "Example MobX store",
                         "language": "typescript" if use_typescript else "javascript"
@@ -2019,13 +2019,13 @@ Ensure the structure follows best practices for {framework} projects.
             # Add utilities
             files.extend([
                 {
-                    "path": "src/utils/helpers" + (use_typescript ? ".ts" : ".js"),
+                    "path": f"src/utils/helpers{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                     "content": await self._generate_content("react/enhanced/src/utils/helpers.ts", description, options),
                     "purpose": "Helper functions",
                     "language": "typescript" if use_typescript else "javascript"
                 },
                 {
-                    "path": "src/utils/api" + (use_typescript ? ".ts" : ".js"),
+                    "path": f"src/utils/api{'.ts' if use_typescript else '.js'}", # Fixed JavaScript ternary
                     "content": await self._generate_content("react/enhanced/src/utils/api.ts", description, options),
                     "purpose": "API utilities",
                     "language": "typescript" if use_typescript else "javascript"
@@ -2048,11 +2048,11 @@ Ensure the structure follows best practices for {framework} projects.
                         "language": "typescript" if use_typescript else "javascript"
                     }
                 ])
-        }
         
-        # Generate files
+        # Generate CodeFile objects from the file information
+        result_files = []
         for file_info in files:
-            files.append(CodeFile(
+            result_files.append(CodeFile(
                 path=file_info["path"],
                 content=file_info["content"],
                 purpose=file_info["purpose"],
@@ -2064,7 +2064,7 @@ Ensure the structure follows best practices for {framework} projects.
             "success": True,
             "framework": "react",
             "variant": variant,
-            "files": files,
+            "files": result_files,
             "project_type": "node",
             "typescript": use_typescript,
             "routing": routing,

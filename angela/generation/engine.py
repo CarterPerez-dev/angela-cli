@@ -13,6 +13,7 @@ import json
 import re
 import time
 from pydantic import BaseModel, Field
+import sys
 
 from angela.generation.context_manager import generation_context_manager
 from angela.ai.client import gemini_client, GeminiRequest
@@ -2100,7 +2101,8 @@ For services/utilities:
             ".scss": "SCSS",
             ".json": "JSON",
             ".xml": "XML",
-            ".yaml": ".yml": "YAML",
+            ".yaml": "YAML",
+            ".yml": "YAML",
             ".md": "Markdown",
             ".sql": "SQL",
             ".go": "Go",
