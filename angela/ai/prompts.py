@@ -311,7 +311,7 @@ def build_prompt(
     request: str, 
     context: Dict[str, Any],
     similar_command: Optional[str] = None,
-    intent_result: Optional[Dict[str, Any]] = None
+    intent_result: Optional[Any] = None
 ) -> str:
     """
     Build a prompt for the Gemini API with enhanced context information.
@@ -463,17 +463,31 @@ def build_prompt(
             for name, entity in session.get("entities", {}).items():
                 context_str += f"- {name}: {entity.get('type')} - {entity.get('value')}\n"
     
-    # Add intent analysis if available
+    # Add intent analysis if available - FIXED SECTION
     if intent_result:
         context_str += "\nIntent analysis:\n"
-        context_str += f"- Intent type: {intent_result.get('intent_type', 'unknown')}\n"
-        context_str += f"- Confidence: {intent_result.get('confidence', 0.0):.2f}\n"
         
-        # Add extracted entities
-        if intent_result.get("entities"):
-            context_str += "- Extracted entities:\n"
-            for key, value in intent_result.get("entities", {}).items():
-                context_str += f"  - {key}: {value}\n"
+        # Check if intent_result is a dictionary or a Pydantic model
+        if hasattr(intent_result, "__dict__") and not hasattr(intent_result, "get"):
+            # It's a Pydantic model - use attribute access
+            context_str += f"- Intent type: {getattr(intent_result, 'intent_type', 'unknown')}\n"
+            context_str += f"- Confidence: {getattr(intent_result, 'confidence', 0.0):.2f}\n"
+            
+            # Add extracted entities safely
+            if hasattr(intent_result, "entities") and intent_result.entities:
+                context_str += "- Extracted entities:\n"
+                for key, value in intent_result.entities.items():
+                    context_str += f"  - {key}: {value}\n"
+        else:
+            # Fall back to dictionary-style access for backwards compatibility
+            context_str += f"- Intent type: {intent_result.get('intent_type', 'unknown')}\n"
+            context_str += f"- Confidence: {intent_result.get('confidence', 0.0):.2f}\n"
+            
+            # Add extracted entities
+            if intent_result.get("entities"):
+                context_str += "- Extracted entities:\n"
+                for key, value in intent_result.get("entities", {}).items():
+                    context_str += f"  - {key}: {value}\n"
     
     # Add similar command suggestion if available
     if similar_command:

@@ -145,7 +145,16 @@ class Orchestrator:
                         registry.register("context_enhancer", context_enhancer)
                         context = await context_enhancer.enrich_context(context)
                     else:
-                        self._logger.warning("context_enhancer is None after direct import, continuing with basic context")
+                        self._logger.warning("context_enhancer is None after direct import, attempting to create instance")
+                        try:
+                            from angela.context.enhancer import ContextEnhancer
+                            temp_enhancer = ContextEnhancer()
+                            registry.register("context_enhancer", temp_enhancer)
+                            context = await temp_enhancer.enrich_context(context)
+                            self._logger.info("Successfully created and used temporary context_enhancer")
+                        except Exception as create_error:
+                            self._logger.error(f"Failed to create context_enhancer instance: {create_error}")
+                            self._logger.warning("Continuing with basic context")
                 except ImportError as e:
                     self._logger.error(f"Failed to import context_enhancer directly: {e}")
                     self._logger.warning("Continuing with basic context")

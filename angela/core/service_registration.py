@@ -14,6 +14,7 @@ def register_core_services():
     logger.info("Registering core services")
 
 
+    # Ensure context_enhancer is properly registered
     try:
         from angela.context.enhancer import context_enhancer
         if context_enhancer is None:
@@ -34,9 +35,11 @@ def register_core_services():
             logger.info("Created and registered new context_enhancer instance")
         except Exception as inner_e:
             logger.critical(f"Failed to create alternative context_enhancer: {inner_e}")
-            raise ImportError(f"Failed to register critical service context_enhancer: {e}")
+            # Don't raise here - continue registering other services
+            logger.error("Continuing with registration of other services without context_enhancer")
     except Exception as e:
         logger.error(f"CRITICAL ERROR: Unexpected error registering context_enhancer: {e}")
+        logger.error("Continuing with registration of other services without context_enhancer")
 
 
     try:
