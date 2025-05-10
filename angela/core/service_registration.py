@@ -13,7 +13,17 @@ def register_core_services():
     """Register all core services with the registry."""
     logger.info("Registering core services")
 
-    # Import services here to avoid circular imports
+
+    try:
+        from angela.context.enhancer import context_enhancer
+        registry.register("context_enhancer", context_enhancer)
+        logger.debug("Registered context_enhancer")
+    except ImportError as e:
+        logger.error(f"CRITICAL ERROR: Could not import context_enhancer: {e}")
+        # Raise an exception here since this is critical
+        raise ImportError(f"Failed to register critical service context_enhancer: {e}")
+
+
     try:
         from angela.execution.engine import execution_engine
         registry.register("execution_engine", execution_engine)
@@ -42,13 +52,6 @@ def register_core_services():
         logger.debug("Registered orchestrator")
     except ImportError as e:
         logger.warning(f"Could not import orchestrator: {e}")
-
-    try:
-        from angela.context.enhancer import context_enhancer
-        registry.register("context_enhancer", context_enhancer)
-        logger.debug("Registered context_enhancer")
-    except ImportError as e:
-        logger.warning(f"Could not import context_enhancer: {e}")
 
     # Register execution hooks
     try:

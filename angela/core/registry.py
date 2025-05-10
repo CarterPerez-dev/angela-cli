@@ -51,6 +51,7 @@ class ServiceRegistry:
         service = self._services.get(name)
         if service is None:
             logger.warning(f"Service not found: {name}")
+            # Here we could add a fallback or retry mechanism if needed
         return service
     
     def clear(self) -> None:

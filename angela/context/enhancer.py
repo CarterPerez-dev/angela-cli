@@ -155,6 +155,8 @@ class ContextEnhancer:
             "paths": paths
         }
     
+    # angela/context/enhancer.py
+    
     def _summarize_structure(self, structure: Dict[str, Any]) -> Dict[str, Any]:
         """
         Summarize project structure for inclusion in context.
@@ -169,12 +171,25 @@ class ContextEnhancer:
         if not structure:
             return {}
         
+        # Handle case where main_directories is a list of strings instead of dictionaries
+        main_directories = structure.get("main_directories", [])
+        
+        # Convert to proper format if needed
+        main_dirs_list = []
+        for directory in main_directories:
+            if isinstance(directory, dict):
+                main_dirs_list.append(directory.get("name", ""))
+            elif isinstance(directory, str):
+                main_dirs_list.append(directory)
+        
         # Return summary
         return {
             "file_counts": structure.get("file_counts", {}),
             "total_files": structure.get("total_files", 0),
-            "main_directories": [d.get("name", "") for d in structure.get("main_directories", [])]
+            "main_directories": main_dirs_list
         }
+    
+
     
     async def _add_recent_file_activity(self, context: Dict[str, Any]) -> None:
         """
@@ -196,12 +211,18 @@ class ContextEnhancer:
                 if entity.get("type") in ["file", "directory", "recent_file"]
             }
             
-            # Get recent file activities from history
+            # Extract accessed files from entities
+            accessed_files = []
+            for name, entity in file_entities.items():
+                if "value" in entity and entity["value"]:
+                    accessed_files.append(entity["value"])
+            
+            # FIXED: Ensure we always have at least an empty list
             recent_activities = []
             
             # Format and add to context
             context["recent_files"] = {
-                "accessed": [entity.get("value", "") for name, entity in file_entities.items()],
+                "accessed": accessed_files,  # FIXED: Use the properly extracted list
                 "activities": recent_activities,
                 "count": len(file_entities)
             }
@@ -209,6 +230,12 @@ class ContextEnhancer:
             self._logger.debug(f"Added {len(file_entities)} recent files to context")
         except Exception as e:
             self._logger.error(f"Error adding recent file activity: {str(e)}")
+            # IMPORTANT: Add an empty recent_files object to context even on failure
+            context["recent_files"] = {
+                "accessed": [],
+                "activities": [],
+                "count": 0
+            }
     
     async def _add_file_reference_context(self, context: Dict[str, Any]) -> None:
         """

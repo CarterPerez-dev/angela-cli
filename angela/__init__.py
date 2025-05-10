@@ -53,14 +53,16 @@ def init_application():
     from angela.core.service_registration import register_core_services
     register_core_services()
     
+    from angela.context.enhancer import context_enhancer
     from angela.execution.engine import execution_engine
     from angela.execution.adaptive_engine import adaptive_engine
     from angela.safety import check_command_safety, validate_command_safety
     from angela.orchestrator import orchestrator
-    from angela.context.enhancer import context_enhancer
+
     
     # These should be already registered by register_core_services,
     # but let's re-register them to ensure they're available
+    registry.register("context_enhancer", context_enhancer)    
     registry.register("execution_engine", execution_engine)
     registry.register("adaptive_engine", adaptive_engine)
     registry.register("check_command_safety", check_command_safety)
