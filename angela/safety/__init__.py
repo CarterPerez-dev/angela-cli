@@ -127,7 +127,7 @@ __all__ = [
     'check_command_safety',
     'check_operation_safety', 
     'validate_command_safety',
-    'validate_operation',     
+    'validate_operation',     # Add this line
     'classify_command_risk',
     'analyze_command_impact',
     'generate_preview',

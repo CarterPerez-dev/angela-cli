@@ -36,7 +36,7 @@ async def test_client_initialization(mock_genai):
         
         # Check if the API was configured correctly
         mock_genai.configure.assert_called_once_with(api_key="test_key")
-        mock_genai.GenerativeModel.assert_called_once_with("gemini-1.0-pro")
+        mock_genai.GenerativeModel.assert_called_once_with("gemini-2.5-pro-exp-03-25")
 
 
 @pytest.mark.asyncio
