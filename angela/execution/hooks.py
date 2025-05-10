@@ -27,12 +27,51 @@ class ExecutionHooks:
     def __init__(self):
         """Initialize the execution hooks."""
         self._logger = logger
+        self._pre_execute_hooks = {}
+        self._post_execute_hooks = {}
+
+
+    def register_hook(self, hook_type: str, handler: callable) -> None:
+        """
+        Register a hook handler for a specific hook type.
+        
+        Args:
+            hook_type: Type of hook (e.g., 'pre_execute_command', 'post_execute_command')
+            handler: Callable to execute when the hook is triggered
+        """
+        self._logger.debug(f"Registering {hook_type} hook")
+        
+        if hook_type.startswith('pre_'):
+            if hook_type not in self._pre_execute_hooks:
+                self._pre_execute_hooks[hook_type] = []
+            self._pre_execute_hooks[hook_type].append(handler)
+        elif hook_type.startswith('post_'):
+            if hook_type not in self._post_execute_hooks:
+                self._post_execute_hooks[hook_type] = []
+            self._post_execute_hooks[hook_type].append(handler)
+        else:
+            self._logger.warning(f"Unknown hook type: {hook_type}")
     
-    async def pre_execute_command(
-        self, 
-        command: str,
-        context: Dict[str, Any]
-    ) -> None:
+    def unregister_hook(self, hook_type: str, handler: callable) -> None:
+        """
+        Unregister a hook handler.
+        
+        Args:
+            hook_type: Type of hook
+            handler: Handler to unregister
+        """
+        self._logger.debug(f"Unregistering {hook_type} hook")
+        
+        if hook_type.startswith('pre_') and hook_type in self._pre_execute_hooks:
+            if handler in self._pre_execute_hooks[hook_type]:
+                self._pre_execute_hooks[hook_type].remove(handler)
+        elif hook_type.startswith('post_') and hook_type in self._post_execute_hooks:
+            if handler in self._post_execute_hooks[hook_type]:
+                self._post_execute_hooks[hook_type].remove(handler)
+
+
+    
+    async def pre_execute_command(self, command: str, context: Dict[str, Any]) -> None:
         """
         Pre-execution hook for commands.
         
@@ -44,13 +83,17 @@ class ExecutionHooks:
         
         # Extract potential file operations from the command
         await self._analyze_command_for_files(command, context)
+        
+        # Call registered pre-execute hooks
+        hook_type = 'pre_execute_command'
+        if hook_type in self._pre_execute_hooks:
+            for handler in self._pre_execute_hooks[hook_type]:
+                try:
+                    await handler(command, context)
+                except Exception as e:
+                    self._logger.error(f"Error in {hook_type} hook: {str(e)}")
     
-    async def post_execute_command(
-        self, 
-        command: str,
-        result: Dict[str, Any],
-        context: Dict[str, Any]
-    ) -> None:
+    async def post_execute_command(self, command: str, result: Dict[str, Any], context: Dict[str, Any]) -> None:
         """
         Post-execution hook for commands.
         
@@ -82,6 +125,15 @@ class ExecutionHooks:
             await self._track_file_copy_move(command, context)
         elif base_command in ["sed", "awk", "perl", "nano", "vim", "emacs"]:
             await self._track_file_modification(command, context)
+        
+        # Call registered post-execute hooks
+        hook_type = 'post_execute_command'
+        if hook_type in self._post_execute_hooks:
+            for handler in self._post_execute_hooks[hook_type]:
+                try:
+                    await handler(command, result, context)
+                except Exception as e:
+                    self._logger.error(f"Error in {hook_type} hook: {str(e)}")
     
     async def pre_execute_file_operation(
         self, 

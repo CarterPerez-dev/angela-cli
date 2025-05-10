@@ -43,35 +43,54 @@ def init_application():
     # Check dependencies first
     check_dependencies()
     
+    # Initialize core registry
+    from angela.core.registry import registry
+    
+    # Register core services first, since other components depend on them
+    from angela.core.service_registration import register_core_services
+    register_core_services()
+    
     from angela.execution.engine import execution_engine
     from angela.execution.adaptive_engine import adaptive_engine
     from angela.safety import check_command_safety, validate_command_safety
     from angela.orchestrator import orchestrator
-    from angela.toolchain.docker import docker_integration
-    from angela.generation.context_manager import generation_context_manager
-    from angela.generation.refiner import interactive_refiner
-    from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
-    from angela.integrations.semantic_integration import semantic_integration
-    from angela.core.registry import registry
     from angela.context.enhancer import context_enhancer
     
-    # Register core services
+    # These should be already registered by register_core_services,
+    # but let's re-register them to ensure they're available
     registry.register("execution_engine", execution_engine)
     registry.register("adaptive_engine", adaptive_engine)
     registry.register("check_command_safety", check_command_safety)
     registry.register("validate_command_safety", validate_command_safety)
     registry.register("orchestrator", orchestrator)
     registry.register("context_enhancer", context_enhancer)
-    registry.register("docker_integration", docker_integration)
-    registry.register("generation_context_manager", generation_context_manager)
-    registry.register("interactive_refiner", interactive_refiner)
-    registry.register("semantic_integration", semantic_integration)
     
-    # Register all missing services
-    from angela.core.service_registration import register_core_services
-    register_core_services()
+    # Apply integrations
+    from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
+    from angela.integrations.semantic_integration import semantic_integration
+    
+    # Register additional services
+    registry.register("semantic_integration", semantic_integration)
     
     # Apply integrations
     apply_enhanced_planner_integration()
     
-
+    # Initialize phase12 (if available)
+    try:
+        from angela.integrations.phase12_integration import phase12_integration
+        import asyncio
+        
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Schedule in running loop
+            from angela.utils.logging import get_logger
+            logger = get_logger(__name__)
+            logger.info("Scheduling phase12 initialization in running event loop")
+            loop.create_task(phase12_integration.initialize())
+        else:
+            # Run short async task
+            loop.run_until_complete(phase12_integration.initialize())
+    except Exception as e:
+        from angela.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.warning(f"Could not initialize Phase 12: {str(e)}")

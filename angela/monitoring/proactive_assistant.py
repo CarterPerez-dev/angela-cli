@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple, Union, Callable, Awaitable
 from enum import Enum
 
+from angela.core.registry import registry
 from angela.utils.logging import get_logger
 from angela.core.events import event_bus
 from angela.shell.formatter import terminal_formatter
@@ -97,8 +98,16 @@ class ProactiveAssistant:
         # Register with background monitor
         background_monitor.register_insight_callback(self._handle_monitor_insight)
         
-        # Register with execution hooks
-        execution_hooks.register_hook("post_execute_command", self._post_execute_command_hook)
+        # Register with execution hooks - with error handling
+        try:
+            execution_hooks_obj = registry.get("execution_hooks")
+            if execution_hooks_obj and hasattr(execution_hooks_obj, "register_hook"):
+                execution_hooks_obj.register_hook("post_execute_command", self._post_execute_command_hook)
+                self._logger.debug("Successfully registered post_execute_command hook")
+            else:
+                self._logger.warning("Execution hooks object missing or doesn't have register_hook method")
+        except Exception as e:
+            self._logger.error(f"Error registering with execution hooks: {str(e)}")
         
         self._logger.info("Proactive assistant started")
     
