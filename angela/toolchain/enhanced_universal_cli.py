@@ -28,23 +28,29 @@ class EnhancedUniversalCLI:
     awareness and tool chaining capabilities.
     """
     
-    def __init__(self):
-        """Initialize the enhanced Universal CLI interface."""
-        self._logger = logger
-        self._translator = None
-        self._tool_cache = {}  # Cache of tool information
-        self._command_history = {}  # History of commands by tool
-    
     def initialize(self):
         """Initialize the translator."""
         self._translator = registry.get("universal_cli_translator")
         if not self._translator:
             try:
+                # Try direct import first
                 from angela.toolchain.universal_cli import universal_cli_translator
                 self._translator = universal_cli_translator
-                registry.register("universal_cli_translator", universal_cli_translator)
+                
+                # If the import worked but returned None, create a new instance
+                if self._translator is None:
+                    from angela.toolchain.universal_cli import UniversalCLITranslator
+                    self._translator = UniversalCLITranslator()
+                    self._logger.warning("Created new UniversalCLITranslator instance as fallback")
+                    
+                # Register the instance we found or created
+                registry.register("universal_cli_translator", self._translator)
+                self._logger.info("Registered universal_cli_translator from enhanced CLI")
             except ImportError:
-                self._logger.error("Failed to import Universal CLI Translator")
+                self._logger.error("Failed to import Universal CLI Translator - filename might be incorrect")
+                return False
+            except Exception as e:
+                self._logger.error(f"Unexpected error initializing Universal CLI Translator: {e}")
                 return False
         
         return self._translator is not None

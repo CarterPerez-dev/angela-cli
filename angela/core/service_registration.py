@@ -72,11 +72,23 @@ def register_core_services():
 
     # Register universal CLI translator
     try:
+        # Ensure we import correctly and initialize the instance if needed
         from angela.toolchain.universal_cli import universal_cli_translator
-        registry.register("universal_cli_translator", universal_cli_translator)
-        logger.debug("Registered universal_cli_translator")
+        
+        # Check if the instance was properly initialized
+        if universal_cli_translator is None:
+            from angela.toolchain.universal_cli import UniversalCLITranslator
+            universal_cli_translator_instance = UniversalCLITranslator()
+            registry.register("universal_cli_translator", universal_cli_translator_instance)
+            logger.info("Created and registered new universal_cli_translator instance")
+        else:
+            registry.register("universal_cli_translator", universal_cli_translator)
+            logger.info("Successfully registered existing universal_cli_translator")
+            
     except ImportError as e:
-        logger.warning(f"Could not import universal_cli_translator: {e}")
+        logger.error(f"CRITICAL ERROR: Could not import universal_cli_translator: {e}")
+        logger.error("This will prevent natural language command processing")
+
 
     # Register complex workflow planner
     try:

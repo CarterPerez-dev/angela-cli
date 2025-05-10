@@ -671,3 +671,16 @@ Be precise and accurate. Include necessary quotes for paths or arguments that ne
 
 # Global instance
 universal_cli_translator = UniversalCLITranslator()
+
+# Register it directly in the registry for immediate availability
+try:
+    # registry is already imported at the top of the file
+    registry.register("universal_cli_translator", universal_cli_translator)
+    logger.info("Universal CLI Translator registered with registry during module initialization")
+except NameError: # If registry was not imported successfully
+    logger.warning("Universal CLI Translator: 'registry' not defined. Cannot register during module initialization.")
+except Exception as e: # Catch other potential registration errors
+    logger.error(f"Universal CLI Translator: Failed to register with registry during module initialization: {e}")
+    # The comment "This is fine, service_registration will handle it later" would still apply here.
+    pass
+
