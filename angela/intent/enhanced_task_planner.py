@@ -29,7 +29,6 @@ from angela.ai.client import gemini_client, GeminiRequest
 from angela.context import context_manager
 from angela.context.file_resolver import file_resolver
 from angela.utils.logging import get_logger
-from angela.execution.error_recovery import ErrorRecoveryManager
 from angela.execution.engine import execution_engine
 from angela.safety.validator import validate_command_safety
 from angela.safety.classifier import classify_command_risk
@@ -106,6 +105,9 @@ class CoreEnhancedTaskPlanner:
     def __init__(self):
         """Initialize the enhanced task planner."""
         self._logger = logger
+
+        from angela.execution.error_recovery import ErrorRecoveryManager
+
         self._error_recovery_manager = registry.get("error_recovery_manager")
         if not self._error_recovery_manager:
             self._error_recovery_manager = ErrorRecoveryManager()
@@ -491,6 +493,9 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         Returns:
             Dictionary with execution results
         """
+
+        from angela.execution.error_recovery import ErrorRecoveryManager
+
         self._logger.info(f"Executing advanced plan: {plan.goal} (ID: {plan.id})")
         start_time = datetime.now()
         
