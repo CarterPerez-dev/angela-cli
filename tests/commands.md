@@ -101,5 +101,73 @@ Here's a list of ~30 commands designed to cover a wide range of Angela CLI's env
     *   *Tests:* Error context recall, basic diagnostic capability.
 
 ---
+Okay, here are 50 commands and natural language scenarios to test out Angela, designed to cover a wide range of its capabilities:
 
+**Core `angela request` (Natural Language Focus):**
+
+1.  "angela list all files in the current directory, including hidden ones"
+2.  "angela what's the git status of this project? I want a summary."
+3.  "angela find all python files in `src/` modified in the last 2 days"
+4.  "angela create a new directory called 'temp_project' and then a file 'notes.txt' inside it with the content 'Initial notes.'"
+5.  "angela show me the disk usage for my home folder in a human-readable format"
+6.  "angela search for 'TODO: Refactor' in all `*.py` files within the 'lib' directory."
+7.  "angela suggest a command to compress the 'archive_data' folder into a tar.gz file named 'backup.tar.gz'"
+8.  "angela how do I check my current python version and where is it installed?"
+9.  "angela what are the main dependencies of this Node.js project?"
+10. "angela I want to delete all `.log` files in the `logs` directory, but show me what you'd do first."
+11. "angela explain the 'process_data' function in 'parser.py'"
+12. "angela what other functions call 'get_user_details' in my project?"
+
+**File Operations (`angela files ...` and Natural Language Equivalents):**
+
+13. `angela files ls --all --long ./docs`
+14. "angela make a new folder structure 'data/raw/images' for me"
+15. `angela files rmdir old_project_files --recursive --force`
+16. "angela display the 'config.yaml' file with syntax highlighting"
+17. `angela files cp ./src/main.py ./backup/main_v2.py --force`
+18. "angela append 'new log entry' to 'application.log'"
+19. `angela files find "*.md" --path ./documentation --hidden`
+20. "angela give me detailed info about 'README.md' and show me the first 20 lines"
+21. `angela files resolve "the main configuration file for the API"`
+22. `angela files recent --limit 3 --type created`
+23. `angela files project`
+
+**Docker Operations (`angela docker ...` and Natural Language Equivalents):**
+
+24. `angela docker status`
+25. "angela list all docker containers, even stopped ones, but just show their IDs"
+26. `angela docker logs my_api_container --follow --tail 50 --timestamps`
+27. "angela start the docker container named 'postgres_db_server'"
+28. `angela docker rmi old_app_image:v1.0 --force`
+29. "angela build a docker image from the current directory, tag it 'web-app:latest', and don't use cache"
+30. `angela docker run -p 3000:80 -v $(pwd)/public:/usr/share/nginx/html --name my-nginx-instance nginx:alpine --rm`
+31. "angela bring up my docker-compose setup in detached mode, rebuilding images if necessary"
+32. `angela docker generate-dockerfile . --output Dockerfile.prod --overwrite`
+33. `angela docker setup . --no-compose --build`
+
+**Code Generation (`angela generate ...` and Natural Language Equivalents):**
+
+34. "angela create a new Python Flask project for a simple URL shortener, initialize git, and set up basic tests"
+35. `angela generate add-feature "implement user profile page with edit functionality" --project_dir ./my-webapp --branch feature/user-profile --generate_tests --auto_commit`
+36. "angela refine the 'data_processing.py' file. The 'parse_csv' function is too slow and lacks proper error handling. Apply the changes and create a backup."
+37. `angela generate generate-ci gitlab_ci --project_dir ./my-monorepo --project_type node`
+38. "angela create a complex project: a microservices-based e-commerce platform with a React frontend, Python (FastAPI) backend for orders, and a Go backend for inventory. Use detailed planning."
+39. `angela generate create-framework-project spring "A REST API for managing book inventory" --output_dir my_book_api --with_auth --install_deps`
+40. `angela generate generate-tests --project_dir ./my-rust-lib --test_framework cargo-test --focus "src/utils/*.rs"`
+
+**Rollback & Workflow Operations (`angela rollback ...`, `angela workflows ...`):**
+
+41. `angela rollback list --limit 5 --transactions`
+42. "angela undo the last file deletion I did"
+43. `angela workflows create backup_logs --description "Backup all .log files to archive folder"` (This will likely be interactive to define steps)
+44. "angela run the 'deploy_staging' workflow and set the version to 'v1.2.3'"
+45. `angela workflows export deploy_staging --output ./deploy_staging_workflow.zip`
+
+**Other Commands & Scenarios:**
+
+46. `angela init` (Test initialization, especially if config is missing/corrupt)
+47. `angela status` (Check overall system status and integrations)
+48. `angela shell` (Then type a few commands like `list files in /tmp` or `what is the current git branch?`)
+49. "angela I want to create a file named 'test.txt' and then another one called 'test.txt'. What happens?" (Tests error handling or overwrite logic for file creation)
+50. "angela I need to find a document about 'API rate limits' or maybe it was 'throttling', it's a markdown file in the 'docs' or 'wiki' folder." (Tests ambiguous file reference and content search)
 This list should provide a solid starting point for testing the breadth of functionalities you're aiming for in the initial phases. As you test, you'll naturally identify more specific edge cases and variations for each command. Remember to adapt these based on what's actually implemented in your "phases 1-12."
