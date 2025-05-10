@@ -3,6 +3,7 @@
 Angela CLI: AI-powered command-line assistant integrated into your terminal shell.
 The main package initialization
 """
+import sys
 
 __version__ = '0.1.0'
 
@@ -33,7 +34,6 @@ def check_dependencies():
             missing_deps.append(pkg_name)
     
     if missing_deps:
-        import sys
         print(f"\033[31mWarning: Missing dependencies: {', '.join(missing_deps)}\033[0m", file=sys.stderr)
         print(f"\033[31mTo install missing dependencies: pip install {' '.join(missing_deps)}\033[0m", file=sys.stderr)
         print(f"\033[31mOr reinstall Angela with all dependencies: pip install -e .\033[0m", file=sys.stderr)
@@ -43,7 +43,6 @@ def init_application():
     # Check dependencies first
     check_dependencies()
     
-    # Import components here to avoid early imports during module loading
     from angela.execution.engine import execution_engine
     from angela.execution.adaptive_engine import adaptive_engine
     from angela.safety import check_command_safety, validate_command_safety
@@ -55,6 +54,7 @@ def init_application():
     from angela.integrations.semantic_integration import semantic_integration
     from angela.core.registry import registry
     from angela.context.enhancer import context_enhancer
+    
     # Register core services
     registry.register("execution_engine", execution_engine)
     registry.register("adaptive_engine", adaptive_engine)
@@ -67,9 +67,11 @@ def init_application():
     registry.register("interactive_refiner", interactive_refiner)
     registry.register("semantic_integration", semantic_integration)
     
+    # Register all missing services
+    from angela.core.service_registration import register_core_services
+    register_core_services()
+    
     # Apply integrations
     apply_enhanced_planner_integration()
-    
-    # Register and initialize any other components as needed
     
 
