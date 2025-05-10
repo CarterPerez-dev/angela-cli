@@ -1,15 +1,11 @@
-# angela/core/service_registration.py - Enhanced implementation
-
 """
 Service registration for Angela CLI.
-
 This module ensures all core services are properly instantiated and registered
 with the central service registry.
 """
 import traceback
 from angela.core.registry import registry
 from angela.utils.logging import get_logger
-
 logger = get_logger(__name__)
 
 def register_core_services():
@@ -19,12 +15,16 @@ def register_core_services():
     # First, initialize all service objects
     # 1. Error Recovery Manager
     try:
-        from angela.execution.error_recovery import ErrorRecoveryManager
-        error_recovery_manager = ErrorRecoveryManager()
-        registry.register("error_recovery_manager", error_recovery_manager)
-        logger.info("✅ Successfully registered error_recovery_manager")
+        # Create a function that returns the error recovery manager
+        def get_error_recovery_manager():
+            from angela.execution.error_recovery import ErrorRecoveryManager
+            return ErrorRecoveryManager()
+
+        # Register the function instead of the instance
+        registry.register("get_error_recovery_manager", get_error_recovery_manager)
+        logger.info("✅ Successfully registered get_error_recovery_manager")
     except Exception as e:
-        logger.error(f"❌ Failed to register error_recovery_manager: {str(e)}")
+        logger.error(f"❌ Failed to register get_error_recovery_manager: {str(e)}")
         logger.error(traceback.format_exc())  # Print full traceback for debugging
     
     # 2. Universal CLI Translator
@@ -68,7 +68,7 @@ def register_core_services():
     
     # Verify registrations
     registered_services = [
-        "error_recovery_manager",
+        "get_error_recovery_manager",  # Updated to reflect the new name
         "universal_cli_translator",
         "ci_cd_integration",
         "complex_workflow_planner",

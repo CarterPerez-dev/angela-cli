@@ -19,23 +19,22 @@ from rich.markdown import Markdown
 from rich.text import Text
 from rich import box
 
-from angela.shell.formatter import terminal_formatter, OutputType
-from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
 console = Console()
 
-async def display_advanced_plan(plan: AdvancedTaskPlan) -> None:
+async def display_advanced_plan(plan: Any) -> None:
     """
     Display an advanced task plan with rich formatting.
     
     Args:
         plan: The advanced task plan to display
     """
-    logger.debug(f"Displaying advanced plan: {plan.id}")
-    
+    # ADD this import inside the function
+    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
     # Create a header panel
     header = Panel(
         f"[bold]{plan.description}[/bold]\n\n{plan.goal}",
@@ -134,6 +133,10 @@ def _build_dependency_tree(node, step_id, plan):
         step_id: Current step ID
         plan: The advanced task plan
     """
+    
+    from angela.intent.planner import PlanStepType
+    
+    
     # Find steps that depend on this step
     for next_id, next_step in plan.steps.items():
         if step_id in next_step.dependencies:
@@ -184,6 +187,8 @@ async def display_execution_results(
         plan: The executed advanced task plan
         results: The execution results
     """
+    
+    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
     logger.debug(f"Displaying execution results for plan: {plan.id}")
     
     # Create a header

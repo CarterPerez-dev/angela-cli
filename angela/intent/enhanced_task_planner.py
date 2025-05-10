@@ -105,12 +105,9 @@ class CoreEnhancedTaskPlanner:
     def __init__(self):
         """Initialize the enhanced task planner."""
         self._logger = logger
-
-        from angela.execution.error_recovery import ErrorRecoveryManager
-
-        self._error_recovery_manager = registry.get("error_recovery_manager")
-        if not self._error_recovery_manager:
-            self._error_recovery_manager = ErrorRecoveryManager()
+    
+        # Initialize to None instead of creating instance directly
+        self._error_recovery_manager = None
         
         # Initialize variable store for data flow
         self._variables: Dict[str, DataFlowVariable] = {}
@@ -128,6 +125,15 @@ class CoreEnhancedTaskPlanner:
         
         # Set up the sandbox environment for code execution
         self._setup_code_sandbox()
+
+    def _get_error_recovery_manager(self):
+        """Get or initialize the error recovery manager."""
+        if self._error_recovery_manager is None:
+            # Import inside the method
+            from angela.execution.error_recovery import ErrorRecoveryManager
+            self._error_recovery_manager = ErrorRecoveryManager()
+        return self._error_recovery_manager
+
     
     def _setup_code_sandbox(self):
         """Set up the sandbox environment for code execution."""
@@ -493,9 +499,9 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         Returns:
             Dictionary with execution results
         """
-
-        from angela.execution.error_recovery import ErrorRecoveryManager
-
+        # Get error recovery manager
+        error_recovery_manager = self._get_error_recovery_manager()
+    
         self._logger.info(f"Executing advanced plan: {plan.goal} (ID: {plan.id})")
         start_time = datetime.now()
         
@@ -611,8 +617,8 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                         self._logger.warning(f"Step {step_id} failed with error: {result.get('error', 'Unknown error')}")
                         
                         # Attempt error recovery
-                        if not dry_run and self._error_recovery_manager:
-                            recovery_result = await self._attempt_recovery(step, result, context)
+                        if not dry_run and error_recovery_manager:
+                            recovery_result = await self._attempt_recovery(step, error_result, context))
                             
                             if recovery_result.get("recovery_success", False):
                                 self._logger.info(f"Recovery succeeded for step {step_id}")
@@ -662,7 +668,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                     context.results[step_id] = error_result
                     
                     # Attempt recovery
-                    if not dry_run and self._error_recovery_manager:
+                    if not dry_run and error_recovery_manager:
                         recovery_result = await self._attempt_recovery(step, error_result, context)
                         
                         if recovery_result.get("recovery_success", False):
@@ -2244,7 +2250,18 @@ class EnhancedTaskPlanner(TaskPlanner):
         # another EnhancedTaskPlanner
         self._core_planner = CoreEnhancedTaskPlanner()
         self._logger = logger
-    
+        self._error_recovery_manager = None
+
+
+    def _get_error_recovery_manager(self):
+        """Get or initialize the error recovery manager."""
+        if self._error_recovery_manager is None:
+            # Import inside the method
+            from angela.execution.error_recovery import ErrorRecoveryManager
+            self._error_recovery_manager = ErrorRecoveryManager()
+        return self._error_recovery_manager
+        
+            
     async def execute_plan(
         self, 
         plan: Union[TaskPlan, AdvancedTaskPlan], 

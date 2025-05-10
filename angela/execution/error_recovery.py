@@ -815,12 +815,12 @@ Valid strategy types:
         """
         Guide the user through recovery options.
         """
-        if not strategies:
-            return None
-        
-        # Import here to avoid circular imports
+
         from angela.shell.formatter import terminal_formatter, OutputType
         
+        if not strategies:
+            return None
+
         # Display recovery options
         terminal_formatter.print_output(
             "Command execution failed. The following recovery options are available:",

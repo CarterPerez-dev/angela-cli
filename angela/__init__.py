@@ -38,6 +38,8 @@ def check_dependencies():
         print(f"\033[31mTo install missing dependencies: pip install {' '.join(missing_deps)}\033[0m", file=sys.stderr)
         print(f"\033[31mOr reinstall Angela with all dependencies: pip install -e .\033[0m", file=sys.stderr)
 
+
+
 def init_application():
     """Initialize all application components."""
     # Check dependencies first

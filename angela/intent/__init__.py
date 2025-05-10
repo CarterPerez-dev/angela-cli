@@ -17,12 +17,10 @@ from .planner import (
     task_planner
 )
 
-# Export enhanced planner 
-# Note: May have circular dependencies with error_recovery modules
-from .enhanced_task_planner import (
-    EnhancedTaskPlanner, 
-    enhanced_task_planner
-)
+def get_enhanced_task_planner():
+    """Get the enhanced task planner lazily to avoid circular imports."""
+    from .enhanced_task_planner import enhanced_task_planner
+    return enhanced_task_planner
 
 # Export semantic understanding components
 # Note: May have circular dependencies with shell.inline_feedback
@@ -47,15 +45,13 @@ __all__ = [
     'AdvancedPlanStep', 'AdvancedTaskPlan',
     'task_planner',
     
-    # Enhanced planning components
+    # Enhanced planning components - CHANGE THIS LINE
     'EnhancedTaskPlanner', 
-    'enhanced_task_planner',
+    'get_enhanced_task_planner',
     
-    # Semantic understanding
+    # Keep the rest of the list the same
     'IntentClarification',
     'semantic_task_planner',
-    
-    # Complex workflow planning
     'WorkflowStepType', 'ComplexWorkflowPlan',
     'complex_workflow_planner',
 ]

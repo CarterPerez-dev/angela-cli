@@ -82,12 +82,20 @@ class Orchestrator:
         """Initialize the orchestrator."""
         self._logger = logger
         self._background_tasks = set()
-        self._error_recovery_manager = ErrorRecoveryManager()
+        self._error_recovery_manager = None
         self._background_monitor = background_monitor
         self._network_monitor = network_monitor
         
         
         self._background_monitor.register_insight_callback(self._handle_monitoring_insight)
+    
+    def _get_error_recovery_manager(self):
+        """Get or initialize the error recovery manager."""
+        if self._error_recovery_manager is None:
+            # Import inside the method
+            from angela.execution.error_recovery import ErrorRecoveryManager
+            error_recovery_manager = ErrorRecoveryManager()
+        return error_recovery_manager    
         
     async def process_request(
         self, 
@@ -106,9 +114,11 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         '''
+        
+        
         # Initialize dependencies we'll need (getting from registry avoids circular imports)
-        if self._error_recovery_manager is None:
-            self._error_recovery_manager = registry.get("error_recovery_manager")
+        error_recovery_manager = self._get_error_recovery_manager()
+
             
         # Get context enhancer from registry
         context_enhancer = registry.get("context_enhancer")
@@ -1706,19 +1716,11 @@ class Orchestrator:
         execute: bool, 
         dry_run: bool
     ) -> Dict[str, Any]:
-        """
-        Process a multi-step operation request with transaction-based rollback support.
-        
-        Args:
-            request: The user request
-            context: Context information
-            execute: Whether to execute the commands
-            dry_run: Whether to simulate execution without making changes
-            
-        Returns:
-            Dictionary with processing results
-        """
+        """Process a multi-step operation request with transaction-based rollback support."""
         self._logger.info(f"Processing multi-step request: {request}")
+        
+        # Get error recovery manager if needed
+        error_recovery_manager = self._get_error_recovery_manager()
         
         # Determine if we should use advanced planning
         complexity = await task_planner._determine_complexity(request)
@@ -2137,6 +2139,9 @@ class Orchestrator:
         Returns:
             Updated execution results after recovery attempts
         """
+        # Get error recovery manager
+        error_recovery_manager = self._get_error_recovery_manager()
+        
         recovered_results = list(execution_results)  # Copy the original results
         
         # Find failed steps
@@ -2155,7 +2160,7 @@ class Orchestrator:
                 # Only attempt recovery if we have a valid step
                 if step:
                     # Attempt recovery
-                    recovery_result = await self._error_recovery_manager.handle_error(
+                    recovery_result = await error_recovery_manager.handle_error(
                         step, result, {"plan": plan}
                     )
                     
