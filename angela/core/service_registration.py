@@ -1,3 +1,4 @@
+# angela/core/service_registration.py
 """
 Service registration for Angela CLI.
 This module ensures all core services are properly instantiated and registered
@@ -12,29 +13,27 @@ def register_core_services():
     """Register all core services with the registry."""
     logger.info("Registering core services...")
     
-    # First, initialize all service objects
     # 1. Error Recovery Manager
     try:
-        # Create a function that returns the error recovery manager
-        def get_error_recovery_manager():
-            from angela.execution.error_recovery import ErrorRecoveryManager
-            return ErrorRecoveryManager()
-
-        # Register the function instead of the instance
-        registry.register("get_error_recovery_manager", get_error_recovery_manager)
-        logger.info("✅ Successfully registered get_error_recovery_manager")
+        # Direct registration instead of using a getter function
+        from angela.execution.error_recovery import ErrorRecoveryManager
+        error_recovery_manager = ErrorRecoveryManager()
+        registry.register("error_recovery_manager", error_recovery_manager)
+        logger.info("✅ Successfully registered error_recovery_manager")
     except Exception as e:
-        logger.error(f"❌ Failed to register get_error_recovery_manager: {str(e)}")
+        logger.error(f"❌ Failed to register error_recovery_manager: {str(e)}")
         logger.error(traceback.format_exc())  # Print full traceback for debugging
     
     # 2. Universal CLI Translator
     try:
-        from angela.toolchain.universal_cli import universal_cli_translator
-        registry.register("universal_cli_translator", universal_cli_translator)
-        logger.info("✅ Successfully registered universal_cli_translator")
-    except Exception as e:
-        logger.error(f"❌ Failed to register universal_cli_translator: {str(e)}")
-        logger.error(traceback.format_exc())
+        # Use a try-except block for each import to handle failures individually
+        try:
+            from angela.toolchain.universal_cli import universal_cli_translator
+            registry.register("universal_cli_translator", universal_cli_translator)
+            logger.info("✅ Successfully registered universal_cli_translator")
+        except Exception as e:
+            logger.error(f"❌ Failed to register universal_cli_translator: {str(e)}")
+            logger.error(traceback.format_exc())
     
     # 3. CI/CD Integration
     try:
@@ -46,8 +45,14 @@ def register_core_services():
     
     # 4. Complex Workflow Planner
     try:
-        from angela.intent.complex_workflow_planner import complex_workflow_planner
-        registry.register("complex_workflow_planner", complex_workflow_planner)
+        # Defer importing complex_workflow_planner to avoid circular dependencies
+        def get_complex_workflow_planner():
+            from angela.intent.complex_workflow_planner import complex_workflow_planner
+            return complex_workflow_planner
+        
+        registry.register("get_complex_workflow_planner", get_complex_workflow_planner)
+        # Also register a factory function for direct access
+        registry.register("complex_workflow_planner", get_complex_workflow_planner())
         logger.debug("Registered complex_workflow_planner")
     except Exception as e:
         logger.error(f"Failed to register complex_workflow_planner: {str(e)}")
@@ -68,7 +73,7 @@ def register_core_services():
     
     # Verify registrations
     registered_services = [
-        "get_error_recovery_manager",  # Updated to reflect the new name
+        "error_recovery_manager",
         "universal_cli_translator",
         "ci_cd_integration",
         "complex_workflow_planner",

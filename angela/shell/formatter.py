@@ -21,7 +21,7 @@ from rich.text import Text
 from rich.layout import Layout
 from rich.tree import Tree
 from rich import box
-
+from angela.intent.planner import AdvancedTaskPlan, PlanStepType
 
 from angela.utils.logging import get_logger
 

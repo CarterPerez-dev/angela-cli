@@ -20,6 +20,13 @@ from rich.text import Text
 from rich import box
 
 
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Use a forward reference for typing to avoid circular imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -35,7 +42,8 @@ async def display_advanced_plan(plan: Any) -> None:
     """
     # ADD this import inside the function
     from angela.intent.planner import AdvancedTaskPlan, PlanStepType
-    # Create a header panel
+    
+    
     header = Panel(
         f"[bold]{plan.description}[/bold]\n\n{plan.goal}",
         title=f"Advanced Plan: {plan.id}",
@@ -189,6 +197,7 @@ async def display_execution_results(
     """
     
     from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+
     logger.debug(f"Displaying execution results for plan: {plan.id}")
     
     # Create a header
@@ -648,5 +657,6 @@ terminal_formatter.display_advanced_plan = display_advanced_plan
 terminal_formatter.display_execution_results = display_execution_results
 terminal_formatter.display_step_details = display_step_details
 terminal_formatter.display_step_error = display_step_error
+
 
 logger.info("Extended terminal formatter with advanced task plan display capabilities")

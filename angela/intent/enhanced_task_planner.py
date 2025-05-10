@@ -618,7 +618,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                         
                         # Attempt error recovery
                         if not dry_run and error_recovery_manager:
-                            recovery_result = await self._attempt_recovery(step, error_result, context))
+                            recovery_result = await self._attempt_recovery(step, error_result, context)
                             
                             if recovery_result.get("recovery_success", False):
                                 self._logger.info(f"Recovery succeeded for step {step_id}")
@@ -734,6 +734,40 @@ Ensure the plan handles potential errors and provides clear decision branches fo
             "execution_time": execution_time,
             "variables": {k: v.dict() for k, v in self._variables.items()}
         }
+
+
+    async def _attempt_recovery(
+        self, 
+        step: Any, 
+        error_result: Dict[str, Any], 
+        context: StepExecutionContext
+    ) -> Dict[str, Any]:
+        """
+        Attempt to recover from a step execution error.
+        
+        Args:
+            step: The step that failed
+            error_result: The execution result with error information
+            context: Execution context
+            
+        Returns:
+            Updated execution result with recovery information
+        """
+        # Get error recovery manager
+        error_recovery_manager = self._get_error_recovery_manager()
+        
+        if error_recovery_manager:
+            # Attempt recovery
+            return await error_recovery_manager.handle_error(step, error_result, context)
+        else:
+            # No recovery manager available
+            return {
+                "recovery_attempted": False,
+                "recovery_success": False,
+                "error": "Error recovery manager not available"
+            }
+
+
     
     async def _execute_advanced_step(
         self, 
