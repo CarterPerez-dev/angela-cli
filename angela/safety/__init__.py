@@ -7,7 +7,7 @@ operations before execution, including command classification, preview generatio
 and adaptive confirmation based on user preferences.
 """
 from .classifier import classify_command_risk, analyze_command_impact
-from .validator import validate_command_safety
+from .validator import validate_command_safety, validate_operation
 from .preview import generate_preview
 from .confirmation import get_confirmation, requires_confirmation
 from .adaptive_confirmation import get_adaptive_confirmation, offer_command_learning
