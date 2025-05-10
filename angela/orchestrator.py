@@ -115,13 +115,9 @@ class Orchestrator:
             Dictionary with processing results
         '''
         
-        
         # Initialize dependencies we'll need (getting from registry avoids circular imports)
         error_recovery_manager = self._get_error_recovery_manager()
-
             
-        # Get context enhancer from registry
-        context_enhancer = registry.get("context_enhancer")
         # Refresh context to ensure we have the latest information
         context_manager.refresh_context()
         context = context_manager.get_context_dict()
@@ -131,10 +127,34 @@ class Orchestrator:
         context["session"] = session_context
         
         # Enhance context with project information, dependencies, and recent activity
-        context = await context_enhancer.enrich_context(context)
+        # Add robust error handling for context enhancement
+        try:
+            # Get context enhancer from registry
+            context_enhancer = registry.get("context_enhancer")
+            
+            if context_enhancer:
+                # If available in registry, use it
+                context = await context_enhancer.enrich_context(context)
+            else:
+                # If not in registry, try direct import as fallback
+                self._logger.warning("context_enhancer not found in registry, attempting direct import")
+                try:
+                    from angela.context.enhancer import context_enhancer
+                    if context_enhancer:
+                        # Register for future use
+                        registry.register("context_enhancer", context_enhancer)
+                        context = await context_enhancer.enrich_context(context)
+                    else:
+                        self._logger.warning("context_enhancer is None after direct import, continuing with basic context")
+                except ImportError as e:
+                    self._logger.error(f"Failed to import context_enhancer directly: {e}")
+                    self._logger.warning("Continuing with basic context")
+        except Exception as e:
+            self._logger.error(f"Error during context enhancement: {str(e)}")
+            self._logger.warning("Continuing with unenriched context")
         
         self._logger.info(f"Processing request: {request}")
-        self._logger.debug(f"Enhanced context with {len(context)} keys")
+        self._logger.debug(f"Context contains {len(context)} keys")
         
         # Extract and resolve file references
         file_references = await file_resolver.extract_references(request, context)

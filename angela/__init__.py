@@ -46,14 +46,20 @@ def init_application():
     check_dependencies()
     
     # Initialize core registry
-    from angela.core.registry import registry
-
+    from angela.core.registry import registry    
     
+    try:
+        from angela.context.enhancer import context_enhancer
+        registry.register("context_enhancer", context_enhancer)
+        logger.debug("Successfully pre-registered context_enhancer")
+    except Exception as e:
+        logger.error(f"Failed to pre-register context_enhancer: {str(e)}")
+        
     # Register core services first, since other components depend on them
     from angela.core.service_registration import register_core_services
     register_core_services()
     
-    from angela.context.enhancer import context_enhancer
+            
     from angela.execution.engine import execution_engine
     from angela.execution.adaptive_engine import adaptive_engine
     from angela.safety import check_command_safety, validate_command_safety
@@ -99,3 +105,36 @@ def init_application():
         from angela.utils.logging import get_logger
         logger = get_logger(__name__)
         logger.warning(f"Could not initialize Phase 12: {str(e)}")
+        
+        
+        
+    from angela.core.registry import registry
+    critical_services = [
+        "universal_cli_translator",
+        "execution_engine",
+        "adaptive_engine",
+        # Add other critical services here
+    ]
+    
+    missing_services = []
+    for service_name in critical_services:
+        if registry.get(service_name) is None:
+            missing_services.append(service_name)
+    
+    if missing_services:
+        from angela.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"CRITICAL ERROR: The following essential services are missing: {', '.join(missing_services)}")
+        logger.error("Application functionality will be severely limited")
+        
+        # Attempt to register missing services as a last resort
+        for service_name in missing_services:
+            if service_name == "universal_cli_translator":
+                try:
+                    from angela.toolchain.universal_cli import universal_cli_translator, UniversalCLITranslator
+                    if universal_cli_translator is None:
+                        universal_cli_translator = UniversalCLITranslator()
+                    registry.register("universal_cli_translator", universal_cli_translator)
+                    logger.info(f"Emergency registration of {service_name} successful")
+                except Exception as e:
+                    logger.error(f"Emergency registration failed for {service_name}: {e}")        

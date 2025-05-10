@@ -16,12 +16,19 @@ def register_core_services():
 
     try:
         from angela.context.enhancer import context_enhancer
+        if context_enhancer is None:
+            logger.error("context_enhancer is None after import, attempting to recreate")
+            # Try to recreate it
+            from angela.context.enhancer import ContextEnhancer
+            context_enhancer = ContextEnhancer()
+        
         registry.register("context_enhancer", context_enhancer)
-        logger.debug("Registered context_enhancer")
+        logger.debug(f"Registered context_enhancer: {type(context_enhancer).__name__}")
     except ImportError as e:
         logger.error(f"CRITICAL ERROR: Could not import context_enhancer: {e}")
-        # Raise an exception here since this is critical
         raise ImportError(f"Failed to register critical service context_enhancer: {e}")
+    except Exception as e:
+        logger.error(f"CRITICAL ERROR: Unexpected error registering context_enhancer: {e}")
 
 
     try:

@@ -357,5 +357,11 @@ class ContextEnhancer:
             return enhanced_context
 
 
-# Global context enhancer instance
-context_enhancer = ContextEnhancer()
+try:
+    # Global context enhancer instance
+    context_enhancer = ContextEnhancer()
+    logger.debug(f"context_enhancer initialized: {context_enhancer}")
+except Exception as e:
+    logger.error(f"Failed to initialize context_enhancer: {e}")
+    # Still create the instance but log the error
+    context_enhancer = ContextEnhancer()
