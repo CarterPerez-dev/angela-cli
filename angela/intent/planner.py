@@ -404,9 +404,11 @@ Include error handling where appropriate.
         """
         self._logger.info(f"Executing plan: {plan.goal}")
         
-        # Handle different plan types
+        # Check for EnhancedTaskPlanner to delegate advanced plans
         if isinstance(plan, AdvancedTaskPlan):
-            return await self._execute_advanced_plan(plan, dry_run, transaction_id)
+            # Import here to avoid circular imports
+            from angela.intent.enhanced_task_planner import enhanced_task_planner
+            return await enhanced_task_planner.execute_plan(plan, dry_run, transaction_id)
         else:
             return await self._execute_basic_plan(plan, dry_run, transaction_id)
     
@@ -427,6 +429,10 @@ Include error handling where appropriate.
         Returns:
             List of execution results for each step
         """
+        # Import necessary modules inside method to avoid circular imports
+        from angela.execution.engine import execution_engine
+        from angela.execution.rollback import rollback_manager
+        
         results = []
         
         # Execute each step in sequence
@@ -438,22 +444,19 @@ Include error handling where appropriate.
             
             try:
                 # Execute the command
-                result = await execution_engine.execute_command(
+                stdout, stderr, return_code = await execution_engine.execute_command(
                     command=step.command,
                     check_safety=True,
                     dry_run=dry_run
                 )
                 
                 # Record command execution in the transaction if successful
-                if not dry_run and transaction_id and result[2] == 0:  # return_code == 0
-                    # Import here to avoid circular imports
-                    from angela.execution.rollback import rollback_manager
-                    
+                if not dry_run and transaction_id and return_code == 0:
                     await rollback_manager.record_command_execution(
                         command=step.command,
-                        return_code=result[2],
-                        stdout=result[0],
-                        stderr=result[1],
+                        return_code=return_code,
+                        stdout=stdout,
+                        stderr=stderr,
                         transaction_id=transaction_id,
                         step_id=step_id
                     )
@@ -463,17 +466,17 @@ Include error handling where appropriate.
                     "step": i + 1,
                     "command": step.command,
                     "explanation": step.explanation,
-                    "stdout": result[0],
-                    "stderr": result[1],
-                    "return_code": result[2],
-                    "success": result[2] == 0
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "return_code": return_code,
+                    "success": return_code == 0
                 }
                 
                 results.append(execution_result)
                 
                 # Stop execution if a step fails
-                if result[2] != 0:
-                    self._logger.warning(f"Step {i+1} failed with return code {result[2]}")
+                if return_code != 0:
+                    self._logger.warning(f"Step {i+1} failed with return code {return_code}")
                     break
                     
             except Exception as e:
@@ -496,7 +499,6 @@ Include error handling where appropriate.
 
     #######################
     # Advanced Planning Methods
-    #######################
     
     async def _generate_advanced_plan(
         self, 
@@ -513,6 +515,9 @@ Include error handling where appropriate.
         Returns:
             An AdvancedTaskPlan with steps to achieve the goal
         """
+        # Import here to avoid circular imports
+        from angela.intent.enhanced_task_planner import enhanced_task_planner
+        return await enhanced_task_planner.plan_advanced_task(goal, context)
         # Build a planning prompt for advanced planning
         prompt = self._build_advanced_planning_prompt(goal, context)
         
@@ -1179,5 +1184,12 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
         }
 
 
-# Global instance
 task_planner = TaskPlanner()
+
+# Import EnhancedTaskPlanner for export (will be available when importing from this module)
+try:
+    from angela.intent.enhanced_task_planner import EnhancedTaskPlanner
+except ImportError:
+    # Log warning but don't fail - EnhancedTaskPlanner may be imported later
+    logger.warning("EnhancedTaskPlanner not available during module initialization. Some advanced features may be limited.")
+    EnhancedTaskPlanner = None

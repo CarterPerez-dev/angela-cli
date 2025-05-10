@@ -13,21 +13,18 @@ def register_core_services():
     """Register all core services with the registry."""
     logger.info("Registering core services")
 
-
-    # Ensure context_enhancer is properly registered
+    # Register context enhancer if available
     try:
         from angela.context.enhancer import context_enhancer
         if context_enhancer is None:
             logger.error("context_enhancer is None after import, attempting to recreate")
-            # Try to recreate it
             from angela.context.enhancer import ContextEnhancer
             context_enhancer = ContextEnhancer()
         
         registry.register("context_enhancer", context_enhancer)
         logger.debug(f"Registered context_enhancer: {type(context_enhancer).__name__}")
     except ImportError as e:
-        logger.error(f"CRITICAL ERROR: Could not import context_enhancer: {e}")
-        # Try creating the class directly
+        logger.error(f"Could not import context_enhancer: {e}")
         try:
             from angela.context.enhancer import ContextEnhancer
             temp_enhancer = ContextEnhancer()
@@ -35,13 +32,8 @@ def register_core_services():
             logger.info("Created and registered new context_enhancer instance")
         except Exception as inner_e:
             logger.critical(f"Failed to create alternative context_enhancer: {inner_e}")
-            # Don't raise here - continue registering other services
-            logger.error("Continuing with registration of other services without context_enhancer")
-    except Exception as e:
-        logger.error(f"CRITICAL ERROR: Unexpected error registering context_enhancer: {e}")
-        logger.error("Continuing with registration of other services without context_enhancer")
 
-
+    # Register essential components
     try:
         from angela.execution.engine import execution_engine
         registry.register("execution_engine", execution_engine)
@@ -88,9 +80,23 @@ def register_core_services():
     except ImportError as e:
         logger.warning(f"Could not import ErrorRecoveryManager: {e}")
 
+    # Register enhanced task planner
+    try:
+        from angela.intent.enhanced_task_planner import enhanced_task_planner
+        registry.register("enhanced_task_planner", enhanced_task_planner)
+        logger.debug("Registered enhanced_task_planner")
+    except ImportError as e:
+        logger.warning(f"Could not import enhanced_task_planner: {e}")
+        try:
+            # Alternative import from planner as fallback
+            from angela.intent.planner import task_planner
+            registry.register("enhanced_task_planner", task_planner)
+            logger.info("Registered task_planner as fallback for enhanced_task_planner")
+        except ImportError:
+            logger.error("Could not register any task planner")
+
     # Register universal CLI translator
     try:
-        # Ensure we import correctly and initialize the instance if needed
         from angela.toolchain.universal_cli import universal_cli_translator
         
         # Check if the instance was properly initialized
@@ -104,8 +110,7 @@ def register_core_services():
             logger.info("Successfully registered existing universal_cli_translator")
             
     except ImportError as e:
-        logger.error(f"CRITICAL ERROR: Could not import universal_cli_translator: {e}")
-        logger.error("This will prevent natural language command processing")
+        logger.error(f"Could not import universal_cli_translator: {e}")
 
 
     # Register complex workflow planner
@@ -123,5 +128,29 @@ def register_core_services():
         logger.debug("Registered ci_cd_integration")
     except ImportError as e:
         logger.warning(f"Could not import ci_cd_integration: {e}")
+
+    # Register Docker integration
+    try:
+        from angela.toolchain.docker import docker_integration
+        registry.register("docker_integration", docker_integration)
+        logger.debug("Registered docker_integration")
+    except ImportError as e:
+        logger.warning(f"Could not import docker_integration: {e}")
+
+    # Register file resolver
+    try:
+        from angela.context.file_resolver import file_resolver
+        registry.register("file_resolver", file_resolver)
+        logger.debug("Registered file_resolver")
+    except ImportError as e:
+        logger.warning(f"Could not import file_resolver: {e}")
+
+    # Register rollback manager
+    try:
+        from angela.execution.rollback import rollback_manager
+        registry.register("rollback_manager", rollback_manager)
+        logger.debug("Registered rollback_manager")
+    except ImportError as e:
+        logger.warning(f"Could not import rollback_manager: {e}")
 
     logger.info("Core services registration complete")
