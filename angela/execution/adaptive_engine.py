@@ -17,7 +17,7 @@ from angela.execution.engine import execution_engine
 from angela.context.history import history_manager
 from angela.context.preferences import preferences_manager
 from angela.context.session import session_manager
-from angela.ai.analyzer import error_analyzer
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -34,6 +34,13 @@ class AdaptiveExecutionEngine:
     def __init__(self):
         """Initialize the adaptive execution engine."""
         self._logger = logger
+        self._error_analyzer = None # Initialize to None
+        
+    def _get_error_analyzer(self): # New helper method
+        if self._error_analyzer is None:
+            from angela.ai.analyzer import error_analyzer # Import here
+            self._error_analyzer = error_analyzer
+        return self._error_analyzer
     
     async def execute_command(
         self, 
@@ -106,8 +113,10 @@ class AdaptiveExecutionEngine:
         
         # If execution failed, analyze error and suggest fixes
         if not result["success"] and result.get("stderr"):
-            result["error_analysis"] = error_analyzer.analyze_error(command, result["stderr"])
-            result["fix_suggestions"] = error_analyzer.generate_fix_suggestions(command, result["stderr"])
+            error_analyzer_instance = self._get_error_analyzer() 
+            result["error_analysis"] = error_analyzer_instance.analyze_error(command, result["stderr"])
+            result["fix_suggestions"] = error_analyzer_instance.generate_fix_suggestions(command, result["stderr"])
+
         
         # Offer to learn from successful executions
         if result["success"] and risk_level > 0:

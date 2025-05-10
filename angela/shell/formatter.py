@@ -23,6 +23,9 @@ from rich.tree import Tree
 from rich import box
 from angela.intent.planner import AdvancedTaskPlan, PlanStepType
 
+_console = Console(record=True, width=100)
+
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -307,9 +310,18 @@ class TerminalFormatter:
             # Format dependencies
             deps = ", ".join([str(d+1) for d in step.dependencies]) if step.dependencies else "None"
             
+            # Create syntax object
+            syntax = Syntax(step.command, "bash", theme="monokai", word_wrap=True)
+            
+            # Render to string instead of using .markup
+            _console.record = True
+            _console.print(syntax)
+            syntax_str = _console.export_text(styles=True)
+            _console.record = False
+            
             table.add_row(
                 str(i + 1),
-                Syntax(step.command, "bash", theme="monokai", word_wrap=True).markup,
+                syntax_str,
                 step.explanation,
                 f"[{risk_style}]{risk_name}[/{risk_style}]",
                 deps

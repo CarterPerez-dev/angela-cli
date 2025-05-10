@@ -113,33 +113,102 @@ class FileResolver:
         """
         self._logger.info(f"Extracting file references from: '{text}'")
         
-        # Define patterns for finding file references
+        # Define common words that should not be treated as file references
+        common_words = set([
+            "that", "this", "those", "these", "the", "it", "which", "what", 
+            "inside", "called", "named", "from", "with", "using", "into", 
+            "as", "for", "about", "like", "than", "then", "when", "where",
+            "how", "why", "who", "whom", "whose", "my", "your", "our", "their"
+        ])
+        
+        # Define minimum token length for potential file references
+        MIN_TOKEN_LENGTH = 3
+        
+        # Define more specific and detailed patterns for finding file references
         patterns = [
-            # Quoted paths
-            r'["\']([^"\']+?\.[a-zA-Z0-9]+)["\']',
-            # File/folder with extension
-            r'\b([a-zA-Z0-9_\-/\.]+\.[a-zA-Z0-9]+)\b',
-            # References to files/folders
-            r'(?:file|folder|directory|script|code|document)\s+["\']?([^\s"\']+)["\']?',
-            # References with in/from/to
-            r'(?:in|from|to)\s+["\']?([^\s"\']+)["\']?',
+            # Quoted paths with extensions - high confidence
+            r'["\']([a-zA-Z0-9](?:[a-zA-Z0-9_\-\.]+)/(?:[a-zA-Z0-9_\-\.]+/)*[a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]{1,10})["\']',
+            
+            # Quoted files with extensions - high confidence
+            r'["\']([a-zA-Z0-9][a-zA-Z0-9_\-\.]{1,50}\.[a-zA-Z0-9]{1,10})["\']',
+            
+            # Unquoted but clear file paths with extensions - medium confidence
+            r'\b([a-zA-Z0-9](?:[a-zA-Z0-9_\-\.]+)/(?:[a-zA-Z0-9_\-\.]+/)*[a-zA-Z0-9_\-\.]+\.[a-zA-Z0-9]{1,10})\b',
+            
+            # Unquoted files with extensions and minimal length - medium confidence
+            r'\b([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}\.[a-zA-Z0-9]{1,10})\b',
+            
+            # Very specific references with operation keywords - high confidence
+            r'(?:edit|open|read|cat|view|show|display|modify|update|check)\s+(?:file|script|module|config)?\s*["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+            
+            # Specific file operations with clear file reference - high confidence
+            r'(?:append\s+to|write\s+to|delete|remove)\s+(?:file|script)?\s*["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+            
+            # File references with clear context - medium confidence
+            r'(?:in|from|to)\s+(?:file|directory|folder)\s+["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+            
+            # References with operations that specifically mention "file" - medium-high confidence
+            r'(?:the|this|that|my)\s+file\s+["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+        ]
+        
+        # Special patterns for creation targets that we won't try to resolve as existing files
+        creation_patterns = [
+            # "save as X" pattern
+            r'save\s+(?:it\s+)?(?:as|to)\s+["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+            
+            # "create file X" pattern
+            r'create\s+(?:a\s+)?(?:new\s+)?(?:file|script)\s+["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}(?:\.[a-zA-Z0-9]{1,10})?)["\']?',
+            
+            # "generate X" where X has a file extension
+            r'generate\s+(?:a\s+)?(?:new\s+)?(?:file|script|code)?\s*["\']?([a-zA-Z0-9][a-zA-Z0-9_\-\.]{2,}\.[a-zA-Z0-9]{1,10})["\']?',
         ]
         
         references = []
+        creation_targets = []  # Track references that are meant for file creation
         
-        # Extract references using each pattern
+        # First identify creation targets that we should NOT try to resolve
+        for pattern in creation_patterns:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                reference = match.group(1)
+                
+                # Skip references that are too short or common words
+                if len(reference) < MIN_TOKEN_LENGTH or reference.lower() in common_words:
+                    continue
+                    
+                # Skip if it's just a number
+                if reference.isdigit():
+                    continue
+                    
+                # Skip if we've already seen this reference
+                if reference in creation_targets:
+                    continue
+                    
+                # This is a creation target, not an existing file to resolve
+                creation_targets.append(reference)
+                self._logger.debug(f"Identified creation target: {reference}")
+        
+        # Now extract references that should be resolved as existing files
         for pattern in patterns:
             for match in re.finditer(pattern, text, re.IGNORECASE):
                 reference = match.group(1)
-                # Skip if reference is already in the list
-                if any(ref == reference for ref, _ in references):
+                
+                # Skip references that are too short or common words
+                if len(reference) < MIN_TOKEN_LENGTH or reference.lower() in common_words:
+                    continue
+                    
+                # Skip if it's just a number
+                if reference.isdigit():
+                    continue
+                    
+                # Skip if this reference is a creation target or already in our list
+                if reference in creation_targets or any(ref == reference for ref, _ in references):
                     continue
                 
                 # Try to resolve the reference
                 resolved = await self.resolve_reference(reference, context)
                 references.append((reference, resolved))
         
-        self._logger.debug(f"Extracted {len(references)} file references")
+        self._logger.debug(f"Extracted {len(references)} file references and skipped {len(creation_targets)} creation targets")
         return references
     
     async def _resolve_exact_path(

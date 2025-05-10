@@ -86,8 +86,27 @@ class Orchestrator:
         self._background_monitor = background_monitor
         self._network_monitor = network_monitor
         
+        self._ensure_context_enhancer()
         
         self._background_monitor.register_insight_callback(self._handle_monitoring_insight)
+
+    def _ensure_context_enhancer(self):
+        """Ensure context_enhancer is available in the registry."""
+        enhancer = registry.get("context_enhancer")
+        if not enhancer:
+            try:
+                from angela.context.enhancer import context_enhancer
+                if context_enhancer:
+                    registry.register("context_enhancer", context_enhancer)
+                    self._logger.info("Successfully registered context_enhancer from direct import")
+                else:
+                    from angela.context.enhancer import ContextEnhancer
+                    new_enhancer = ContextEnhancer()
+                    registry.register("context_enhancer", new_enhancer)
+                    self._logger.info("Created and registered new context_enhancer instance")
+            except Exception as e:
+                self._logger.error(f"Failed to ensure context_enhancer: {str(e)}")
+
     
     def _get_error_recovery_manager(self):
         """Get or initialize the error recovery manager."""
@@ -127,7 +146,6 @@ class Orchestrator:
         context["session"] = session_context
         
         # Enhance context with project information, dependencies, and recent activity
-        # Add robust error handling for context enhancement
         try:
             # Get context enhancer from registry
             context_enhancer = registry.get("context_enhancer")
@@ -165,15 +183,32 @@ class Orchestrator:
         self._logger.info(f"Processing request: {request}")
         self._logger.debug(f"Context contains {len(context)} keys")
         
-        # Extract and resolve file references
-        file_references = await file_resolver.extract_references(request, context)
-        if file_references:
-            # Add resolved file references to context
-            context["resolved_files"] = [
-                {"reference": ref, "path": str(path) if path else None}
-                for ref, path in file_references
-            ]
-            self._logger.debug(f"Resolved {len(file_references)} file references")
+        # Perform quick intent analysis to determine if we should extract file references
+        request_intent = self._analyze_quick_intent(request)
+        
+        # Only extract file references for certain intents
+        if request_intent in ["read", "modify", "analyze", "unknown"]:
+            # Extract and resolve file references
+            file_references = await file_resolver.extract_references(request, context)
+            if file_references:
+                # Add resolved file references to context
+                context["resolved_files"] = [
+                    {"reference": ref, "path": str(path) if path else None}
+                    for ref, path in file_references
+                ]
+                self._logger.debug(f"Resolved {len(file_references)} file references")
+        else:
+            self._logger.debug(f"Skipping file resolution for {request_intent} intent")
+        
+        try:
+            # Analyze the request to determine its type
+            request_type = await self._determine_request_type(request, context)
+            self._logger.info(f"Determined request type: {request_type.value}")
+            
+            # Process the request based on its type
+            if request_type == RequestType.COMMAND:
+                # Handle single command request
+                return await self._process_command_request(request, context, execute, dry_run)
         
         try:
             # Analyze the request to determine its type
@@ -514,6 +549,57 @@ class Orchestrator:
             # Default to single command
             return RequestType.COMMAND
 
+
+    def _analyze_quick_intent(self, request: str) -> str:
+        """
+        Perform a quick analysis of request intent to determine if file resolution is needed.
+        
+        Args:
+            request: The user request
+            
+        Returns:
+            String indicating the high-level intent: "create", "read", "modify", "analyze", "unknown"
+        """
+        request_lower = request.lower()
+        
+        # Check for file creation keywords
+        creation_keywords = [
+            "create", "generate", "make", "new file", "save as", 
+            "write a new", "write new", "save it as", "output to"
+        ]
+        for keyword in creation_keywords:
+            if keyword in request_lower:
+                return "create"
+        
+        # Check for file reading keywords
+        read_keywords = [
+            "read", "open", "show", "display", "view", "cat", 
+            "print", "output", "list", "contents of"
+        ]
+        for keyword in read_keywords:
+            if keyword in request_lower:
+                return "read"
+        
+        # Check for file modification keywords
+        modify_keywords = [
+            "edit", "modify", "update", "change", "replace", "delete",
+            "remove", "rename", "move", "copy"
+        ]
+        for keyword in modify_keywords:
+            if keyword in request_lower:
+                return "modify"
+        
+        # Check for analysis keywords
+        analyze_keywords = [
+            "analyze", "examine", "check", "inspect", "review",
+            "summarize", "understand", "evaluate"
+        ]
+        for keyword in analyze_keywords:
+            if keyword in request_lower:
+                return "analyze"
+        
+        # Default case
+        return "unknown"
 
     async def _process_code_generation_request(
         self, 
@@ -2501,7 +2587,18 @@ Keep your response concise and focused.
         similar_command: Optional[str] = None,
         intent_result: Optional[Any] = None
     ) -> CommandSuggestion:
-        """Get a command suggestion from the AI service."""
+        """
+        Get a command suggestion from the AI service.
+        
+        Args:
+            request: The user request
+            context: Context information about the current environment
+            similar_command: Optional similar command from history
+            intent_result: Optional intent analysis result
+            
+        Returns:
+            A CommandSuggestion object with the suggested command
+        """
         # Build prompt with context, including session context if available
         prompt = build_prompt(request, context, similar_command, intent_result)
         
@@ -2510,13 +2607,22 @@ Keep your response concise and focused.
         
         # Call the Gemini API
         self._logger.info("Sending request to Gemini API")
-        api_response = await gemini_client.generate_text(api_request)
-        
-        # Parse the response
-        suggestion = parse_ai_response(api_response.text)
-        
-        self._logger.info(f"Received suggestion: {suggestion.command}")
-        return suggestion
+        try:
+            api_response = await gemini_client.generate_text(api_request)
+            
+            # Parse the response
+            suggestion = parse_ai_response(api_response.text)
+            
+            self._logger.info(f"Received suggestion: {suggestion.command}")
+            return suggestion
+        except Exception as e:
+            self._logger.exception(f"Error getting AI suggestion: {str(e)}")
+            # Provide a fallback suggestion
+            return CommandSuggestion(
+                intent="error",
+                command=f"echo 'Error generating suggestion: {str(e)}'",
+                explanation="This is a fallback command due to an error in the AI service."
+            )
     
     async def _extract_file_path(
         self, 
