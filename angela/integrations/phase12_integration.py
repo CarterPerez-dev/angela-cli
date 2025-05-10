@@ -12,6 +12,7 @@ import re
 import os
 from typing import Dict, Any, List, Optional, Set, Union, Tuple
 from pathlib import Path
+from enum import Enum
 
 from angela.utils.logging import get_logger
 from angela.context import context_manager

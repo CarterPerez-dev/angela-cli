@@ -13,6 +13,7 @@ import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple, Union, Callable, Awaitable
+from enum import Enum
 
 from angela.utils.logging import get_logger
 from angela.core.events import event_bus

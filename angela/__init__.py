@@ -17,7 +17,9 @@ def check_dependencies():
         ("prompt_toolkit", "prompt_toolkit"),
         ("typer", "typer"),
         ("rich", "rich"),
-        ("tomli", "tomli"),
+        # Only check tomli for Python < 3.11, otherwise use tomllib
+        ("tomli" if sys.version_info < (3, 11) else "tomllib", 
+         "tomli" if sys.version_info < (3, 11) else "tomllib"),
         ("loguru", "loguru"),
         ("google-generativeai", "google.generativeai"),
         ("aiohttp", "aiohttp"),
