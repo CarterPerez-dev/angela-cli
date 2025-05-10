@@ -244,7 +244,7 @@ def show_status():
 
 
 
-# Add this to angela/cli/main.py
+
 
 @app.command("--notify", hidden=True)
 def notify(

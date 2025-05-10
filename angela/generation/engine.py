@@ -2146,7 +2146,7 @@ For services/utilities:
             Maximum token count
         """
         # Base token limit
-        base_limit = 4000
+        base_limit = 8000
         
         # Adjust based on expected file complexity
         path = file.path.lower()
