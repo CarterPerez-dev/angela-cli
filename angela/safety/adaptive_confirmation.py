@@ -188,7 +188,7 @@ async def _get_simple_confirmation(
         console.print(explanation)
     
     # Display preview if available and enabled
-    if preview and preferences_manager.preferences.ui.show_preview:
+    if preview and preferences_manager.preferences.ui.show_command_preview:
         console.print(Panel(
             preview,
             title="Preview",
@@ -197,11 +197,12 @@ async def _get_simple_confirmation(
         ))
     
     # Use prompt_toolkit dialog for confirmation
-    confirmed = yes_no_dialog(
+    # FIXED: Using run_async() instead of run()
+    confirmed = await yes_no_dialog(
         title=f'Execute {risk_name} Risk Command?',
         text=f'{command}\n\nReason: {risk_reason}',
         style=CONFIRMATION_STYLES
-    ).run()
+    ).run_async()
     
     return confirmed
 
@@ -281,19 +282,21 @@ async def _get_detailed_confirmation(
         ))
     
     # Use prompt_toolkit dialog for confirmation
-    confirmed = yes_no_dialog(
+    # FIXED: Using run_async() instead of run()
+    confirmed = await yes_no_dialog(
         title=f'WARNING: Execute {risk_name} Risk Command?',
         text=f'{command}\n\nThis is a {risk_name} risk operation.\nReason: {risk_reason}\n\nAre you sure you want to proceed?',
         style=CONFIRMATION_STYLES
-    ).run()
+    ).run_async()
     
     # If confirmed for a high-risk operation, offer to add to trusted commands
     if confirmed and risk_level >= RISK_LEVELS["HIGH"]:
-        add_to_trusted = yes_no_dialog(
+        # FIXED: Using run_async() instead of run()
+        add_to_trusted = await yes_no_dialog(
             title='Add to Trusted Commands?',
             text=f'Would you like to auto-execute similar commands in the future?',
             style=CONFIRMATION_STYLES
-        ).run()
+        ).run_async()
         
         if add_to_trusted:
             preferences_manager.add_trusted_command(command)
@@ -314,11 +317,12 @@ async def offer_command_learning(command: str) -> None:
     
     # Only offer for commands used a few times but not yet trusted
     if pattern and 2 <= pattern.count <= 5 and command not in preferences_manager.preferences.trust.trusted_commands:
-        add_to_trusted = yes_no_dialog(
+        # FIXED: Using run_async() instead of run()
+        add_to_trusted = await yes_no_dialog(
             title='Add to Trusted Commands?',
             text=f'You\'ve used "{base_command}" {pattern.count} times. Would you like to auto-execute it in the future?',
             style=CONFIRMATION_STYLES
-        ).run()
+        ).run_async()
         
         if add_to_trusted:
             preferences_manager.add_trusted_command(command)
