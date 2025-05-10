@@ -36,6 +36,15 @@ CONFIRMATION_STYLES = Style.from_dict({
 # Risk level names
 RISK_LEVEL_NAMES = {v: k for k, v in RISK_LEVELS.items()}
 
+# Rich-compatible color mapping for risk levels
+RISK_COLORS = {
+    'safe': 'green',
+    'low': 'blue',
+    'medium': 'yellow',
+    'high': 'red',
+    'critical': 'dark_red',
+}
+
 # Console setup
 console = Console()
 
@@ -84,7 +93,7 @@ async def get_adaptive_confirmation(
     
     # For all other cases, get explicit confirmation
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    risk_style = risk_name.lower() if risk_name.lower() in CONFIRMATION_STYLES.names else 'medium'
+    risk_style = risk_name.lower() if risk_name.lower() in ['safe', 'low', 'medium', 'high', 'critical'] else 'medium'
     
     # For high-risk operations, use a more detailed confirmation dialog
     if risk_level >= RISK_LEVELS["HIGH"]:
@@ -161,14 +170,16 @@ async def _get_simple_confirmation(
 ) -> bool:
     """Get a simple confirmation for medium/low risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    risk_style = risk_name.lower() if risk_name.lower() in CONFIRMATION_STYLES.names else 'medium'
+    risk_style = risk_name.lower() if risk_name.lower() in ['safe', 'low', 'medium', 'high', 'critical'] else 'medium'
+    # Get actual color for rich components
+    risk_color = RISK_COLORS.get(risk_style, "yellow")
     
     # Display the command
     console.print("\n")
     console.print(Panel(
         Syntax(command, "bash", theme="monokai", word_wrap=True),
         title=f"Execute [{risk_name} Risk]",
-        border_style=risk_style,
+        border_style=risk_color,
         expand=False
     ))
     
@@ -181,7 +192,7 @@ async def _get_simple_confirmation(
         console.print(Panel(
             preview,
             title="Preview",
-            border_style=risk_style,
+            border_style=risk_color,
             expand=False
         ))
     
@@ -205,19 +216,21 @@ async def _get_detailed_confirmation(
 ) -> bool:
     """Get a detailed confirmation for high/critical risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    risk_style = risk_name.lower() if risk_name.lower() in CONFIRMATION_STYLES.names else 'high'
+    risk_style = risk_name.lower() if risk_name.lower() in ['safe', 'low', 'medium', 'high', 'critical'] else 'high'
+    # Get actual color for rich components
+    risk_color = RISK_COLORS.get(risk_style, "red")
     
     # Format the command and impact information
     console.print("\n")
     console.print(Panel(
         Syntax(command, "bash", theme="monokai", word_wrap=True),
-        title=f"[bold {risk_style}]HIGH RISK OPERATION[/bold {risk_style}]",
-        border_style=risk_style,
+        title=f"[bold {risk_color}]HIGH RISK OPERATION[/bold {risk_color}]",
+        border_style=risk_color,
         expand=False
     ))
     
-    console.print(f"[bold {risk_style}]Risk Level:[/bold {risk_style}] {risk_name}")
-    console.print(f"[bold {risk_style}]Reason:[/bold {risk_style}] {risk_reason}")
+    console.print(f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}")
+    console.print(f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}")
     
     # Display explanation if provided
     if explanation:
@@ -237,7 +250,7 @@ async def _get_detailed_confirmation(
         
         # Add warning for destructive operations
         if impact.get("destructive", False):
-            table.add_row("⚠️ Warning", f"[bold {risk_style}]This operation may delete or overwrite files[/bold {risk_style}]")
+            table.add_row("⚠️ Warning", f"[bold {risk_color}]This operation may delete or overwrite files[/bold {risk_color}]")
         
         # Add affected files/directories
         affected_files = impact.get("affected_files", [])
@@ -254,7 +267,7 @@ async def _get_detailed_confirmation(
         console.print(Panel(
             preview,
             title="Command Preview",
-            border_style=risk_style,
+            border_style=risk_color,
             expand=False
         ))
     

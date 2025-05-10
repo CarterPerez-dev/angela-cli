@@ -10,9 +10,7 @@ import asyncio
 from typing import Dict, Any, Optional, List, Set, Callable, Awaitable
 from pathlib import Path
 
-from angela.context import context_manager
-from angela.context.project_inference import project_inference
-from angela.context.session import session_manager
+# Non-circular imports can remain at the top level
 from angela.config import config_manager
 from angela.utils.logging import get_logger
 
@@ -46,17 +44,86 @@ class ContextEnhancer:
         # Start with a copy of the original context
         enriched = dict(context)
         
-        # Add enhanced project information if in a project
-        if context.get("project_root"):
-            await self._add_project_info(enriched, context["project_root"])
+        try:
+            # Add enhanced project information if in a project
+            if context.get("project_root"):
+                await self._add_project_info(enriched, context["project_root"])
+            
+            # Add recent file activity
+            await self._add_recent_file_activity(enriched)
+            
+            # Add file reference context
+            await self._add_file_reference_context(enriched)
+            
+            # Add enhanced file activity information 
+            from angela.context.file_activity import file_activity_tracker, ActivityType
+            
+            try:
+                # Get recent file activities by types
+                viewed_activities = file_activity_tracker.get_recent_activities(
+                    limit=5, 
+                    activity_types=[ActivityType.VIEWED]
+                )
+                modified_activities = file_activity_tracker.get_recent_activities(
+                    limit=5, 
+                    activity_types=[ActivityType.MODIFIED]
+                )
+                created_activities = file_activity_tracker.get_recent_activities(
+                    limit=5, 
+                    activity_types=[ActivityType.CREATED]
+                )
+                
+                # Extract paths from activities
+                viewed_files = [activity.get('path', '') for activity in viewed_activities if 'path' in activity]
+                modified_files = [activity.get('path', '') for activity in modified_activities if 'path' in activity]
+                created_files = [activity.get('path', '') for activity in created_activities if 'path' in activity]
+                
+                # Update or create recent_files
+                if "recent_files" not in enriched:
+                    enriched["recent_files"] = {}
+                    
+                enriched["recent_files"].update({
+                    "accessed": viewed_files,
+                    "modified": modified_files,
+                    "created": created_files,
+                })
+                
+                # Get most active files
+                most_active = file_activity_tracker.get_most_active_files(limit=5)
+                enriched["active_files"] = most_active
+            except Exception as e:
+                self._logger.warning(f"Error getting file activity: {str(e)}")
+            
+            # Add file resolver information if available
+            if "requested_file" in context:
+                from angela.context.file_resolver import file_resolver
+                
+                try:
+                    resolved_files = await file_resolver.resolve_file_references(
+                        context.get("cwd", ""),
+                        context.get("project_root", ""),
+                        [context["requested_file"]]
+                    )
+                    
+                    if resolved_files:
+                        enriched["resolved_files"] = resolved_files
+                except Exception as e:
+                    self._logger.warning(f"Error resolving file references: {str(e)}")
+            
+            # Run all registered enhancers
+            for enhancer in self._enhancers:
+                try:
+                    result = await enhancer(enriched)
+                    if result:
+                        enriched.update(result)
+                except Exception as e:
+                    self._logger.error(f"Error in enhancer {getattr(enhancer, '__name__', 'anonymous')}: {str(e)}")
+            
+            self._logger.debug(f"Context enriched with {len(enriched) - len(context)} additional keys")
+        except Exception as e:
+            self._logger.error(f"Error enriching context: {str(e)}")
+            # Return what we have so far
         
-        # Add recent file activity
-        await self._add_recent_file_activity(enriched)
-        
-        # Add file reference context
-        await self._add_file_reference_context(enriched)
-        
-        self._logger.debug(f"Context enriched with {len(enriched) - len(context)} additional keys")
         return enriched
     
     async def _add_project_info(self, context: Dict[str, Any], project_root: str) -> None:
@@ -67,6 +134,9 @@ class ContextEnhancer:
             context: The context to enrich
             project_root: The path to the project root
         """
+        # Local import to avoid circular dependency
+        from angela.context.project_inference import project_inference
+        
         self._logger.debug(f"Adding project info for {project_root}")
         
         try:
@@ -155,8 +225,6 @@ class ContextEnhancer:
             "paths": paths
         }
     
-    # angela/context/enhancer.py
-    
     def _summarize_structure(self, structure: Dict[str, Any]) -> Dict[str, Any]:
         """
         Summarize project structure for inclusion in context.
@@ -189,8 +257,6 @@ class ContextEnhancer:
             "main_directories": main_dirs_list
         }
     
-
-    
     async def _add_recent_file_activity(self, context: Dict[str, Any]) -> None:
         """
         Add recent file activity to the context.
@@ -198,6 +264,9 @@ class ContextEnhancer:
         Args:
             context: The context to enrich
         """
+        # Local import to avoid circular dependency
+        from angela.context.session import session_manager
+        
         self._logger.debug("Adding recent file activity to context")
         
         try:
@@ -217,12 +286,12 @@ class ContextEnhancer:
                 if "value" in entity and entity["value"]:
                     accessed_files.append(entity["value"])
             
-            # FIXED: Ensure we always have at least an empty list
+            # Always ensure we have at least an empty list
             recent_activities = []
             
             # Format and add to context
             context["recent_files"] = {
-                "accessed": accessed_files,  # FIXED: Use the properly extracted list
+                "accessed": accessed_files,
                 "activities": recent_activities,
                 "count": len(file_entities)
             }
@@ -276,8 +345,6 @@ class ContextEnhancer:
         self._project_info_cache.clear()
         self._file_activity_cache.clear()
 
-
-
     def register_enhancer(self, enhancer_func: Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]) -> None:
         """
         Register a context enhancer function.
@@ -289,76 +356,9 @@ class ContextEnhancer:
         self._enhancers.append(enhancer_func)
 
 
-
-    async def enhance_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Enhance the context with additional information.
-        
-        Args:
-            context: The base context dictionary
-            
-        Returns:
-            Enhanced context with additional information
-        """
-        enhanced_context = dict(context)  # Create a copy of the original context
-        
-        try:
-            # Add project information if available
-            project_root = context.get("project_root")
-            if project_root:
-                from angela.context.project_inference import project_inference
-                
-                # Get project info (cached or fresh inference)
-                project_info = await project_inference.get_project_info(project_root)
-                if project_info:
-                    enhanced_context["enhanced_project"] = project_info
-            
-            # Add recent file activity
-            from angela.context.file_activity import file_activity_tracker
-            
-            recent_files = {
-                "accessed": file_activity_tracker.get_recently_accessed_files(),
-                "modified": file_activity_tracker.get_recently_modified_files(),
-                "created": file_activity_tracker.get_recently_created_files(),
-            }
-            enhanced_context["recent_files"] = recent_files
-            
-            # Get most active files
-            most_active = file_activity_tracker.get_most_active_files()
-            enhanced_context["active_files"] = most_active
-            
-            # Add file resolver information if available
-            if "requested_file" in context:
-                from angela.context.file_resolver import file_resolver
-                
-                resolved_files = await file_resolver.resolve_file_references(
-                    context.get("cwd", ""),
-                    context.get("project_root", ""),
-                    [context["requested_file"]]
-                )
-                
-                if resolved_files:
-                    enhanced_context["resolved_files"] = resolved_files
-            
-            # Run all registered enhancers
-            for enhancer in self._enhancers:
-                try:
-                    result = await enhancer(enhanced_context)
-                    if result:
-                        enhanced_context.update(result)
-                except Exception as e:
-                    self._logger.error(f"Error in enhancer {enhancer.__name__ if hasattr(enhancer, '__name__') else 'anonymous'}: {str(e)}")
-            
-            return enhanced_context
-            
-        except Exception as e:
-            self._logger.error(f"Error enhancing context: {str(e)}")
-            # Return the original context if enhancement fails
-            return enhanced_context
-
-
+# Global context enhancer instance
 try:
-    # Global context enhancer instance
+    # Initialize the ContextEnhancer instance
     context_enhancer = ContextEnhancer()
     logger.debug(f"context_enhancer initialized: {context_enhancer}")
 except Exception as e:
