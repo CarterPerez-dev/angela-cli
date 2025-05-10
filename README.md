@@ -1,16 +1,16 @@
 # Angela CLI
 
 <div align="center">
-  <img src="https://via.placeholder.com/200x200" alt="Angela CLI Logo" width="200" height="200">
-  <h3>AI-Powered Command Line Intelligence</h3>
+  <img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp" alt="Angela CLI Logo" width="200" height="200">
+  <h3>Worlds First AGI Command Line Intelligence</h3>
   <p><em>Your ambient-intelligence terminal companion that understands natural language and your development context</em></p>
 </div>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![Gemini API](https://img.shields.io/badge/AI-Gemini_API-orange)](https://ai.google.dev/)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/your-repo/angela-cli)
-[![Code Coverage](https://img.shields.io/badge/coverage-87%25-green)](https://github.com/your-repo/angela-cli)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/CarterPerez-dev/angela-cli)
+[![Code Coverage](https://img.shields.io/badge/coverage-87%25-green)](https://github.com/CarterPerez-dev/angela-cli)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 ## 📚 Table of Contents
@@ -129,7 +129,7 @@ Angela CLI offers several installation methods depending on your preferences and
 The quickest way to get started is with our installation script:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/your-repo/angela-cli/main/scripts/install-quick.sh | bash
+curl -sSL https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/scripts/install-quick.sh | bash
 ```
 
 This script will:
@@ -148,7 +148,7 @@ For more control over the installation process:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-repo/angela-cli.git
+git clone https://github.com/CarterPerez-dev/angela-cli.git
 cd angela-cli
 ```
 
@@ -634,54 +634,148 @@ The system is organized into several key subsystems:
 ### Core Components
 
 ```
-angela/
-├── ai/               # AI integration with Google Gemini
-│   ├── client.py     # API client for Gemini
-│   ├── prompts.py    # Prompt engineering and templates
-│   ├── parser.py     # Response parsing logic
-│   └── ...
-├── cli/              # Command-line interface components
-│   ├── main.py       # Primary CLI entry points
-│   ├── files.py      # File operation commands
-│   └── ...
-├── context/          # Environmental awareness
-│   ├── manager.py    # Core context tracking
-│   ├── project_inference.py  # Project type detection
-│   └── ...
-├── execution/        # Command execution
-│   ├── engine.py     # Core execution engine
-│   ├── filesystem.py # Safe file operations
-│   └── ...
-├── generation/       # Code generation
-│   ├── engine.py     # Code generation orchestration
-│   ├── frameworks.py # Framework-specific templates
-│   └── ...
-├── intent/           # Request understanding
-│   ├── planner.py    # Task planning and decomposition
-│   ├── models.py     # Intent and plan data models
-│   └── ...
-├── review/           # Code analysis and feedback
-│   ├── diff_manager.py  # Code diff generation
-│   ├── feedback.py   # User feedback processing
-│   └── ...
-├── safety/           # Safety mechanisms
-│   ├── classifier.py # Risk assessment
-│   ├── validator.py  # Command validation
-│   └── ...
-├── shell/            # Shell integration
-│   ├── angela.bash   # Bash integration script
-│   ├── angela.zsh    # Zsh integration script
-│   └── ...
-├── toolchain/        # Tool integrations
-│   ├── git.py        # Git operations
-│   ├── docker.py     # Docker operations
-│   └── ...
-├── utils/            # Utilities
-│   ├── logging.py    # Logging configuration
-│   └── ...
-└── workflows/        # Workflow management
-    ├── manager.py    # Workflow definition and execution
-    └── ...
+├── Makefile                     # Build automation
+├── QUICKSTART.md                # Fast setup guide
+├── README.md                    # Project overview
+├── angela/                      # Main application
+│   ├── __init__.py              # Package initializer
+│   ├── __main__.py              # Executable entry
+│   ├── ai/                      # AI components
+│   │   ├── __init__.py          # AI package
+│   │   ├── analyzer.py          # Error analysis
+│   │   ├── client.py            # Gemini client
+│   │   ├── confidence.py        # Suggestion confidence
+│   │   ├── content_analyzer.py  # File content AI
+│   │   ├── content_analyzer_extensions.py # Content AI extras
+│   │   ├── enhanced_prompts.py  # Advanced AI prompts
+│   │   ├── file_integration.py  # AI file ops
+│   │   ├── intent_analyzer.py   # User intent AI
+│   │   ├── parser.py            # AI response parsing
+│   │   ├── prompts.py           # AI prompt templates
+│   │   └── semantic_analyzer.py # Code semantics AI
+│   ├── check_services.py        # Service status check
+│   ├── cli/                     # Command-line interface
+│   │   ├── __init__.py          # CLI package
+│   │   ├── docker.py            # Docker commands
+│   │   ├── files.py             # File commands
+│   │   ├── files_extensions.py  # Advanced file cmds
+│   │   ├── generation.py        # Code gen commands
+│   │   ├── main.py              # Main CLI app
+│   │   └── workflows.py         # Workflow commands
+│   ├── config.py                # App configuration
+│   ├── constants.py             # Global constants
+│   ├── context/                 # Environmental awareness
+│   │   ├── __init__.py          # Context package
+│   │   ├── enhanced_file_activity.py # Advanced file track
+│   │   ├── enhancer.py          # Context enrichment
+│   │   ├── file_activity.py     # File activity log
+│   │   ├── file_detector.py     # File type detection
+│   │   ├── file_resolver.py     # File path resolution
+│   │   ├── history.py           # Command history
+│   │   ├── manager.py           # Core context
+│   │   ├── preferences.py       # User settings
+│   │   ├── project_inference.py # Project type ID
+│   │   ├── project_state_analyzer.py # Project state
+│   │   ├── semantic_context_manager.py # Code context
+│   │   └── session.py           # User session data
+│   ├── core/                    # Core infrastructure
+│   │   ├── __init__.py          # Core package
+│   │   ├── events.py            # Event bus
+│   │   ├── registry.py          # Service locator
+│   │   └── service_registration.py # Service setup
+│   ├── diagnostic.py            # System diagnostics
+│   ├── execution/               # Command execution
+│   │   ├── __init__.py          # Execution package
+│   │   ├── adaptive_engine.py   # Smart cmd exec
+│   │   ├── engine.py            # Command executor
+│   │   ├── error_recovery.py    # Error handling
+│   │   ├── filesystem.py        # File operations
+│   │   ├── hooks.py             # Execution hooks
+│   │   ├── rollback.py          # Undo operations
+│   │   └── rollback_commands.py # Rollback CLI
+│   ├── generation/              # Code generation
+│   │   ├── __init__.py          # Generation package
+│   │   ├── architecture.py      # Arch analysis
+│   │   ├── context_manager.py   # Gen context
+│   │   ├── documentation.py     # Doc generation
+│   │   ├── engine.py            # Code gen engine
+│   │   ├── frameworks.py        # Framework templates
+│   │   ├── models.py            # Gen data models
+│   │   ├── planner.py           # Project planning
+│   │   ├── refiner.py           # Code refinement
+│   │   └── validators.py        # Code validation
+│   ├── integrations/            # System integrations
+│   │   ├── __init__.py          # Integrations pkg
+│   │   ├── enhanced_planner_integration.py # Planner integration
+│   │   ├── phase12_integration.py # Advanced features
+│   │   └── semantic_integration.py # Semantics link
+│   ├── intent/                  # Intent understanding
+│   │   ├── __init__.py          # Intent package
+│   │   ├── complex_workflow_planner.py # Complex workflows
+│   │   ├── enhanced_task_planner.py # Advanced planning
+│   │   ├── models.py            # Intent data models
+│   │   ├── planner.py           # Task planning
+│   │   └── semantic_task_planner.py # Semantic planning
+│   ├── interfaces/              # Component interfaces
+│   │   ├── __init__.py          # Interfaces pkg
+│   │   ├── execution.py         # Exec interfaces
+│   │   └── safety.py            # Safety interfaces
+│   ├── monitoring/              # Background monitoring
+│   │   ├── __init__.py          # Monitoring pkg
+│   │   ├── background.py        # Background tasks
+│   │   ├── network_monitor.py   # Network checks
+│   │   ├── notification_handler.py # Shell notifications
+│   │   └── proactive_assistant.py # Proactive help
+│   ├── orchestrator.py          # Core coordinator
+│   ├── review/                  # Code review & feedback
+│   │   ├── __init__.py          # Review package
+│   │   ├── diff_manager.py      # Code diffs
+│   │   └── feedback.py          # Feedback processing
+│   ├── safety/                  # Safety mechanisms
+│   │   ├── __init__.py          # Safety package
+│   │   ├── adaptive_confirmation.py # Smart confirms
+│   │   ├── classifier.py        # Risk assessment
+│   │   ├── confirmation.py      # User confirms
+│   │   ├── preview.py           # Command preview
+│   │   └── validator.py         # Command validation
+│   ├── shell/                   # Shell integration
+│   │   ├── __init__.py          # Shell package
+│   │   ├── advanced_formatter.py # Rich CLI output
+│   │   ├── angela.bash          # Bash integration
+│   │   ├── angela.tmux          # Tmux integration
+│   │   ├── angela.zsh           # Zsh integration
+│   │   ├── angela_enhanced.bash # Adv Bash hooks
+│   │   ├── angela_enhanced.zsh  # Adv Zsh hooks
+│   │   ├── completion.py        # CLI completion
+│   │   ├── formatter.py         # CLI output format
+│   │   └── inline_feedback.py   # Terminal feedback
+│   ├── toolchain/               # Tool integrations
+│   │   ├── __init__.py          # Toolchain pkg
+│   │   ├── ci_cd.py             # CI/CD tools
+│   │   ├── cross_tool_workflow_engine.py # Multi-tool flows
+│   │   ├── docker.py            # Docker tools
+│   │   ├── enhanced_universal_cli.py # Adv CLI translation
+│   │   ├── git.py               # Git tools
+│   │   ├── package_managers.py  # Pkg manager tools
+│   │   ├── test_frameworks.py   # Test tool integration
+│   │   └── universal_cli.py     # CLI translation
+│   ├── utils/                   # Utilities
+│   │   ├── __init__.py          # Utils package
+│   │   ├── enhanced_logging.py  # Advanced logging
+│   │   └── logging.py           # Logging setup
+│   └── workflows/               # Workflow management
+│       ├── __init__.py          # Workflows pkg
+│       ├── manager.py           # Workflow exec
+│       └── sharing.py           # Workflow sharing
+├── pyproject.toml               # Python packaging
+├── pytest.ini                   # Test configuration
+├── requirements.txt             # Python dependencies
+├── scripts/                     # Utility scripts
+│   ├── generate_docs.sh         # Docs generation
+│   ├── install-quick.sh         # Quick install
+│   ├── install.sh               # Main installer
+│   └── uninstall.sh             # Uninstaller
+└── setup.py                     # Python setup
 ```
 
 ### Key Design Patterns
@@ -1780,7 +1874,7 @@ For new components, follow the existing patterns:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/angela-cli.git
+git clone https://github.com/CarterPerez-dev/angela-cli.git
 cd angela-cli
 
 # Install in development mode
@@ -1876,7 +1970,7 @@ Special thanks to all our contributors and early adopters who have helped shape 
 
 ## 📞 Contact & Support
 
-- **GitHub Issues**: [Submit bugs and feature requests](https://github.com/your-repo/angela-cli/issues)
+- **GitHub Issues**: [Submit bugs and feature requests](https://github.com/CarterPerez-dev/angela-cli/issues)
 - **Documentation**: [Official documentation site](https://docs.angela-cli.dev)
 - **Community Discussion**: [Join our Discord server](https://discord.gg/angela-cli)
 - **Twitter**: [@AngelaCLI](https://twitter.com/AngelaCLI)
@@ -1890,8 +1984,8 @@ For security issues, please email security@angela-cli.dev instead of using the p
   <p>Built with ❤️ by the Angela CLI Team</p>
   <p>
     <a href="https://docs.angela-cli.dev">Documentation</a> •
-    <a href="https://github.com/your-repo/angela-cli/issues">Report Bug</a> •
-    <a href="https://github.com/your-repo/angela-cli/issues">Request Feature</a> •
+    <a href="https://github.com/CarterPerez-dev/angela-cli/issues">Report Bug</a> •
+    <a href="https://github.com/CarterPerez-dev/angela-cli/issues">Request Feature</a> •
     <a href="https://discord.gg/angela-cli">Community</a>
   </p>
 </div>
