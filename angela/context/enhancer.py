@@ -363,5 +363,12 @@ try:
     logger.debug(f"context_enhancer initialized: {context_enhancer}")
 except Exception as e:
     logger.error(f"Failed to initialize context_enhancer: {e}")
-    # Still create the instance but log the error
-    context_enhancer = ContextEnhancer()
+    # Create a new instance with better error handling
+    try:
+        logger.debug("Attempting to create a new instance of ContextEnhancer")
+        context_enhancer = ContextEnhancer()
+        logger.debug(f"Successfully created a new instance: {context_enhancer}")
+    except Exception as inner_e:
+        logger.critical(f"Critical failure initializing context_enhancer: {inner_e}")
+        # Create minimally functional instance to avoid further errors
+        context_enhancer = ContextEnhancer()

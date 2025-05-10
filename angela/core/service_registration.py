@@ -26,7 +26,15 @@ def register_core_services():
         logger.debug(f"Registered context_enhancer: {type(context_enhancer).__name__}")
     except ImportError as e:
         logger.error(f"CRITICAL ERROR: Could not import context_enhancer: {e}")
-        raise ImportError(f"Failed to register critical service context_enhancer: {e}")
+        # Try creating the class directly
+        try:
+            from angela.context.enhancer import ContextEnhancer
+            temp_enhancer = ContextEnhancer()
+            registry.register("context_enhancer", temp_enhancer)
+            logger.info("Created and registered new context_enhancer instance")
+        except Exception as inner_e:
+            logger.critical(f"Failed to create alternative context_enhancer: {inner_e}")
+            raise ImportError(f"Failed to register critical service context_enhancer: {e}")
     except Exception as e:
         logger.error(f"CRITICAL ERROR: Unexpected error registering context_enhancer: {e}")
 

@@ -1648,7 +1648,7 @@ class Orchestrator:
             Dictionary with processing results
         """
         # Analyze intent with enhanced NLU
-        intent_result = await intent_analyzer.analyze_intent(request)
+        intent_result = intent_analyzer.analyze_intent(request)
         
         # Check if we've seen a similar request before
         similar_command = history_manager.search_similar_command(request)
