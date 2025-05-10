@@ -13,7 +13,7 @@ from angela.ai.client import gemini_client, GeminiRequest
 from angela.ai.analyzer import error_analyzer
 from angela.context import context_manager
 from angela.utils.logging import get_logger
-from angela.shell.formatter import terminal_formatter, OutputType
+
 
 logger = get_logger(__name__)
 
@@ -814,18 +814,12 @@ Valid strategy types:
     ) -> Optional[Dict[str, Any]]:
         """
         Guide the user through recovery options.
-        
-        Args:
-            strategies: Available recovery strategies
-            step: The step that failed
-            error_result: The original error result
-            context: Context information
-            
-        Returns:
-            Recovery result or None if aborted
         """
         if not strategies:
             return None
+        
+        # Import here to avoid circular imports
+        from angela.shell.formatter import terminal_formatter, OutputType
         
         # Display recovery options
         terminal_formatter.print_output(
