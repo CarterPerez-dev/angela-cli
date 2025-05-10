@@ -45,6 +45,7 @@ def init_application():
     
     # Initialize core registry
     from angela.core.registry import registry
+
     
     # Register core services first, since other components depend on them
     from angela.core.service_registration import register_core_services
