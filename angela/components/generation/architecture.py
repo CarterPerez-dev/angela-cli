@@ -12,10 +12,11 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 import json
 import re
 
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
 
 class ArchitecturalPattern:
     """Base class for architectural patterns."""
@@ -983,10 +984,10 @@ class ArchitecturalAnalyzer:
         
         # Build prompt for AI
         prompt = """
-You are an expert software architect tasked with providing architectural recommendations based on detected patterns and anti-patterns in a project.
-
-Here are the detected architectural patterns:
-"""
+    You are an expert software architect tasked with providing architectural recommendations based on detected patterns and anti-patterns in a project.
+    
+    Here are the detected architectural patterns:
+    """
         
         # Add pattern information
         for pattern_result in patterns_results:
@@ -1018,27 +1019,28 @@ Here are the detected architectural patterns:
                         prompt += f"\n       Violations: {violations}"
         
         prompt += """
-
-Based on the above information, provide 3-5 high-level architectural recommendations that would improve the project's design.
-For each recommendation, include:
-1. A title (concise description)
-2. A detailed explanation
-3. Concrete action steps
-4. Priority (high, medium, low)
-
-Format your response as a JSON array of recommendation objects, like this:
-[
-  {
-    "title": "Clear recommendation title",
-    "description": "Detailed explanation of the issue",
-    "action": "Specific action steps to implement the recommendation",
-    "priority": "high|medium|low"
-  },
-  ...
-]
-"""
+    
+    Based on the above information, provide 3-5 high-level architectural recommendations that would improve the project's design.
+    For each recommendation, include:
+    1. A title (concise description)
+    2. A detailed explanation
+    3. Concrete action steps
+    4. Priority (high, medium, low)
+    
+    Format your response as a JSON array of recommendation objects, like this:
+    [
+      {
+        "title": "Clear recommendation title",
+        "description": "Detailed explanation of the issue",
+        "action": "Specific action steps to implement the recommendation",
+        "priority": "high|medium|low"
+      },
+      ...
+    ]
+    """
         
         # Call AI service
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=2000,
@@ -1079,6 +1081,7 @@ Format your response as a JSON array of recommendation objects, like this:
         except Exception as e:
             self._logger.error(f"Error generating AI recommendations: {str(e)}")
             return []
+            
 
 async def analyze_project_architecture(
     project_path: Union[str, Path],

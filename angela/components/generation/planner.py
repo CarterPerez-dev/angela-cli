@@ -14,13 +14,17 @@ import re
 from pydantic import BaseModel, Field
 
 
-from angela.generation.context_manager import generation_context_manager
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
+ffrom angela.api.generation import get_generation_context_manager, get_code_file_class, get_code_project_class
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
-from angela.generation.engine import CodeProject, CodeFile
+
+
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
+CodeFile = get_code_file_class()
+CodeProject = get_code_project_class()
 
 class ComponentRelationship(BaseModel):
     """Model for relationships between architecture components."""
@@ -355,6 +359,7 @@ class ProjectPlanner:
         
         # Get context if not provided
         if context is None:
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
         
         # Determine appropriate architecture style based on project type and framework
@@ -364,6 +369,7 @@ class ProjectPlanner:
         prompt = self._build_detailed_architecture_prompt(description, project_type, framework, architecture_style, context)
         
         # Call AI service to generate architecture
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=8000,  # Increased token limit for more detailed planning
@@ -377,6 +383,7 @@ class ProjectPlanner:
         architecture = await self._parse_detailed_architecture(response.text, architecture_style)
         
         # Store in global context
+        generation_context_manager = get_generation_context_manager()
         generation_context_manager.set_global_context("architecture", architecture.dict())
         generation_context_manager.set_global_context("project_type", project_type)
         if framework:

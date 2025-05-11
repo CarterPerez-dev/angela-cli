@@ -12,12 +12,14 @@ import json
 import re
 from collections import defaultdict
 
+
 from angela.utils.logging import get_logger
-from angela.generation.models import CodeFile
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context.file_detector import detect_file_type
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_file_detector
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
+
 
 class GenerationContextManager:
     """
@@ -249,7 +251,7 @@ class GenerationContextManager:
         """
         return self._entity_references.get(entity_name, [])
         
-    async def extract_entities_from_file(self, file: CodeFile) -> List[Dict[str, Any]]:
+    async def extract_entities_from_file(self, file: "CodeFile") -> List[Dict[str, Any]]:
         """
         Extract entities from a file.
         
@@ -262,7 +264,8 @@ class GenerationContextManager:
         self._logger.debug(f"Extracting entities from {file.path}")
         
         # Determine file type
-        file_type = detect_file_type(Path(file.path))
+        file_detector = get_file_detector()
+        file_type = file_detector.detect_file_type(Path(file.path))
         language = file_type.get("language", "unknown")
         
         # Extract entities based on language

@@ -12,11 +12,12 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 import json
 import re
 
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.utils.logging import get_logger
-from angela.context import context_manager
+from angela.api.context import get_context_manager, get_file_detector
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
 
 class DocumentationGenerator:
     """
@@ -311,8 +312,8 @@ class DocumentationGenerator:
                 
                 # Try to determine file type and language
                 try:
-                    from angela.context.file_detector import detect_file_type
-                    type_info = detect_file_type(file_path)
+                    file_detector = get_file_detector()
+                    type_info = file_detector.detect_file_type(file_path)
                     file_info["type"] = type_info.get("type")
                     file_info["language"] = type_info.get("language")
                     

@@ -14,16 +14,16 @@ import time
 import sys
 
 # Import models from the new models module instead of defining them here
-from angela.generation.models import CodeFile, CodeProject
-from angela.generation.context_manager import generation_context_manager
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
-from angela.context.enhancer import context_enhancer
+from angela.api.generation import get_generation_context_manager, validate_code, get_code_file_class, get_code_project_class
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_context_manager, get_context_enhancer
 from angela.utils.logging import get_logger
-from angela.execution.filesystem import create_directory, create_file, write_file
-from angela.generation.validators import validate_code
+from angela.api.execution import get_filesystem_functions
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
+CodeFile = get_code_file_class()
+CodeProject = get_code_project_class()
 
 class CodeGenerationEngine:
     """
@@ -58,6 +58,8 @@ class CodeGenerationEngine:
         
         # Get current context if not provided
         if context is None:
+            context_manager = get_context_manager()
+            context_enhancer = get_context_enhancer()
             context = context_manager.get_context_dict()
             context = await context_enhancer.enrich_context(context)
         
@@ -98,8 +100,10 @@ class CodeGenerationEngine:
         
         # Create the root directory if it doesn't exist
         root_path = Path(project.root_dir)
+        filesystem = get_filesystem_functions()
+        
         if not root_path.exists() and not dry_run:
-            await create_directory(root_path, parents=True)
+            await filesystem.create_directory(root_path, parents=True)
         
         # Create files in dependency order
         created_files = []
@@ -112,12 +116,12 @@ class CodeGenerationEngine:
             
             # Create parent directories if needed
             if not dry_run:
-                await create_directory(file_path.parent, parents=True)
+                await filesystem.create_directory(file_path.parent, parents=True)
             
             # Write file content
             try:
                 if not dry_run:
-                    await write_file(file_path, file.content)
+                    await filesystem.write_file(file_path, file.content)
                 created_files.append(str(file_path))
                 self._logger.debug(f"Created file: {file_path}")
             except Exception as e:
@@ -162,6 +166,7 @@ class CodeGenerationEngine:
         prompt = self._build_project_planning_prompt(description, project_type, context)
         
         # Call AI service to generate project plan
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=8000,  # Large token limit for complex project plans
@@ -220,14 +225,15 @@ class CodeGenerationEngine:
         
         # No clear indicators, use AI to infer
         prompt = f"""
-Determine the most suitable programming language/framework for this project:
-
-"{description}"
-
-Return only the project type as a single word, using one of these options:
-python, node, java, go, ruby, rust, or other.
-"""
+    Determine the most suitable programming language/framework for this project:
+    
+    "{description}"
+    
+    Return only the project type as a single word, using one of these options:
+    python, node, java, go, ruby, rust, or other.
+    """
         
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(prompt=prompt, max_tokens=10)
         response = await gemini_client.generate_text(api_request)
         
@@ -454,6 +460,7 @@ python, node, java, go, ruby, rust, or other.
         prompt = self._build_file_content_prompt(file, project, dependencies_content)
         
         # Call AI service to generate file content
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=4000,
@@ -474,13 +481,13 @@ python, node, java, go, ruby, rust, or other.
             
             # Build a new prompt with the validation error
             fix_prompt = f"""
-The code you generated has an issue that needs to be fixed:
-{validation_message}
-Here is the original code:
-{content}
-Please provide the corrected code for file '{file.path}'.
-Only respond with the corrected code, nothing else.
-"""
+    The code you generated has an issue that needs to be fixed:
+    {validation_message}
+    Here is the original code:
+    {content}
+    Please provide the corrected code for file '{file.path}'.
+    Only respond with the corrected code, nothing else.
+    """
             # Call AI service to fix the code
             fix_request = GeminiRequest(
                 prompt=fix_prompt,
@@ -825,6 +832,8 @@ Only return the file content, nothing else.
         
         # Get context if not provided
         if context is None:
+            context_manager = get_context_manager()
+            context_enhancer = get_context_enhancer()
             context = context_manager.get_context_dict()
             context = await context_enhancer.enrich_context(context)
         
@@ -891,8 +900,9 @@ Only return the file content, nothing else.
         
         # If project type is unknown or not in context, detect it
         if project_info.get("project_type") == "unknown" or not project_info:
-            # Import here to avoid circular imports
-            from angela.toolchain.ci_cd import ci_cd_integration
+            # Import through API layer
+            from angela.api.toolchain import get_ci_cd_integration
+            ci_cd_integration = get_ci_cd_integration()
             detection_result = await ci_cd_integration.detect_project_type(project_path)
             project_info["project_type"] = detection_result.get("project_type")
         
@@ -918,8 +928,8 @@ Only return the file content, nothing else.
                 
                 # Try to determine file type and language
                 try:
-                    from angela.context.file_detector import detect_file_type
-                    type_info = detect_file_type(file_path)
+                    file_detector = get_file_detector()
+                    type_info = file_detector.detect_file_type(file_path)
                     file_info["type"] = type_info.get("type")
                     file_info["language"] = type_info.get("language")
                     
@@ -1444,16 +1454,19 @@ Follow the project's existing coding style and patterns.
             "errors": []
         }
         
+        # Get filesystem functions
+        filesystem = get_filesystem_functions()
+        
         # Create new files
         for file_info in feature_files.get("new_files", []):
             file_path = project_path / file_info["path"]
             
             try:
                 # Create parent directories if needed
-                await create_directory(file_path.parent, parents=True)
+                await filesystem.create_directory(file_path.parent, parents=True)
                 
                 # Write file content
-                await write_file(file_path, file_info["content"])
+                await filesystem.write_file(file_path, file_info["content"])
                 
                 result["created_files"].append(str(file_path))
                 self._logger.debug(f"Created new file: {file_path}")
@@ -1472,7 +1485,7 @@ Follow the project's existing coding style and patterns.
                     raise FileNotFoundError(f"File not found: {file_path}")
                 
                 # Write modified content
-                await write_file(file_path, file_info["modified_content"])
+                await filesystem.write_file(file_path, file_info["modified_content"])
                 
                 result["modified_files"].append(str(file_path))
                 self._logger.debug(f"Modified file: {file_path}")
@@ -1624,6 +1637,8 @@ Follow the project's existing coding style and patterns.
         
         # Get current context if not provided
         if context is None:
+            context_manager = get_context_manager()
+            context_enhancer = get_context_enhancer()
             context = context_manager.get_context_dict()
             context = await context_enhancer.enrich_context(context)
         
@@ -1645,8 +1660,10 @@ Follow the project's existing coding style and patterns.
             framework = await self._infer_framework(description, project_type)
             self._logger.debug(f"Inferred framework: {framework}")
         
-        # Import project planner here to avoid circular imports
-        from angela.generation.planner import project_planner
+        # Get project planner through the API layer
+        from angela.api.generation import get_project_planner, get_project_architecture_class
+        project_planner = get_project_planner()
+        ProjectArchitecture = get_project_architecture_class()
         
         # Create a detailed architecture if requested
         if use_detailed_planning:
@@ -1684,6 +1701,7 @@ Follow the project's existing coding style and patterns.
         self._logger.info(f"Created project plan with {len(project_plan.files)} files")
         
         # Analyze project structure to understand relationships between files
+        generation_context_manager = get_generation_context_manager()
         analysis_result = await generation_context_manager.analyze_code_relationships(project_plan.files)
         self._logger.debug(f"Code relationship analysis complete: {analysis_result}")
         
@@ -1887,6 +1905,7 @@ If no specific framework is clearly indicated, return "None".
         prompt = self._build_complex_file_content_prompt(file, project, dependencies)
         
         # Enhance prompt with generation context
+        generation_context_manager = get_generation_context_manager()
         related_files = [dep.path for dep in dependencies]
         enhanced_prompt = await generation_context_manager.enhance_prompt_with_context(
             prompt=prompt,
@@ -1898,6 +1917,7 @@ If no specific framework is clearly indicated, return "None".
         max_tokens = self._determine_max_tokens_for_file(file)
         
         # Call AI service to generate file content
+        gemini_client = get_gemini_client()
         api_request = GeminiRequest(
             prompt=enhanced_prompt,
             max_tokens=max_tokens,
@@ -1918,15 +1938,15 @@ If no specific framework is clearly indicated, return "None".
             
             # Build a new prompt with the validation error
             fix_prompt = f"""
-The code you generated has an issue that needs to be fixed:
-{validation_message}
-
-Here is the original code:
-{content}
-
-Please provide the corrected code for file '{file.path}'.
-Only respond with the corrected code, nothing else.
-"""
+    The code you generated has an issue that needs to be fixed:
+    {validation_message}
+    
+    Here is the original code:
+    {content}
+    
+    Please provide the corrected code for file '{file.path}'.
+    Only respond with the corrected code, nothing else.
+    """
             # Call AI service to fix the code
             fix_request = GeminiRequest(
                 prompt=fix_prompt,

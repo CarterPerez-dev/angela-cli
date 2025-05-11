@@ -14,13 +14,14 @@ import re
 import difflib
 
 from angela.utils.logging import get_logger
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.generation.engine import CodeFile, CodeProject
-from angela.review.feedback import feedback_manager
-from angela.review.diff_manager import diff_manager
-from angela.generation.context_manager import generation_context_manager
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.generation import get_code_file_class
+from angela.api.review import get_feedback_manager, get_diff_manager
+from angela.api.generation import get_generation_context_manager
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
+CodeFile = get_code_file_class()
 
 class InteractiveRefiner:
     """
@@ -326,7 +327,7 @@ Only include files that are directly relevant to the feedback.
         
         return result
     
-    def _build_file_context(self, file: CodeFile, project: CodeProject) -> Dict[str, Any]:
+    async def _build_file_context(self, file: CodeFile, project: "CodeProject") -> Dict[str, Any]:
         """
         Build context for a file for feedback processing.
         
@@ -352,6 +353,7 @@ Only include files that are directly relevant to the feedback.
             context["dependencies"] = file.dependencies
         
         # Add global context from generation context manager
+        generation_context_manager = get_generation_context_manager()
         context.update(generation_context_manager.get_all_global_context())
         
         # Add project architecture if available

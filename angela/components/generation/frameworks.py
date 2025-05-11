@@ -13,11 +13,13 @@ import json
 import re
 import sys
 
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.utils.logging import get_logger
-from angela.generation.engine import CodeFile
+from angela.api.generation import get_code_file_class
 
 logger = get_logger(__name__)
+GeminiRequest = get_gemini_request_class()
+CodeFile = get_code_file_class()
 
 class FrameworkGenerator:
     """
