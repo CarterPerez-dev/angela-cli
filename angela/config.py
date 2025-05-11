@@ -7,6 +7,8 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import sys
+from angela.utils.logging import get_logger
+
 
 # --- TOML Library Handling ---
 
@@ -71,6 +73,7 @@ class ConfigManager:
         self.CONFIG_DIR = CONFIG_DIR
         self._load_environment()
         self._ensure_config_dir()
+        self._logger = get_logger(__name__)
         # Note: Loading from file happens via the global instance later
 
     def _load_environment(self) -> None:
@@ -89,62 +92,66 @@ class ConfigManager:
             print(f"Error creating configuration directory {CONFIG_DIR}: {e}")
             # Depending on severity, might want to raise or exit here
 
+    # Update in angela/config.py
+    
     def load_config(self) -> None:
         """Loads configuration from the TOML config file."""
         if not CONFIG_FILE.exists():
-            print(f"Configuration file not found at '{CONFIG_FILE}'. Saving default configuration.")
+            # Only log at debug level, not print to console
+            self._logger.debug(f"Configuration file not found at '{CONFIG_FILE}'. Saving default configuration.")
             self.save_config() # Save default TOML config
             return
-    
+        
         if not _TOML_LOAD_AVAILABLE:
-            print(f"Warning: Cannot load TOML config file '{CONFIG_FILE}'.")
+            self._logger.error(f"Warning: Cannot load TOML config file '{CONFIG_FILE}'.")
             if sys.version_info < (3, 11):
-                print("       Reason: 'tomli' package is not installed for this Python version.")
-                print("       To fix, ensure 'tomli; python_version < \"3.11\"' is in your dependencies.")
+                self._logger.error("       Reason: 'tomli' package is not installed for this Python version.")
+                self._logger.error("       To fix, ensure 'tomli; python_version < \"3.11\"' is in your dependencies.")
             else:
-                 print("       Reason: Could not import the built-in 'tomllib' module.") # Should be unlikely
-            print("       Using default configuration and environment variables.")
+                 self._logger.error("       Reason: Could not import the built-in 'tomllib' module.") # Should be unlikely
+            self._logger.error("       Using default configuration and environment variables.")
             return
-    
+        
         try:
-            print(f"Loading configuration from: {CONFIG_FILE}") # Debugging info
+            # Changed: only log at debug level, not print to console
+            self._logger.debug(f"Loading configuration from: {CONFIG_FILE}")
             with open(CONFIG_FILE, "rb") as f: # TOML requires binary read mode
                 config_data = tomllib.load(f)
-    
+        
             # Update configuration with loaded data, using Pydantic validation
             if "api" in config_data and isinstance(config_data["api"], dict):
                 self._config.api = ApiConfig(**config_data["api"])
-    
+        
             if "user" in config_data and isinstance(config_data["user"], dict):
                  # Pydantic will handle Path conversion from string during validation
                  self._config.user = UserConfig(**config_data["user"])
-    
+        
             if "debug" in config_data:
                 # Explicitly check type for robustness
                 if isinstance(config_data["debug"], bool):
                      self._config.debug = config_data["debug"]
                 else:
-                     print(f"Warning: Invalid type for 'debug' in {CONFIG_FILE}. Expected boolean, got {type(config_data['debug'])}. Ignoring.")
-    
+                     self._logger.warning(f"Invalid type for 'debug' in {CONFIG_FILE}. Expected boolean, got {type(config_data['debug'])}. Ignoring.")
+        
         except _TOML_READ_ERROR_TYPE as e:
-             print(f"Error decoding TOML configuration file ({CONFIG_FILE}): {e}")
-             print("       Please check the file syntax. Using default configuration and environment variables.")
-             print("       Resetting configuration to default.")
+             self._logger.error(f"Error decoding TOML configuration file ({CONFIG_FILE}): {e}")
+             self._logger.error("       Please check the file syntax. Using default configuration and environment variables.")
+             self._logger.error("       Resetting configuration to default.")
              self._config = AppConfig()
              self._load_environment()
         except FileNotFoundError as e:
-            print(f"Configuration file not found: {e}")
-            print("       Using default configuration and environment variables.")
+            self._logger.error(f"Configuration file not found: {e}")
+            self._logger.error("       Using default configuration and environment variables.")
             self._config = AppConfig()
             self._load_environment()
         except PermissionError as e:
-            print(f"Permission error accessing configuration file: {e}")
-            print("       Using default configuration and environment variables.")
+            self._logger.error(f"Permission error accessing configuration file: {e}")
+            self._logger.error("       Using default configuration and environment variables.")
             self._config = AppConfig()
             self._load_environment()
         except IOError as e:
-            print(f"I/O error accessing configuration file: {e}")
-            print("       Using default configuration and environment variables.")
+            self._logger.error(f"I/O error accessing configuration file: {e}")
+            self._logger.error("       Using default configuration and environment variables.")
             self._config = AppConfig()
             self._load_environment()
 

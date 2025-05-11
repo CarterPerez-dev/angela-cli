@@ -49,7 +49,62 @@ class TerminalFormatter:
     Rich terminal formatter with support for asynchronous output
     and interactive elements.
     """
+
+    # Add at the class level
+    FUN_LOADING_QUOTES = [
+        "Hacking the mainframe...",
+        "Bypassing firewalls...",
+        "Executing top secret code...",
+        "Calculating probabilities...",
+        "Compiling quantum algorithms...",
+        "Downloading more RAM...",
+        "Applying machine learning...",
+        "Consulting the digital oracle...",
+        "Brewing digital coffee...",
+        "Searching the matrix...",
+        "Finding the perfect command...",
+        "Optimizing the execution path...",
+        "Connecting neural networks...",
+        "Interrogating the kernel...",
+        "Running at ludicrous speed...",
+        "Decrypting user intent...",
+        "Breaking the code...",
+        "Summoning digital demons...",
+        "Consulting the AI overlords...",
+        "Calculating the meaning of life...",
+        "Converting coffee to code...",
+        "Thinking at the speed of light...",
+        "Dividing by zero...",
+        "Engaging warp drive...",
+        "Feeding the hamsters powering this server...",
+        "Translating human to computer...",
+        "Negotiating with the CPU...",
+        "Convincing RAM to cooperate...",
+        "Preparing witty responses...",
+        "Processing at ludicrous speed...",
+        "Navigating through cyberspace...",
+        "Parsing the digital realm...",
+        "Entering the matrix...",
+        "Reticulating splines...",
+        "Unleashing digital magic...",
+        "Assembling bits and bytes...",
+        "Bending the rules of computation...",
+        "Defragmenting the space-time continuum...",
+        "Channeling the spirit of Ada Lovelace...",
+        "Consulting with digital elders...",
+        "Solving impossible equations...",
+        "Exploring the depths of code...",
+        "Talking to the AI spirits...",
+        "Entering the digital wilderness...",
+        "Following the white rabbit...",
+        "Looking for the answer to everything...",
+        "Deleting system32... just kidding!",
+        "Mining digital gold...",
+        "Breaking the internet... gently...",
+        "Reversing the polarity..."
+    ]
     
+        
     def __init__(self):
         """Initialize the terminal formatter."""
         self._console = Console()
@@ -182,16 +237,22 @@ class TerminalFormatter:
         """
         # Import here to avoid circular imports
         from angela.execution.engine import execution_engine
+        import random
+        import time
         
         stdout_chunks = []
         stderr_chunks = []
         return_code = None
+        start_time = time.time()
+        
+        # Choose a random fun quote
+        fun_quote = random.choice(self.FUN_LOADING_QUOTES)
         
         # Set up progress display if requested
         if show_spinner:
             progress = Progress(
                 SpinnerColumn(),
-                TextColumn("[bold blue]Executing command...[/bold blue]"),
+                TextColumn(f"[bold blue]{fun_quote} [/bold blue]"),
                 TimeElapsedColumn(),
                 console=self._console
             )
@@ -254,7 +315,11 @@ class TerminalFormatter:
             
             # Update progress
             if progress:
-                progress.update(task, completed=True)
+                end_time = time.time()
+                execution_time = end_time - start_time
+                progress.update(task, description=f"[bold green]Completed in {execution_time:.2f}s[/bold green]", completed=True)
+                # Give a short pause to show completion time
+                await asyncio.sleep(0.5)
         
         finally:
             # Clean up progress

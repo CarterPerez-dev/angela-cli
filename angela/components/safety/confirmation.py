@@ -109,7 +109,9 @@ async def get_confirmation(
     risk_reason: str,
     impact: Dict[str, Any],
     preview: Optional[str] = None,
-    dry_run: bool = False
+    dry_run: bool = False,
+    explanation: Optional[str] = None,
+    confidence_score: Optional[float] = None
 ) -> bool:
     """
     Get user confirmation for a command based on its risk level.
@@ -121,11 +123,13 @@ async def get_confirmation(
         impact: The impact analysis dictionary.
         preview: Optional preview of command results.
         dry_run: Whether this is a dry run.
+        explanation: Explanation of what the command does.
+        confidence_score: Confidence score for the command.
         
     Returns:
         True if the user confirms, False otherwise.
     """
-    # If the risk doesn't require confirmation, return True
+    # If safety checks are not required, return True
     if not requires_confirmation(risk_level) and not dry_run:
         return True
     
@@ -137,27 +141,59 @@ async def get_confirmation(
     if dry_run:
         title = Text("DRY RUN", style=f"bold {risk_color}")
     else:
-        title = Text(f"Confirm {risk_name} Risk Operation", style=f"bold {risk_color}")
+        title = Text(f"Execute [{risk_name} Risk]", style=f"bold {risk_color}")
     
-    # Display the command with syntax highlighting
-    console.print("\n")
-    console.print(Panel(
+    # Create a multi-panel display with all relevant information
+    panels = []
+    
+    # Command panel
+    panels.append(Panel(
         Syntax(command, "bash", theme="monokai", word_wrap=True),
         title="Command",
         border_style=risk_color,
         expand=False
     ))
     
-    # Display the risk information
-    console.print(f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}")
-    console.print(f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}")
+    # Explanation panel if provided
+    if explanation:
+        panels.append(Panel(
+            explanation,
+            title="Explanation",
+            border_style="blue",
+            expand=False
+        ))
     
-    # Display impact analysis
-    console.print(format_impact_analysis(impact))
+    # Risk info
+    risk_info = f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}\n"
+    risk_info += f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}"
     
-    # Display preview if available
+    # Add confidence info if available
+    if confidence_score is not None:
+        confidence_color = "green" if confidence_score > 0.8 else "yellow" if confidence_score > 0.6 else "red"
+        confidence_stars = int(confidence_score * 5)
+        confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+        
+        risk_info += f"\n\n[bold]Confidence:[/bold] [{confidence_color}]{confidence_score:.2f}[/{confidence_color}] {confidence_display}"
+        risk_info += "\n[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]"
+    
+    panels.append(Panel(
+        risk_info,
+        title="Risk Assessment",
+        border_style=risk_color,
+        expand=False
+    ))
+    
+    # Impact analysis panel
+    panels.append(Panel(
+        format_impact_analysis(impact),
+        title="Impact Analysis",
+        border_style="blue",
+        expand=False
+    ))
+    
+    # Preview panel if available
     if preview:
-        console.print(Panel(
+        panels.append(Panel(
             preview,
             title="Command Preview",
             border_style=risk_color,
@@ -166,7 +202,7 @@ async def get_confirmation(
     
     # For critical operations, use a more prominent warning
     if risk_level == RISK_LEVELS["CRITICAL"]:
-        console.print(Panel(
+        panels.append(Panel(
             "⚠️  [bold red]This is a CRITICAL risk operation[/bold red] ⚠️\n"
             "It may cause significant changes to your system or data loss.",
             border_style="red",
@@ -175,12 +211,28 @@ async def get_confirmation(
     
     # For dry run, just show the information without asking for confirmation
     if dry_run:
-        console.print(Panel(
+        panels.append(Panel(
             "[bold blue]This is a dry run.[/bold blue] No changes will be made.",
             border_style="blue",
             expand=False
         ))
+        
+        # Display all panels
+        for panel in panels:
+            console.print(panel)
+        
         return False
     
-    # Ask for confirmation
-    return Confirm.ask("Do you want to proceed?", default=False)
+    # Display all panels
+    for panel in panels:
+        console.print(panel)
+    
+    # Ask for confirmation using prompt_toolkit for a better experience
+    from prompt_toolkit import prompt
+    from prompt_toolkit.formatted_text import HTML
+    
+    # Use a more stylish prompt
+    confirmation_prompt = HTML("<ansigreen>Proceed with execution? [y/N]: </ansigreen>")
+    response = prompt(confirmation_prompt).lower()
+    
+    return response in ("y", "yes")

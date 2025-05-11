@@ -12,6 +12,7 @@ from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Update in angela/components/context/preferences.py
 class TrustPreferences(BaseModel):
     """Model for user trust preferences."""
     default_trust_level: int = Field(4, description="Default trust level (0-4)")
@@ -22,6 +23,7 @@ class TrustPreferences(BaseModel):
     auto_execute_critical: bool = Field(False, description="Auto-execute CRITICAL risk operations")
     trusted_commands: List[str] = Field(default_factory=list, description="Commands that are always trusted")
     untrusted_commands: List[str] = Field(default_factory=list, description="Commands that require confirmation")
+    command_rejections: Dict[str, int] = Field(default_factory=dict, description="Count of rejections for commands")
 
 class UIPreferences(BaseModel):
     """Model for UI preferences."""
@@ -143,6 +145,40 @@ class PreferencesManager:
             if command in self._prefs.trust.trusted_commands:
                 self._prefs.trust.trusted_commands.remove(command)
             self._save_preferences()
+
+    def get_command_rejection_count(self, command: str) -> int:
+        """
+        Get the number of times a user has rejected auto-execution for a command.
+        
+        Args:
+            command: The command to check
+            
+        Returns:
+            Number of rejections
+        """
+        if not hasattr(self._prefs.trust, 'command_rejections'):
+            self._prefs.trust.command_rejections = {}
+        
+        # Extract base command for more general tracking
+        base_command = command.split()[0] if command else ""
+        return self._prefs.trust.command_rejections.get(base_command, 0)
+    
+    def increment_command_rejection_count(self, command: str) -> None:
+        """
+        Increment the rejection count for a command.
+        
+        Args:
+            command: The command to increment rejection count for
+        """
+        if not hasattr(self._prefs.trust, 'command_rejections'):
+            self._prefs.trust.command_rejections = {}
+        
+        # Extract base command for more general tracking
+        base_command = command.split()[0] if command else ""
+        current_count = self._prefs.trust.command_rejections.get(base_command, 0)
+        self._prefs.trust.command_rejections[base_command] = current_count + 1
+        self._save_preferences()
+
     
     @property
     def preferences(self) -> UserPreferences:

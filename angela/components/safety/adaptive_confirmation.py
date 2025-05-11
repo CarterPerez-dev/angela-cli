@@ -55,7 +55,9 @@ async def get_adaptive_confirmation(
     preview: Optional[str] = None,
     explanation: Optional[str] = None,
     natural_request: Optional[str] = None,
-    dry_run: bool = False
+    dry_run: bool = False,
+    confidence_score: Optional[float] = None,  # Added new parameter
+    command_info: Optional[Dict[str, Any]] = None  # Added new parameter
 ) -> bool:
     """
     Get user confirmation for a command based on risk level and user history.
@@ -69,6 +71,8 @@ async def get_adaptive_confirmation(
         explanation: AI explanation of the command
         natural_request: The original natural language request
         dry_run: Whether this is a dry run
+        confidence_score: Optional confidence score for the command
+        command_info: Optional command information dictionary
         
     Returns:
         True if the user confirms, False otherwise
@@ -100,10 +104,14 @@ async def get_adaptive_confirmation(
     
     # For high-risk operations, use a more detailed confirmation dialog
     if risk_level >= RISK_LEVELS["HIGH"]:
-        return await _get_detailed_confirmation(command, risk_level, risk_reason, impact, preview, explanation)
+        return await _get_detailed_confirmation(
+            command, risk_level, risk_reason, impact, preview, explanation, confidence_score
+        )
     
     # For medium and lower risk operations, use a simpler confirmation
-    return await _get_simple_confirmation(command, risk_level, risk_reason, preview, explanation)
+    return await _get_simple_confirmation(
+        command, risk_level, risk_reason, preview, explanation, confidence_score
+    )
 
 
 async def _show_dry_run_preview(
@@ -170,7 +178,8 @@ async def _get_simple_confirmation(
     risk_level: int, 
     risk_reason: str,
     preview: Optional[str],
-    explanation: Optional[str]
+    explanation: Optional[str],
+    confidence_score: Optional[float] = None  # Added new parameter
 ) -> bool:
     """Get a simple confirmation for medium/low risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
@@ -192,6 +201,14 @@ async def _get_simple_confirmation(
     # Display explanation if provided
     if explanation:
         console.print(explanation)
+    
+    # Display confidence score if available
+    if confidence_score is not None:
+        confidence_color = "green" if confidence_score > 0.8 else "yellow" if confidence_score > 0.6 else "red"
+        confidence_stars = int(confidence_score * 5)
+        confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+        console.print(f"[bold]Confidence:[/bold] [{confidence_color}]{confidence_score:.2f}[/{confidence_color}] {confidence_display}")
+        console.print("[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]")
     
     # Display preview if available and enabled
     if preview and preferences_manager.preferences.ui.show_command_preview:
@@ -219,7 +236,8 @@ async def _get_detailed_confirmation(
     risk_reason: str,
     impact: Dict[str, Any],
     preview: Optional[str],
-    explanation: Optional[str]
+    explanation: Optional[str],
+    confidence_score: Optional[float] = None  # Added new parameter
 ) -> bool:
     """Get a detailed confirmation for high/critical risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
@@ -240,6 +258,14 @@ async def _get_detailed_confirmation(
     
     console.print(f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}")
     console.print(f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}")
+    
+    # Display confidence score if available
+    if confidence_score is not None:
+        confidence_color = "green" if confidence_score > 0.8 else "yellow" if confidence_score > 0.6 else "red"
+        confidence_stars = int(confidence_score * 5)
+        confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+        console.print(f"[bold]Confidence:[/bold] [{confidence_color}]{confidence_score:.2f}[/{confidence_color}] {confidence_display}")
+        console.print("[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]")
     
     # Display explanation if provided
     if explanation:
@@ -328,17 +354,31 @@ async def offer_command_learning(command: str) -> None:
     pattern = history_manager._patterns.get(base_command)
     
     # Only offer for commands used a few times but not yet trusted
-    if pattern and 2 <= pattern.count <= 5 and command not in preferences_manager.preferences.trust.trusted_commands:
-        # FIXED: Using run_async() instead of run()
-        add_to_trusted = await yes_no_dialog(
-            title='Add to Trusted Commands?',
-            text=f'You\'ve used "{base_command}" {pattern.count} times. Would you like to auto-execute it in the future?',
-            style=CONFIRMATION_STYLES
-        ).run_async()
+    if pattern and pattern.count >= 2 and command not in preferences_manager.preferences.trust.trusted_commands:
+        # Check if user has previously rejected this command
+        rejection_count = preferences_manager.get_command_rejection_count(command)
         
-        if add_to_trusted:
-            preferences_manager.add_trusted_command(command)
-            console.print(f"Added [green]{base_command}[/green] to trusted commands.")
+        # Determine if we should show the prompt based on rejection count
+        threshold = 2  # Base threshold
+        if rejection_count > 0:
+            # Progressive threshold: 2, 5, 7, 9, 11, etc.
+            threshold = 2 + (rejection_count * 2)
+        
+        if pattern.count >= threshold:
+            # FIXED: Using run_async() instead of run()
+            add_to_trusted = await yes_no_dialog(
+                title='Add to Trusted Commands?',
+                text=f'You\'ve used "{base_command}" {pattern.count} times. Would you like to auto-execute it in the future?',
+                style=CONFIRMATION_STYLES
+            ).run_async()
+            
+            if add_to_trusted:
+                preferences_manager.add_trusted_command(command)
+                console.print(f"Added [green]{base_command}[/green] to trusted commands.")
+            else:
+                # Record the rejection to increase the threshold for next time
+                preferences_manager.increment_command_rejection_count(command)
+                console.print(f"[dim]You'll be asked again after using this command {threshold + 2} more times.[/dim]")
 
 
 adaptive_confirmation = get_adaptive_confirmation

@@ -79,6 +79,28 @@ class AdaptiveExecutionEngine:
             preview_generator = get_command_preview_generator()
             preview = await preview_generator.generate_preview(command)
         
+        # Get confidence score if available
+        confidence_score = None
+        try:
+            from angela.api.ai import get_confidence_scorer
+            confidence_scorer = get_confidence_scorer()
+            context = {"request": natural_request}
+            confidence_score = confidence_scorer.score_command_confidence(natural_request, command, context)
+        except Exception as e:
+            self._logger.error(f"Error calculating confidence score: {str(e)}")
+        
+        # Prepare full information to display before confirmation
+        command_info = {
+            "command": command,
+            "risk_level": risk_level,
+            "risk_reason": risk_reason,
+            "impact": impact,
+            "preview": preview,
+            "explanation": explanation,
+            "confidence_score": confidence_score,
+            "dry_run": dry_run
+        }
+        
         # Get adaptive confirmation based on risk level and user history
         confirmation_handler = get_adaptive_confirmation()
         confirmed = await confirmation_handler(
@@ -89,7 +111,9 @@ class AdaptiveExecutionEngine:
             preview=preview,
             explanation=explanation,
             natural_request=natural_request,
-            dry_run=dry_run
+            dry_run=dry_run,
+            confidence_score=confidence_score,  # Pass the confidence score
+            command_info=command_info          # Pass the command info
         )
         
         if not confirmed and not dry_run:
@@ -101,11 +125,15 @@ class AdaptiveExecutionEngine:
                 "stdout": "",
                 "stderr": "Command execution cancelled by user",
                 "return_code": 1,
-                "dry_run": dry_run
+                "dry_run": dry_run,
+                "confidence": confidence_score  # Include confidence in result
             }
         
         # Execute the command
         result = await self._execute_with_feedback(command, dry_run)
+        
+        # Add confidence score to the result
+        result["confidence"] = confidence_score
         
         # Add to history
         history_manager = get_history_manager()

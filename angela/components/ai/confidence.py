@@ -33,7 +33,7 @@ class ConfidenceScorer:
             context: Context information
             
         Returns:
-            Confidence score (0.0-1.0)
+            Confidence score (0.0-1.0) representing how well the command matches the user's request
         """
         # Base confidence starts at 0.7 (moderate default)
         confidence = 0.7

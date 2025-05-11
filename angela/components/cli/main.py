@@ -53,8 +53,23 @@ def main(
     monitor: bool = typer.Option(
         False, "--monitor", "-m", help="Enable background monitoring for proactive assistance"
     ),
+
 ):
-    """Angela: AI-powered command-line assistant"""
+    """
+    Angela: AI-powered command-line assistant
+    
+    Angela helps you perform tasks through natural language commands.
+    Simply tell Angela what you want to do in plain English!
+    
+    Examples:
+      angela request "create a new directory called my_project"
+      angela request "find all python files in the current directory"
+      angela request "help me write a bash script that renames files"
+    
+    Use 'angela --help' to see available commands, or 'angela COMMAND --help'
+    for more information about a specific command.
+    """
+    
     # Set debug mode
     config_manager.config.debug = debug
     
@@ -82,8 +97,26 @@ def request(
     force: bool = typer.Option(
         False, "--force", "-f", help="Execute without confirmation, even for risky operations."
     ),
+    # The 'help' parameter is GONE
 ):
-    """Send a natural language request to Angela."""
+    """
+    Send a natural language request to Angela.
+    
+    This is the main way to interact with Angela. Just type your request
+    in plain English, and Angela will understand and take action.
+    
+    Examples:
+      angela request "list all files in the current directory"
+      angela request "show me the disk usage"
+      angela request "create a file called todo.txt with a shopping list"
+      angela request "help me debug my Python script"
+    
+    Use --suggest-only to see what command would be run without executing it.
+    Use --dry-run to simulate execution without making changes.
+    Use --force to skip confirmation prompts (use with caution for risky operations).
+    """
+    # The 'if help:' block is GONE
+    
     # Combine all arguments into a single request string
     full_request = " ".join(request_text)
     
