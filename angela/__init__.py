@@ -1,121 +1,34 @@
 # angela/__init__.py
 """
 Angela CLI: AI-powered command-line assistant integrated into your terminal shell.
-The main package initialization
 """
-import sys
 
 __version__ = '0.1.0'
 
-def check_dependencies():
-    """Check if all required dependencies are installed and warn if any are missing."""
-    missing_deps = []
-    
-    # List of critical packages to check (package_name, import_name)
-    dependencies = [
-        ("pydantic", "pydantic"),
-        ("python-dotenv", "dotenv"),
-        ("prompt_toolkit", "prompt_toolkit"),
-        ("typer", "typer"),
-        ("rich", "rich"),
-        # Only check tomli for Python < 3.11, otherwise use tomllib
-        ("tomli" if sys.version_info < (3, 11) else "tomllib", 
-         "tomli" if sys.version_info < (3, 11) else "tomllib"),
-        ("loguru", "loguru"),
-        ("google-generativeai", "google.generativeai"),
-        ("aiohttp", "aiohttp"),
-        ("PyYAML", "yaml"),
-    ]
-    
-    for pkg_name, import_name in dependencies:
-        try:
-            __import__(import_name)
-        except ImportError:
-            missing_deps.append(pkg_name)
-    
-    if missing_deps:
-        print(f"\033[31mWarning: Missing dependencies: {', '.join(missing_deps)}\033[0m", file=sys.stderr)
-        print(f"\033[31mTo install missing dependencies: pip install {' '.join(missing_deps)}\033[0m", file=sys.stderr)
-        print(f"\033[31mOr reinstall Angela with all dependencies: pip install -e .\033[0m", file=sys.stderr)
-
-
-
+# Import key functions needed at the top level
+from angela.api.cli import app
+from angela.core.registry import registry
 
 
 def init_application():
     """Initialize all application components."""
-    check_dependencies()
-    
-    # Initialize core registry
-    from angela.core.registry import registry    
-    
-    # Register core services first, since other components depend on them
-    from angela.core.service_registration import register_core_services
-    register_core_services()
-    
-    # Import only after core services are registered
-    from angela.execution.engine import execution_engine
-    from angela.execution.adaptive_engine import adaptive_engine
-    from angela.safety import check_command_safety, validate_command_safety
+    # Import and register core components
+    from angela.api.cli import get_app
+    from angela.api.execution import get_execution_engine, get_adaptive_engine
+    from angela.api.safety import get_command_validator
+    from angela.api.context import get_context_manager
     from angela.orchestrator import orchestrator
     
     # Register critical components
-    registry.register("execution_engine", execution_engine)
-    registry.register("adaptive_engine", adaptive_engine)
-    registry.register("check_command_safety", check_command_safety)
-    registry.register("validate_command_safety", validate_command_safety)
+    registry.register("app", get_app())
+    registry.register("execution_engine", get_execution_engine())
+    registry.register("adaptive_engine", get_adaptive_engine())
     registry.register("orchestrator", orchestrator)
     
-    # Apply integrations
-    try:
-        from angela.integrations.enhanced_planner_integration import apply_enhanced_planner_integration
-        from angela.integrations.semantic_integration import semantic_integration
-        
-        # Register additional services
-        registry.register("semantic_integration", semantic_integration)
-        
-        # Apply enhanced planner integration
-        apply_enhanced_planner_integration()
-    except ImportError as e:
-        from angela.utils.logging import get_logger
-        logger = get_logger(__name__)
-        logger.warning(f"Failed to apply enhanced planner integration: {e}")
-    
-    # Initialize phase12 (if available)
-    try:
-        from angela.integrations.phase12_integration import phase12_integration
-        import asyncio
-        
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Schedule in running event loop
-            from angela.utils.logging import get_logger
-            logger = get_logger(__name__)
-            logger.info("Scheduling phase12 initialization in running event loop")
-            loop.create_task(phase12_integration.initialize())
-        else:
-            # Run short async task
-            loop.run_until_complete(phase12_integration.initialize())
-    except Exception as e:
-        from angela.utils.logging import get_logger
-        logger = get_logger(__name__)
-        logger.warning(f"Could not initialize Phase 12: {str(e)}")
-    
-    # Verify critical services
-    from angela.core.registry import registry
-    critical_services = [
-        "execution_engine",
-        "adaptive_engine",
-        # Add other critical services here
-    ]
-    
-    missing_services = []
-    for service_name in critical_services:
-        if registry.get(service_name) is None:
-            missing_services.append(service_name)
-    
-    if missing_services:
-        from angela.utils.logging import get_logger
-        logger = get_logger(__name__)
-        logger.error(f"CRITICAL ERROR: The following essential services are missing: {', '.join(missing_services)}")
-        logger.error("Application functionality will be severely limited")
+    # Initialize context
+    from angela.api.context import initialize_project_inference
+    initialize_project_inference()
+
+
+# Export the main app and initialization function
+__all__ = ['app', 'init_application', '__version__']

@@ -1,4 +1,4 @@
-# angela/orhestrator.py
+# angela/orchestrator.py
 """
 Main orchestration service for Angela CLI.
 
@@ -16,40 +16,63 @@ from rich.console import Console
 from datetime import datetime
 from rich.panel import Panel
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.ai.prompts import build_prompt
-from angela.ai.parser import parse_ai_response, CommandSuggestion
-from angela.ai.file_integration import extract_file_operation, execute_file_operation
-from angela.ai.content_analyzer import content_analyzer
-from angela.ai.content_analyzer_extensions import EnhancedContentAnalyzer
-from angela.context import context_manager
-from angela.context.session import session_manager
-from angela.context.history import history_manager
-from angela.execution.engine import execution_engine
-from angela.execution.adaptive_engine import adaptive_engine
-from angela.ai.analyzer import error_analyzer
-from angela.ai.intent_analyzer import intent_analyzer
-from angela.intent.planner import AdvancedTaskPlan, TaskPlan
-from angela.ai.confidence import confidence_scorer
-from angela.intent.planner import task_planner
-from angela.workflows.manager import workflow_manager
-from angela.utils.logging import get_logger
-from angela.shell.formatter import terminal_formatter, OutputType
-from angela.execution.error_recovery import ErrorRecoveryManager
-from angela.context.enhancer import context_enhancer
-from angela.context.file_resolver import file_resolver
-from angela.context.file_activity import file_activity_tracker, ActivityType
-from angela.execution.hooks import execution_hooks
-from angela.core.registry import registry
-from angela.shell import advanced_formatter
-from angela.monitoring.background import background_monitor
-from angela.monitoring.network_monitor import network_monitor
-from angela.execution.rollback import rollback_manager  
-from angela.safety.classifier import classify_command_risk, analyze_command_impact 
-from angela.context.preferences import preferences_manager  
-from angela.safety.adaptive_confirmation import get_adaptive_confirmation
-from angela.toolchain.docker import docker_integration
+# Use API imports to avoid circular dependencies
+from angela.api.ai import get_gemini_client, get_gemini_request_class, get_parse_ai_response_func
+from angela.api.ai import get_build_prompt_func, get_error_analyzer, get_content_analyzer, get_intent_analyzer
+from angela.api.ai import get_confidence_scorer
+from angela.api.context import get_context_manager, get_session_manager, get_history_manager, get_file_resolver
+from angela.api.context import get_file_activity_tracker, get_activity_type, get_context_enhancer
+from angela.api.execution import get_execution_engine, get_adaptive_engine, get_rollback_manager, get_execution_hooks
+from angela.api.intent import get_task_planner, get_plan_model_classes
+from angela.api.workflows import get_workflow_manager
+from angela.api.shell import get_terminal_formatter, get_output_type_enum, get_advanced_formatter
+from angela.api.monitoring import get_background_monitor, get_network_monitor
+from angela.api.safety import get_command_risk_classifier, get_adaptive_confirmation
+from angela.api.toolchain import get_docker_integration
 
+# Get the core models and classes
+from angela.utils.logging import get_logger
+
+# Import execution modules via api to avoid circular imports
+from angela.api.execution import get_execution_engine, get_adaptive_engine
+execution_engine = get_execution_engine()
+adaptive_engine = get_adaptive_engine()
+
+# Import other required components
+GeminiRequest = get_gemini_request_class()
+parse_ai_response = get_parse_ai_response_func()
+build_prompt = get_build_prompt_func()
+context_manager = get_context_manager()
+session_manager = get_session_manager()
+history_manager = get_history_manager()
+error_analyzer = get_error_analyzer()
+intent_analyzer = get_intent_analyzer() 
+confidence_scorer = get_confidence_scorer()
+task_planner = get_task_planner()
+workflow_manager = get_workflow_manager()
+file_resolver = get_file_resolver()
+file_activity_tracker = get_file_activity_tracker()
+ActivityType = get_activity_type()
+terminal_formatter = get_terminal_formatter()
+OutputType = get_output_type_enum()
+rollback_manager = get_rollback_manager()
+execution_hooks = get_execution_hooks()
+background_monitor = get_background_monitor()
+network_monitor = get_network_monitor()
+content_analyzer = get_content_analyzer()
+context_enhancer = get_context_enhancer()
+gemini_client = get_gemini_client()
+
+# Get classification and confirmation from API
+classify_command_risk = get_command_risk_classifier().classify
+analyze_command_impact = get_command_risk_classifier().analyze_impact
+get_adaptive_confirmation = get_adaptive_confirmation()
+
+# Get Docker integration
+docker_integration = get_docker_integration()
+
+# Get necessary plan model classes
+AdvancedTaskPlan, TaskPlan = get_plan_model_classes()[3:5]
 
 logger = get_logger(__name__)
 
@@ -82,39 +105,11 @@ class Orchestrator:
         """Initialize the orchestrator."""
         self._logger = logger
         self._background_tasks = set()
-        self._error_recovery_manager = None
         self._background_monitor = background_monitor
         self._network_monitor = network_monitor
         
-        self._ensure_context_enhancer()
-        
+        # Register the monitoring insight callback
         self._background_monitor.register_insight_callback(self._handle_monitoring_insight)
-
-    def _ensure_context_enhancer(self):
-        """Ensure context_enhancer is available in the registry."""
-        enhancer = registry.get("context_enhancer")
-        if not enhancer:
-            try:
-                from angela.context.enhancer import context_enhancer
-                if context_enhancer:
-                    registry.register("context_enhancer", context_enhancer)
-                    self._logger.info("Successfully registered context_enhancer from direct import")
-                else:
-                    from angela.context.enhancer import ContextEnhancer
-                    new_enhancer = ContextEnhancer()
-                    registry.register("context_enhancer", new_enhancer)
-                    self._logger.info("Created and registered new context_enhancer instance")
-            except Exception as e:
-                self._logger.error(f"Failed to ensure context_enhancer: {str(e)}")
-
-    
-    def _get_error_recovery_manager(self):
-        """Get or initialize the error recovery manager."""
-        if self._error_recovery_manager is None:
-            # Import inside the method
-            from angela.execution.error_recovery import ErrorRecoveryManager
-            error_recovery_manager = ErrorRecoveryManager()
-        return error_recovery_manager    
         
     async def process_request(
         self, 
