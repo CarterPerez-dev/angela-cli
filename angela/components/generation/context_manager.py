@@ -635,7 +635,7 @@ class GenerationContextManager:
         
         return entities
         
-    async def analyze_code_relationships(self, files: List[CodeFile]) -> Dict[str, Any]:
+    async def analyze_code_relationships(self, files: List["CodeFile"]) -> Dict[str, Any]:
         """
         Analyze relationships between code files.
         
