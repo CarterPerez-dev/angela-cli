@@ -18,6 +18,8 @@ from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+
+
 async def preview_mkdir(command: str, tokens: List[str]) -> str:
     """Generate a preview for mkdir command."""
     # Parse flags and paths
@@ -500,3 +502,23 @@ async def generic_preview(command: str) -> Optional[str]:
     
     # For commands without dry run support, return a generic message
     return "Preview not available for this command type. Use --dry-run to simulate."
+    
+    
+class CommandPreviewGenerator:
+    """Generator for command previews."""
+    
+    async def generate_preview(self, command: str) -> Optional[str]:
+        """
+        Generate a preview of what a command will do.
+        
+        Args:
+            command: The shell command to preview.
+            
+        Returns:
+            A string containing the preview, or None if preview is not available.
+        """
+        # This simply delegates to the existing function
+        return await generate_preview(command)
+
+# Create a global instance of the generator class
+command_preview_generator = CommandPreviewGenerator()    

@@ -17,8 +17,8 @@ def get_command_validator():
 # Command Risk Classifier API
 def get_command_risk_classifier():
     """Get the command risk classifier instance."""
-    from angela.components.safety.classifier import command_risk_classifier
-    return registry.get_or_create("command_risk_classifier", lambda: command_risk_classifier)
+    from angela.components.safety.classifier import CommandRiskClassifier, command_risk_classifier
+    return registry.get_or_create("command_risk_classifier", CommandRiskClassifier, factory=lambda: command_risk_classifier)
 
 # Confirmation Helper API
 def get_confirmation_helper():
@@ -35,8 +35,8 @@ def get_adaptive_confirmation():
 # Command Preview API
 def get_command_preview_generator():
     """Get the command preview generator instance."""
-    from angela.components.safety.preview import command_preview_generator
-    return registry.get_or_create("command_preview_generator", lambda: command_preview_generator)
+    from angela.components.safety.preview import CommandPreviewGenerator, command_preview_generator
+    return registry.get_or_create("command_preview_generator", CommandPreviewGenerator, factory=lambda: command_preview_generator)
 
 # Additional functions needed by components
 def get_validate_command_safety_func():
