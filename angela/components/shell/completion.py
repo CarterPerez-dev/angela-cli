@@ -9,11 +9,11 @@ from pathlib import Path
 import re
 
 from angela.utils.logging import get_logger
-from angela.context import context_manager
-from angela.context.file_activity import file_activity_tracker
-from angela.context.session import session_manager
-from angela.context.history import history_manager
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.api.context import get_context_manager
+from angela.api.context import get_file_activity_tracker
+from angela.api.context import get_session_manager
+from angela.api.context import get_history_manager
+from angela.api.ai import get_gemini_client, get_gemini_request_class
 
 logger = get_logger(__name__)
 
@@ -416,32 +416,33 @@ class CompletionHandler:
         Returns:
             List of AI-suggested completions
         """
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
         try:
             # Build a prompt for the AI
             prompt = f"""
-You are suggesting auto-completions for the Angela CLI's "{command}" command.
-The user has typed: "{command} {partial}"
-Context information:
-Project type: {context.get('project_type', 'unknown')}
-Recent files: {', '.join(context.get('recent_files', [])[:3])}
-Recent commands: {', '.join(context.get('recent_commands', [])[:3])}
-Last failed command: {context.get('last_failed_command', 'none')}
-Suggest 3-5 natural language completions that would be helpful continuations of what the user is typing.
-Each completion should be the FULL text that would follow "{command} ", not just the part after "{partial}".
-Completions should be relevant to the current context and project type.
-Respond with ONLY a JSON array of strings, like:
-["completion 1", "completion 2", "completion 3"
-"""
+    You are suggesting auto-completions for the Angela CLI's "{command}" command.
+    The user has typed: "{command} {partial}"
+    Context information:
+    Project type: {context.get('project_type', 'unknown')}
+    Recent files: {', '.join(context.get('recent_files', [])[:3])}
+    Recent commands: {', '.join(context.get('recent_commands', [])[:3])}
+    Last failed command: {context.get('last_failed_command', 'none')}
+    Suggest 3-5 natural language completions that would be helpful continuations of what the user is typing.
+    Each completion should be the FULL text that would follow "{command} ", not just the part after "{partial}".
+    Completions should be relevant to the current context and project type.
+    Respond with ONLY a JSON array of strings, like:
+    ["completion 1", "completion 2", "completion 3"
+    """
             
-    
-
+            GeminiRequest = get_gemini_request_class()
             api_request = GeminiRequest(
                 prompt=prompt,
                 max_tokens=200,
                 temperature=0.1  # Low temperature for more deterministic completions
             )
             
-            response = await gemini_client.generate_text(api_request)
+            response = await get_gemini_client().generate_text(api_request)
             
             # Parse the response to extract completions
             import json
@@ -468,6 +469,38 @@ Respond with ONLY a JSON array of strings, like:
         except Exception as e:
             self._logger.error(f"Error getting AI completions: {str(e)}")
             return []
+    
+    def _build_completion_context(self) -> Dict[str, Any]:
+        """
+        Build a context dictionary for completions.
+        
+        Returns:
+            Context dictionary
+        """
+        from angela.api.context import get_context_manager
+        from angela.api.context import get_file_activity_tracker
+        from angela.api.context import get_session_manager
+        
+        context = {}
+        
+        # Add project information
+        context["project_type"] = get_context_manager().project_type
+        
+        # Add recent files
+        recent_activities = get_file_activity_tracker().get_recent_activities(max_count=5)
+        context["recent_files"] = [str(activity.file_path) for activity in recent_activities 
+                                  if activity.file_path is not None]
+        
+        # Add recent commands from session
+        session_context = get_session_manager().get_context()
+        context["recent_commands"] = session_context.get("recent_commands", [])
+        
+        # Add last failed command if available
+        last_failed = get_session_manager().get_entity("last_failed_command")
+        if last_failed:
+            context["last_failed_command"] = last_failed.get("value", "")
+        
+        return context
 
     
     def _build_completion_context(self) -> Dict[str, Any]:

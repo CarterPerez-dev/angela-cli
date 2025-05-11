@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Set, Callable, Awaitable
 from datetime import datetime, timedelta
 
-from angela.ai.client import GeminiRequest
-from angela.context import context_manager
+from angela.api.ai import get_gemini_request_class
+from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
-from angela.shell.formatter import terminal_formatter
+from angela.api.shell import get_terminal_formatter
 from angela.core.events import event_bus
 
 logger = get_logger(__name__)
@@ -115,12 +115,15 @@ class BackgroundMonitor:
     
     async def _monitor_git_status(self) -> None:
         """Monitor Git status in the current project."""
+        from angela.api.context import get_context_manager
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting Git status monitoring")
         
         while self._monitoring_active:
             try:
                 # Check if the current directory is a Git repository
-                context = context_manager.get_context_dict()
+                context = get_context_manager().get_context_dict()
                 if not context.get("project_root"):
                     # No project detected, sleep and try again later
                     await asyncio.sleep(60)
@@ -160,7 +163,7 @@ class BackgroundMonitor:
                             
                             # Display the suggestion if possible
                             if suggestion and self._can_show_suggestion():
-                                terminal_formatter.print_proactive_suggestion(suggestion, "Git Monitor")
+                                get_terminal_formatter().print_proactive_suggestion(suggestion, "Git Monitor")
                                 self._suggestions.add(suggestion_key)
                                 self._last_suggestion_time = datetime.now()
                                 
@@ -190,6 +193,9 @@ class BackgroundMonitor:
     
     async def _monitor_file_changes(self) -> None:
         """Monitor file changes for syntax errors and linting issues."""
+        from angela.api.context import get_context_manager
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting file changes monitoring")
         
         # Track the last modified time of each file
@@ -198,7 +204,7 @@ class BackgroundMonitor:
         while self._monitoring_active:
             try:
                 # Get current project context
-                context = context_manager.get_context_dict()
+                context = get_context_manager().get_context_dict()
                 if not context.get("project_root"):
                     # No project detected, sleep and try again later
                     await asyncio.sleep(30)
@@ -229,7 +235,7 @@ class BackgroundMonitor:
                 # Check changed files for issues
                 for file_path in changed_files:
                     # Get file info
-                    file_info = context_manager.get_file_info(file_path)
+                    file_info = get_context_manager().get_file_info(file_path)
                     
                     # Check file based on language
                     if file_info.get("language") == "Python":
@@ -247,6 +253,8 @@ class BackgroundMonitor:
     
     async def _monitor_system_resources(self) -> None:
         """Monitor system resources for potential issues."""
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting system resources monitoring")
         
         # Last values for comparison
@@ -264,7 +272,7 @@ class BackgroundMonitor:
                     # Disk usage above 90% and increased by 5%
                     if self._can_show_suggestion():
                         suggestion = f"Your disk space is running low ({disk_usage}% used). Consider cleaning up unused files or moving data to free up space."
-                        terminal_formatter.print_proactive_suggestion(suggestion, "System Monitor")
+                        get_terminal_formatter().print_proactive_suggestion(suggestion, "System Monitor")
                         self._last_suggestion_time = datetime.now()
                         
                         # Publish as an event
@@ -273,14 +281,14 @@ class BackgroundMonitor:
                             "disk_usage": disk_usage,
                             "timestamp": datetime.now().isoformat()
                         })
-
-
+    
+    
                         await self._notify_insight_callbacks("disk_space_low", {
                             "suggestion": suggestion,
                             "disk_usage": disk_usage,
                             "timestamp": datetime.now().isoformat()
                         })
-
+    
                         
                 last_values["disk_usage"] = disk_usage
                 
@@ -374,6 +382,8 @@ class BackgroundMonitor:
         Args:
             file_path: Path to the Python file
         """
+        from angela.api.shell import get_terminal_formatter
+        
         # Check for syntax errors
         result = await self._run_command(f"python -m py_compile {file_path}")
         
@@ -388,7 +398,7 @@ class BackgroundMonitor:
                 error_msg = match.group(1) if match else "syntax error"
                 
                 suggestion = f"Syntax error detected in {file_path.name}: {error_msg}"
-                terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
+                get_terminal_formatter().print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
                 
@@ -399,15 +409,15 @@ class BackgroundMonitor:
                     "error_message": error_msg,
                     "timestamp": datetime.now().isoformat()
                 })
-
+    
                 await self._notify_insight_callbacks("python_syntax_error", {
                     "suggestion": suggestion,
                     "file_path": str(file_path),
                     "error_message": error_msg,
                     "timestamp": datetime.now().isoformat()
                 })
-
-  
+    
+      
         # Check with flake8 if available
         flake8_result = await self._run_command(f"flake8 {file_path}")
         
@@ -418,7 +428,7 @@ class BackgroundMonitor:
             if suggestion_key not in self._suggestions and self._can_show_suggestion():
                 lint_issues = flake8_result["stdout"].strip().count('\n') + 1
                 suggestion = f"Found {lint_issues} linting issues in {file_path.name}"
-                terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
+                get_terminal_formatter().print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
                 
@@ -437,6 +447,8 @@ class BackgroundMonitor:
         Args:
             file_path: Path to the JavaScript file
         """
+        from angela.api.shell import get_terminal_formatter
+        
         # Check for syntax errors with Node.js
         result = await self._run_command(f"node --check {file_path}")
         
@@ -447,7 +459,7 @@ class BackgroundMonitor:
             
             if suggestion_key not in self._suggestions and self._can_show_suggestion():
                 suggestion = f"Syntax error detected in {file_path.name}"
-                terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
+                get_terminal_formatter().print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
                 
@@ -469,7 +481,7 @@ class BackgroundMonitor:
             if suggestion_key not in self._suggestions and self._can_show_suggestion():
                 lint_issues = eslint_result["stdout"].strip().count('\n') + 1
                 suggestion = f"Found {lint_issues} linting issues in {file_path.name}"
-                terminal_formatter.print_proactive_suggestion(suggestion, "File Monitor")
+                get_terminal_formatter().print_proactive_suggestion(suggestion, "File Monitor")
                 self._suggestions.add(suggestion_key)
                 self._last_suggestion_time = datetime.now()
                 

@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 
 from angela.config import config_manager
 from angela.utils.logging import get_logger
-from angela.shell.formatter import terminal_formatter
-from angela.context import context_manager
+from angela.api.shell import get_terminal_formatter
+from angela.api.context import get_context_manager
 
 logger = get_logger(__name__)
 
@@ -93,8 +93,11 @@ class NetworkMonitor:
                 elif name == "network_connectivity":
                     self._create_monitoring_task(self._monitor_network_connectivity(), name)
     
-    async def _monitor_local_services(self):
+    async def _monitor_local_services(self) -> None:
         """Monitor local services like web servers and databases."""
+        from angela.api.context import get_context_manager
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting local services monitoring")
         
         # Track service status to detect changes
@@ -103,7 +106,7 @@ class NetworkMonitor:
         while self._monitoring_active:
             try:
                 # Get current project context
-                context = context_manager.get_context_dict()
+                context = get_context_manager().get_context_dict()
                 project_type = context.get("project_type")
                 
                 # Detect potential services based on project type
@@ -119,7 +122,7 @@ class NetworkMonitor:
                         # Status changed
                         if status["status"] == "down" and self._can_show_suggestion():
                             suggestion = f"Service '{service_name}' appears to be down. {status.get('message', '')}"
-                            terminal_formatter.print_proactive_suggestion(suggestion, "Network Monitor")
+                            get_terminal_formatter().print_proactive_suggestion(suggestion, "Network Monitor")
                             self._last_suggestion_time = datetime.now()
                     
                     # Update status
@@ -132,8 +135,11 @@ class NetworkMonitor:
                 self._logger.exception(f"Error monitoring local services: {str(e)}")
                 await asyncio.sleep(120)  # Wait before retrying
     
-    async def _monitor_dependency_updates(self):
+    async def _monitor_dependency_updates(self) -> None:
         """Monitor for available updates to project dependencies."""
+        from angela.api.context import get_context_manager
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting dependency updates monitoring")
         
         # Track which dependencies we've already notified about
@@ -142,7 +148,7 @@ class NetworkMonitor:
         while self._monitoring_active:
             try:
                 # Get current project context
-                context = context_manager.get_context_dict()
+                context = get_context_manager().get_context_dict()
                 project_root = context.get("project_root")
                 project_type = context.get("project_type")
                 
@@ -173,7 +179,7 @@ class NetworkMonitor:
                         more = f" and {count - 3} more" if count > 3 else ""
                         
                         suggestion = f"Found {count} dependency updates available: {pkg_list}{more}"
-                        terminal_formatter.print_proactive_suggestion(suggestion, "Dependency Monitor")
+                        get_terminal_formatter().print_proactive_suggestion(suggestion, "Dependency Monitor")
                         
                         # Mark as notified
                         for update in new_updates:
@@ -188,8 +194,10 @@ class NetworkMonitor:
                 self._logger.exception(f"Error monitoring dependency updates: {str(e)}")
                 await asyncio.sleep(3600)  # Wait before retrying
     
-    async def _monitor_network_connectivity(self):
+    async def _monitor_network_connectivity(self) -> None:
         """Monitor network connectivity to important services."""
+        from angela.api.shell import get_terminal_formatter
+        
         self._logger.debug("Starting network connectivity monitoring")
         
         # Track connectivity status to detect changes
@@ -207,14 +215,14 @@ class NetworkMonitor:
                 if connectivity_status["internet"] != internet_status["connected"]:
                     if not internet_status["connected"] and self._can_show_suggestion():
                         suggestion = f"Internet connectivity appears to be down. {internet_status.get('message', '')}"
-                        terminal_formatter.print_proactive_suggestion(suggestion, "Network Monitor")
+                        get_terminal_formatter().print_proactive_suggestion(suggestion, "Network Monitor")
                         self._last_suggestion_time = datetime.now()
                     elif internet_status["connected"] and not connectivity_status["internet"]:
                         # Internet connection restored
                         elapsed = datetime.now() - connectivity_status["last_check"]
                         if elapsed > timedelta(minutes=5) and self._can_show_suggestion():
                             suggestion = "Internet connectivity has been restored."
-                            terminal_formatter.print_proactive_suggestion(suggestion, "Network Monitor")
+                            get_terminal_formatter().print_proactive_suggestion(suggestion, "Network Monitor")
                             self._last_suggestion_time = datetime.now()
                 
                 # Update status
@@ -227,7 +235,7 @@ class NetworkMonitor:
             except Exception as e:
                 self._logger.exception(f"Error monitoring network connectivity: {str(e)}")
                 await asyncio.sleep(60)  # Wait before retrying
-    
+                
     def _detect_project_services(self, project_type: Optional[str]) -> Dict[str, Dict[str, Any]]:
         """
         Detect services to monitor based on project type.

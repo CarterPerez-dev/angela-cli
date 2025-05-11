@@ -13,7 +13,7 @@ import json
 
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.review import get_diff_manager
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

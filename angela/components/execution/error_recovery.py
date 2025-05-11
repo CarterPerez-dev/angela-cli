@@ -13,7 +13,7 @@ from datetime import datetime
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.ai import get_error_analyzer
 from angela.api.context import get_context_manager
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -8,7 +8,7 @@ import subprocess
 from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
 
 # Import through API layer
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 from angela.api.core import get_registry
 
 if TYPE_CHECKING:

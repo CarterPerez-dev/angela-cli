@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional, List, Tuple, Union
 
 # Import through API layer
 from angela.api.context import get_file_activity_tracker, get_activity_type
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

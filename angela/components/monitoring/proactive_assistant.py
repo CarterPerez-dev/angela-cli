@@ -18,13 +18,13 @@ from enum import Enum
 from angela.core.registry import registry
 from angela.utils.logging import get_logger
 from angela.core.events import event_bus
-from angela.shell.formatter import terminal_formatter
-from angela.context import context_manager
-from angela.context.session import session_manager
-from angela.context.history import history_manager
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.monitoring.background import background_monitor
-from angela.execution.hooks import execution_hooks
+from angela.api.shell import get_terminal_formatter
+from angela.api.context import get_context_manager
+from angela.api.context import get_session_manager
+from angela.api.context import get_history_manager
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.monitoring import get_background_monitor
+from angela.api.execution import get_execution_hooks
 
 logger = get_logger(__name__)
 
@@ -85,6 +85,9 @@ class ProactiveAssistant:
     
     def start(self):
         """Start the proactive assistant."""
+        from angela.api.monitoring import get_background_monitor
+        from angela.api.execution import get_execution_hooks
+        
         if self._active_listening:
             return
         
@@ -96,16 +99,13 @@ class ProactiveAssistant:
         event_bus.subscribe("command:executed", self._handle_command_executed)
         
         # Register with background monitor
-        background_monitor.register_insight_callback(self._handle_monitor_insight)
+        get_background_monitor().register_insight_callback(self._handle_monitor_insight)
         
         # Register with execution hooks - with error handling
         try:
-            execution_hooks_obj = registry.get("execution_hooks")
-            if execution_hooks_obj and hasattr(execution_hooks_obj, "register_hook"):
-                execution_hooks_obj.register_hook("post_execute_command", self._post_execute_command_hook)
-                self._logger.debug("Successfully registered post_execute_command hook")
-            else:
-                self._logger.warning("Execution hooks object missing or doesn't have register_hook method")
+            execution_hooks = get_execution_hooks()
+            execution_hooks.register_hook("post_execute_command", self._post_execute_command_hook)
+            self._logger.debug("Successfully registered post_execute_command hook")
         except Exception as e:
             self._logger.error(f"Error registering with execution hooks: {str(e)}")
         
@@ -113,6 +113,9 @@ class ProactiveAssistant:
     
     def stop(self):
         """Stop the proactive assistant."""
+        from angela.api.monitoring import get_background_monitor
+        from angela.api.execution import get_execution_hooks
+        
         if not self._active_listening:
             return
         
@@ -124,10 +127,10 @@ class ProactiveAssistant:
         event_bus.unsubscribe("command:executed", self._handle_command_executed)
         
         # Unregister from background monitor
-        background_monitor.unregister_insight_callback(self._handle_monitor_insight)
+        get_background_monitor().unregister_insight_callback(self._handle_monitor_insight)
         
         # Unregister from execution hooks
-        execution_hooks.unregister_hook("post_execute_command", self._post_execute_command_hook)
+        get_execution_hooks().unregister_hook("post_execute_command", self._post_execute_command_hook)
         
         self._logger.info("Proactive assistant stopped")
     
@@ -334,6 +337,8 @@ class ProactiveAssistant:
         Args:
             insight_data: Insight data
         """
+        from angela.api.shell import get_terminal_formatter
+        
         if not self._can_show_suggestion():
             return
         
@@ -348,7 +353,7 @@ class ProactiveAssistant:
             return
         
         # Show the suggestion
-        terminal_formatter.print_proactive_suggestion(suggestion, "Git Status")
+        get_terminal_formatter().print_proactive_suggestion(suggestion, "Git Status")
         
         # Remember this suggestion
         self._recent_suggestions.add(suggestion_key)
@@ -361,6 +366,8 @@ class ProactiveAssistant:
         Args:
             insight_data: Insight data
         """
+        from angela.api.shell import get_terminal_formatter
+        
         if not self._can_show_suggestion():
             return
         
@@ -380,7 +387,7 @@ class ProactiveAssistant:
         suggestion = f"Syntax error detected in {Path(file_path).name}: {error_message}"
         
         # Show the suggestion
-        terminal_formatter.print_proactive_suggestion(
+        get_terminal_formatter().print_proactive_suggestion(
             suggestion, 
             "File Error", 
             "Consider fixing this error to avoid compilation/runtime issues."
@@ -1301,8 +1308,11 @@ class ProactiveAssistant:
         Args:
             command: The command that was executed
         """
+        from angela.api.context import get_history_manager
+        from angela.api.shell import get_terminal_formatter
+        
         # Get recent commands
-        recent_commands = history_manager.get_recent_commands(limit=20)
+        recent_commands = get_history_manager().get_recent_commands(limit=20)
         if not recent_commands:
             return
         
@@ -1324,7 +1334,7 @@ class ProactiveAssistant:
             suggestion += "\nYou can then run it with a simple command like: angela run my-workflow"
             
             # Show the suggestion
-            terminal_formatter.print_proactive_suggestion(
+            get_terminal_formatter().print_proactive_suggestion(
                 suggestion, 
                 "Workflow Opportunity", 
                 "I can automate this repeated command for you."

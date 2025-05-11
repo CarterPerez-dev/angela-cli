@@ -15,7 +15,7 @@ import hashlib
 from pydantic import BaseModel, Field
 
 from angela.api.config import get_config_manager
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 from angela.api.workflows import get_workflow_manager, get_workflow_model_classes
 
 logger = get_logger(__name__)

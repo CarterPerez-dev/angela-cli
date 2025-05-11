@@ -21,7 +21,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Union, Set
 
 
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 from angela.api.review import get_diff_manager
 from angela.api.execution import get_execution_engine, get_backup_dir
 

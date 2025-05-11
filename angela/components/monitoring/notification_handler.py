@@ -11,11 +11,11 @@ import logging
 import sys
 
 from angela.utils.logging import get_logger
-from angela.context import context_manager
-from angela.context.session import session_manager
-from angela.context.file_activity import file_activity_tracker
-from angela.monitoring.background import background_monitor
-from angela.shell.inline_feedback import inline_feedback
+from angela.api.context import get_context_manager
+from angela.api.context import get_session_manager
+from angela.api.context import get_file_activity_tracker
+from angela.api.monitoring import get_background_monitor
+from angela.api.shell import get_inline_feedback
 
 logger = get_logger(__name__)
 
@@ -72,16 +72,19 @@ class NotificationHandler:
         Args:
             command: The command about to be executed
         """
+        from angela.api.context import get_session_manager, get_context_manager
+        from angela.api.monitoring import get_background_monitor
+        
         if not command:
             return
             
         # Update session context
-        session_manager.add_entity("current_command", "command", command)
+        get_session_manager().add_entity("current_command", "command", command)
         
         # Record start time for performance tracking
         self._running_commands[command] = {
             "start_time": asyncio.get_event_loop().time(),
-            "cwd": str(context_manager.cwd)
+            "cwd": str(get_context_manager().cwd)
         }
         
         # Log the command for later analysis
@@ -89,7 +92,7 @@ class NotificationHandler:
         
         # If it's a potentially long-running command, start monitoring
         if _is_long_running_command(command):
-            background_monitor.start_command_monitoring(command)
+            get_background_monitor().start_command_monitoring(command)
     
     async def _handle_post_exec(self, command: str, exit_code: int, duration: int, stderr: str = "") -> None:
         """
@@ -101,6 +104,10 @@ class NotificationHandler:
             duration: Execution duration in seconds
             stderr: Standard error output (if available)
         """
+        from angela.api.context import get_session_manager
+        from angela.api.monitoring import get_background_monitor
+        from angela.api.shell import get_inline_feedback
+        
         if not command:
             return
             
@@ -136,23 +143,23 @@ class NotificationHandler:
         
         # Stop monitoring if it was a long-running command
         if _is_long_running_command(command):
-            background_monitor.stop_command_monitoring(command)
+            get_background_monitor().stop_command_monitoring(command)
         
         # Add to session recent commands
-        session_manager.add_command(command)
-        session_manager.add_entity("last_exit_code", "exit_code", exit_code)
+        get_session_manager().add_command(command)
+        get_session_manager().add_entity("last_exit_code", "exit_code", exit_code)
         if stderr:
-            session_manager.add_entity("last_stderr", "error_output", stderr)
+            get_session_manager().add_entity("last_stderr", "error_output", stderr)
         
         # If command failed, store it for potential automatic fixes
         if exit_code != 0:
-            session_manager.add_entity("last_failed_command", "command", command)
+            get_session_manager().add_entity("last_failed_command", "command", command)
             
             # Analyze the failed command and show proactive suggestions
             fix_suggestion = await self._analyze_failed_command(command, stderr)
             if fix_suggestion:
                 # Trigger a proactive suggestion in the terminal
-                await inline_feedback.show_message(
+                await get_inline_feedback().show_message(
                     f"Command failed. Suggestion: {fix_suggestion}",
                     message_type="warning",
                     timeout=15
@@ -165,11 +172,15 @@ class NotificationHandler:
         Args:
             new_dir: The new current directory
         """
+        from angela.api.context import get_context_manager
+        from angela.api.context import get_session_manager
+        from angela.api.shell import get_inline_feedback
+        
         if not new_dir:
             return
             
         # Update context manager with new directory
-        context_manager.refresh_context()
+        get_context_manager().refresh_context()
         
         # Add to recent directories
         if new_dir not in self._recent_directories:
@@ -179,19 +190,19 @@ class NotificationHandler:
                 self._recent_directories = self._recent_directories[:self._max_directories]
         
         # Update session context
-        session_manager.add_entity("current_directory", "directory", new_dir)
-        session_manager.add_entity("recent_directories", "directories", self._recent_directories)
+        get_session_manager().add_entity("current_directory", "directory", new_dir)
+        get_session_manager().add_entity("recent_directories", "directories", self._recent_directories)
         
         # If moving to a project directory, refresh project context
-        project_root = context_manager.project_root
+        project_root = get_context_manager().project_root
         if project_root:
-            session_manager.add_entity("project_root", "directory", str(project_root))
+            get_session_manager().add_entity("project_root", "directory", str(project_root))
             
             # If this is a new project, show a helpful message
             if str(project_root) not in self._recent_directories[1:]:
-                project_type = context_manager.project_type
+                project_type = get_context_manager().project_type
                 if project_type:
-                    await inline_feedback.show_message(
+                    await get_inline_feedback().show_message(
                         f"Detected {project_type.capitalize()} project. Type 'angela help-with {project_type}' for project-specific assistance.",
                         message_type="info",
                         timeout=5
@@ -208,9 +219,11 @@ class NotificationHandler:
         Returns:
             A suggestion string or None if no suggestion is available
         """
+        from angela.api.context import get_session_manager, get_history_manager
+        
         # Get exit code from session if stderr not provided
         if not stderr:
-            stderr_entity = session_manager.get_entity("last_stderr")
+            stderr_entity = get_session_manager().get_entity("last_stderr")
             stderr = stderr_entity.get("value", "") if stderr_entity else ""
         
         # Common error patterns and suggested fixes
@@ -347,9 +360,7 @@ class NotificationHandler:
         # Check if we have similar past failures
         if cmd_base in self._command_errors:
             # Look for successful commands that followed the same failed command
-            from angela.context.history import history_manager
-            
-            similar_commands = history_manager.search_similar_command(command)
+            similar_commands = get_history_manager().search_similar_command(command)
             if similar_commands and similar_commands.get("success", False):
                 return f"Previously successful command: {similar_commands['command']}"
         

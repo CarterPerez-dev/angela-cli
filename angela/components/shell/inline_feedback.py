@@ -6,7 +6,7 @@ import time
 import threading
 
 from angela.utils.logging import get_logger
-from angela.context.session import session_manager
+from angela.api.context import get_session_manager
 
 logger = get_logger(__name__)
 
@@ -150,6 +150,8 @@ class InlineFeedback:
         """
         Suggest a command and offer to execute it.
         """
+        from angela.api.context import get_session_manager
+        
         confidence_stars = int(confidence * 5)
         confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
         message = (
@@ -168,7 +170,7 @@ class InlineFeedback:
         elif response == "e":
             edited_command = await self._get_edited_command(command)
             if edited_command and execute_callback:
-                session_manager.add_entity("edited_command", "command", edited_command)
+                get_session_manager().add_entity("edited_command", "command", edited_command)
                 await execute_callback()
                 return True
         return False

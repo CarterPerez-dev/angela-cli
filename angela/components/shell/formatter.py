@@ -21,12 +21,16 @@ from rich.text import Text
 from rich.layout import Layout
 from rich.tree import Tree
 from rich import box
-from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+
+
+from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
+from angela.utils.logging import get_logger
+
+
+AdvancedTaskPlan = get_advanced_task_plan_class()
+PlanStepType = get_plan_step_type_enum(
 
 _console = Console(record=True, width=100)
-
-
-from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 

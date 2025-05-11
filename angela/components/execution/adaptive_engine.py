@@ -15,7 +15,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeEl
 from angela.api.safety import get_command_risk_classifier, get_command_impact_analyzer, get_adaptive_confirmation_handler, get_command_preview_generator, get_command_learning_handler
 from angela.api.execution import get_execution_engine
 from angela.api.context import get_history_manager, get_preferences_manager, get_session_manager
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
 console = Console()

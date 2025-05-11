@@ -16,7 +16,7 @@ from dataclasses import dataclass, field, asdict
 from pydantic import BaseModel, Field
 
 from angela.api.config import get_config_manager
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.intent import get_task_planner
 

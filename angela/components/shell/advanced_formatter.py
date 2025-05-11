@@ -18,17 +18,18 @@ from rich.tree import Tree
 from rich.markdown import Markdown
 from rich.text import Text
 from rich import box
-from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
 from angela.shell.formatter import terminal_formatter, OutputType
 
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# Use a forward reference for typing to avoid circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+    from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
 
 from angela.utils.logging import get_logger
+
+# Get the classes after import to avoid circular imports
+AdvancedTaskPlan = get_advanced_task_plan_class()
+PlanStepType = get_plan_step_type_enum()
 
 logger = get_logger(__name__)
 
@@ -41,9 +42,12 @@ async def display_advanced_plan(plan: Any) -> None:
     Args:
         plan: The advanced task plan to display
     """
-    # ADD this import inside the function
-    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+    # Import inside the function through API layer
+    from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
     
+    # Get the classes after import
+    AdvancedTaskPlan = get_advanced_task_plan_class()
+    PlanStepType = get_plan_step_type_enum()
     
     header = Panel(
         f"[bold]{plan.description}[/bold]\n\n{plan.goal}",
@@ -142,9 +146,11 @@ def _build_dependency_tree(node, step_id, plan):
         step_id: Current step ID
         plan: The advanced task plan
     """
+    # Import inside the function through API layer
+    from angela.api.intent import get_plan_step_type_enum
     
-    from angela.intent.planner import PlanStepType
-    
+    # Get the enum after import
+    PlanStepType = get_plan_step_type_enum()
     
     # Find steps that depend on this step
     for next_id, next_step in plan.steps.items():
@@ -196,8 +202,12 @@ async def display_execution_results(
         plan: The executed advanced task plan
         results: The execution results
     """
+    # Import inside the function through API layer
+    from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
     
-    from angela.intent.planner import AdvancedTaskPlan, PlanStepType
+    # Get the classes after import
+    AdvancedTaskPlan = get_advanced_task_plan_class()
+    PlanStepType = get_plan_step_type_enum()
 
     logger.debug(f"Displaying execution results for plan: {plan.id}")
     
@@ -404,6 +414,12 @@ async def display_step_details(
         result: The step's execution result
         plan: Optional plan for context
     """
+    # Import inside the function through API layer
+    from angela.api.intent import get_plan_step_type_enum
+    
+    # Get the enum after import
+    PlanStepType = get_plan_step_type_enum()
+    
     # Get the step type as a string from the result
     step_type_str = result.get("type", "")
     
@@ -627,7 +643,6 @@ async def display_step_details(
             console.print(Panel(result_dump, title=f"Raw Result Data for Step {step_id}", border_style="yellow"))
         except Exception as e:
             console.print(f"[red]Could not serialize raw result data: {e}[/red]")
-            
 
 async def display_step_error(
     step_id: str,

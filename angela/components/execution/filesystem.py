@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Union, BinaryIO, TextIO
 
 # Import through API layer
-from angela.api.utils import get_logger
+from angela.utils.logging import get_logger
 from angela.api.safety import get_operation_safety_checker
 
 logger = get_logger(__name__)
