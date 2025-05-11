@@ -1,4 +1,4 @@
-# angela/toolchain/docker.py
+# angela/components/toolchain/docker.py
 """
 Docker toolchain integration for Angela CLI.
 
@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union, Set
 
 from angela.utils.logging import get_logger
-from angela.execution.engine import execution_engine
-from angela.context import context_manager
-from angela.safety.classifier import classify_command_risk
+# Updated imports to use API layer
+from angela.api.execution import get_execution_engine
+from angela.api.context import get_context_manager
+from angela.api.safety import get_command_risk_classifier
 
 logger = get_logger(__name__)
 
@@ -141,6 +142,9 @@ class DockerIntegration:
             True if Docker is available, False otherwise
         """
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 "docker --version",
                 check_safety=True
@@ -158,6 +162,9 @@ class DockerIntegration:
             True if Docker Compose is available, False otherwise
         """
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Try docker compose (v2) command first
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 "docker compose version",
@@ -215,6 +222,9 @@ class DockerIntegration:
         self._logger.info(f"Listing {'all' if all_containers else 'running'} Docker containers")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Build command
             command = "docker ps --format json"
             if all_containers:
@@ -226,25 +236,6 @@ class DockerIntegration:
                 check_safety=True
             )
             
-            if exit_code != 0:
-                return {
-                    "success": False,
-                    "error": f"Error listing containers: {stderr}",
-                    "containers": []
-                }
-            
-            # Parse container information
-            containers = []
-            
-            # Handle older Docker versions that don't support --format json
-            if not stdout.strip().startswith('['):
-                # Fall back to regular format parsing
-                fallback_command = f"docker ps{' --all' if all_containers else ''}"
-                stdout, stderr, exit_code = await execution_engine.execute_command(
-                    fallback_command,
-                    check_safety=True
-                )
-                
                 if exit_code != 0:
                     return {
                         "success": False,
@@ -1103,6 +1094,8 @@ class DockerIntegration:
         
         # Determine project directory
         if project_directory is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             project_directory = context_manager.cwd
         else:
             project_directory = Path(project_directory)
@@ -1132,6 +1125,9 @@ class DockerIntegration:
             command += " " + " ".join(services)
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 command,

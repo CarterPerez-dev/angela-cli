@@ -1,4 +1,4 @@
-# angela/toolchain/package_managers.py
+# angela/components/toolchain/package_managers.py
 
 """
 Package manager integration for Angela CLI.
@@ -15,8 +15,9 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 import re
 
 from angela.utils.logging import get_logger
-from angela.execution.engine import execution_engine
-from angela.context import context_manager
+# Updated imports to use API layer
+from angela.api.execution import get_execution_engine
+from angela.api.context import get_context_manager
 
 logger = get_logger(__name__)
 
@@ -71,7 +72,10 @@ class PackageManagerIntegration:
         # Determine project type if not provided
         if project_type is None:
             # Try to detect from context
+            # Get context manager from API
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
+            
             if context.get("project_type"):
                 project_type = context["project_type"]
             else:
@@ -272,6 +276,9 @@ class PackageManagerIntegration:
             "errors": []
         }
         
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
+        
         # Create virtual environment if requested
         if virtual_env and not (path / "venv").exists():
             venv_command = "python -m venv venv"
@@ -310,6 +317,7 @@ class PackageManagerIntegration:
                 results["success"] = False
                 results["errors"].append(f"Failed to install dependencies: {install_stderr}")
                 return results
+        
         
         # Install dev dependencies
         if dev_dependencies:
@@ -827,4 +835,4 @@ class PackageManagerIntegration:
         return None
 
 # Global package manager integration instance
-package_manager_integration = PackageManagerIntegration()                
+package_manager_integration = PackageManagerIntegration()               

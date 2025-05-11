@@ -1,4 +1,4 @@
-# angela/toolchain/git.py
+# angela/components/toolchain/git.py
 
 """
 Enhanced Git integration for Angela CLI.
@@ -14,7 +14,8 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 import re
 
 from angela.utils.logging import get_logger
-from angela.execution.engine import execution_engine
+# Updated import to use API layer
+from angela.api.execution import get_execution_engine
 
 logger = get_logger(__name__)
 
@@ -70,6 +71,9 @@ class GitIntegration:
         
         # Initialize the repository
         init_command = f"git init -b {initial_branch}"
+        
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
         
         # Execute the command
         stdout, stderr, return_code = await execution_engine.execute_command(
@@ -138,6 +142,9 @@ class GitIntegration:
             add_command = f"git add {' '.join(quoted_files)}"
         else:
             add_command = "git add ."
+        
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
         
         # Execute the command
         stdout, stderr, return_code = await execution_engine.execute_command(
@@ -211,6 +218,9 @@ class GitIntegration:
             quoted_files = [f'"{f}"' for f in files]
             commit_command += f" {' '.join(quoted_files)}"
         
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
+        
         # Execute the command
         stdout, stderr, return_code = await execution_engine.execute_command(
             commit_command,
@@ -278,6 +288,9 @@ class GitIntegration:
         if start_point:
             branch_command += f" {start_point}"
         
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
+        
         # Execute the command
         stdout, stderr, return_code = await execution_engine.execute_command(
             branch_command,
@@ -326,6 +339,9 @@ class GitIntegration:
                 "stdout": "",
                 "stderr": f"Not a Git repository: {path}"
             }
+        
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
         
         # Get current branch
         branch_command = "git branch --show-current"

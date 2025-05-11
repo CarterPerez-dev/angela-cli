@@ -1,4 +1,4 @@
-# angela/toolchain/universal_cli.py
+# angela/components/toolchain/universal_cli.py
 
 """
 Universal CLI Translator for Angela CLI.
@@ -17,10 +17,11 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
+# Updated imports to use API layer
+from angela.api.ai import get_gemini_client, GeminiRequest
+from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
-from angela.safety.validator import validate_command_safety
+from angela.api.safety import get_command_validator
 from angela.core.registry import registry
 
 logger = get_logger(__name__)
@@ -130,7 +131,9 @@ class UniversalCLITranslator:
         
         # Validate the generated command for safety
         command_str = cmd_result["command"]
-        is_safe, error_message = validate_command_safety(command_str)
+        # Get command validator from API
+        command_validator = get_command_validator()
+        is_safe, error_message = command_validator(command_str)
         
         if not is_safe:
             return {
@@ -216,6 +219,9 @@ Only include the most likely tool. If you're unsure, make your best guess.
 """
         
         self._logger.debug("Sending analysis request to AI service")
+        
+        # Get gemini client from API
+        gemini_client = get_gemini_client()
         
         # Call AI service
         api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
@@ -446,7 +452,8 @@ Return a structured JSON object with:
 
 Focus on accuracy. Skip any sections you can't confidently parse.
 """
-        
+
+        gemini_client = get_gemini_client()        
         # Call AI service
         api_request = GeminiRequest(prompt=prompt, max_tokens=2000)
         response = await gemini_client.generate_text(api_request)
@@ -557,6 +564,9 @@ EXPLANATION: <explanation of the command>
 
 Be precise and accurate. Include necessary quotes for paths or arguments that need them.
 """
+        
+        # Get gemini client from API
+        gemini_client = get_gemini_client()
         
         # Call AI service
         api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
@@ -669,18 +679,6 @@ Be precise and accurate. Include necessary quotes for paths or arguments that ne
         
         return result
 
+
 # Global instance
 universal_cli_translator = UniversalCLITranslator()
-
-# Register it directly in the registry for immediate availability
-try:
-    # registry is already imported at the top of the file
-    registry.register("universal_cli_translator", universal_cli_translator)
-    logger.info("Universal CLI Translator registered with registry during module initialization")
-except NameError: # If registry was not imported successfully
-    logger.warning("Universal CLI Translator: 'registry' not defined. Cannot register during module initialization.")
-except Exception as e: # Catch other potential registration errors
-    logger.error(f"Universal CLI Translator: Failed to register with registry during module initialization: {e}")
-    # The comment "This is fine, service_registration will handle it later" would still apply here.
-    pass
-

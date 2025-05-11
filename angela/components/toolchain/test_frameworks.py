@@ -1,4 +1,4 @@
-# angela/toolchain/test_frameworks.py
+# angela/components/toolchain/test_frameworks.py
 """
 Test framework integration for Angela CLI.
 
@@ -14,8 +14,9 @@ import importlib
 import inspect
 
 from angela.utils.logging import get_logger
-from angela.generation.models import CodeFile
-from angela.context import context_manager
+# Updated imports to use API layer
+from angela.api.generation import get_code_file_class
+from angela.api.context import get_context_manager
 
 logger = get_logger(__name__)
 
@@ -69,7 +70,10 @@ class TestFrameworkIntegration:
         # Determine project type if not provided
         if project_type is None:
             # Try to detect from context
+            # Get context manager from API
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
+            
             if context.get("project_type"):
                 project_type = context["project_type"]
             else:
@@ -216,18 +220,23 @@ class TestFrameworkIntegration:
         
         # Get project root
         if root_dir is None:
-            root_dir = context_manager.get_context_dict().get("project_root", os.getcwd())
+            # Get context manager from API
+            context_manager = get_context_manager()
+            context = context_manager.get_context_dict()
+            root_dir = context.get("project_root", os.getcwd())
         
         root_path = Path(root_dir)
         
         # Detect project type if not provided
         if project_type is None:
             # Try to detect from context
+            # Get context manager from API
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
+            
             if context.get("project_type"):
                 project_type = context["project_type"]
             else:
-                # Try to infer from files
                 if (root_path / "requirements.txt").exists() or (root_path / "setup.py").exists():
                     project_type = "python"
                 elif (root_path / "package.json").exists():
@@ -1105,5 +1114,7 @@ func Benchmark{functions[0]}(b *testing.B) {{
             "file_count": len(generated_files)
         }
 
-# Global test framework integration instance
-test_framework_integration = TestFrameworkIntegration()
+
+
+# Then define CodeFile within this module
+CodeFile = get_code_file_class()

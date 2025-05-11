@@ -21,14 +21,15 @@ import textwrap
 from pydantic import BaseModel, Field
 
 from angela.utils.logging import get_logger
-from angela.context import context_manager
+# Updated imports using API layer
+from angela.api.context import get_context_manager
 from angela.core.registry import registry
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.shell.formatter import terminal_formatter
-from angela.execution.engine import execution_engine
-from angela.execution.hooks import execution_hooks
+from angela.api.ai import get_gemini_client, GeminiRequest
+from angela.api.shell import get_terminal_formatter
+from angela.api.execution import get_execution_engine, get_execution_hooks
 
 logger = get_logger(__name__)
+
 
 class CrossToolStep(BaseModel):
     """Model for a step in a cross-tool workflow."""
@@ -79,16 +80,18 @@ class CrossToolWorkflowEngine:
     
     def initialize(self):
         """Initialize the workflow engine."""
-        # Get enhanced universal CLI
+        # Get enhanced universal CLI using the registry
         self._enhanced_universal_cli = registry.get("enhanced_universal_cli")
         if not self._enhanced_universal_cli:
             try:
-                from angela.toolchain.enhanced_universal_cli import enhanced_universal_cli
-                self._enhanced_universal_cli = enhanced_universal_cli
-                registry.register("enhanced_universal_cli", enhanced_universal_cli)
+                # Updated to use API layer
+                from angela.api.toolchain import get_enhanced_universal_cli
+                self._enhanced_universal_cli = get_enhanced_universal_cli()
+                registry.register("enhanced_universal_cli", self._enhanced_universal_cli)
             except ImportError:
                 self._logger.error("Failed to import Enhanced Universal CLI")
                 self._enhanced_universal_cli = None
+
     
     async def create_workflow(
         self,
@@ -515,6 +518,9 @@ class CrossToolWorkflowEngine:
                 if translation_result.get("success", False) and "command" in translation_result:
                     command = translation_result["command"]
             
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute the command
             stdout, stderr, return_code = await execution_engine.execute_command(
                 command=command,
@@ -893,6 +899,9 @@ Format:
 """
 
         try:
+            # Get gemini client from API
+            gemini_client = get_gemini_client()
+            
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=500)
             response = await gemini_client.generate_text(api_request)
@@ -930,7 +939,7 @@ Format:
                 if tool in request.lower():
                     detected.append(tool)
             
-            return detected or ["bash"]  # Default to bash if no tools detected
+            return detected or ["bash"]  
     
     async def _generate_workflow(
         self,
@@ -1024,6 +1033,9 @@ Ensure the workflow:
 """
 
         try:
+            # Get gemini client from API
+            gemini_client = get_gemini_client()
+            
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=4000)
             response = await gemini_client.generate_text(api_request)
@@ -1129,6 +1141,9 @@ Ensure the workflow:
             String with tool information
         """
         info = []
+        
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
         
         for tool in tools:
             # Basic command for getting version information
@@ -1303,4 +1318,3 @@ registry.register("cross_tool_workflow_engine", cross_tool_workflow_engine)
 
 # Initialize on module import
 cross_tool_workflow_engine.initialize()
-

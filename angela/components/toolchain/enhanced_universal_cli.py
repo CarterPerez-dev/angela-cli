@@ -1,5 +1,3 @@
-# angela/toolchain/enhanced_universal_cli.py
-
 """
 Enhanced Universal CLI Integration for Angela CLI.
 
@@ -16,9 +14,11 @@ from pathlib import Path
 
 from angela.utils.logging import get_logger
 from angela.core.registry import registry
-from angela.context import context_manager
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.shell.formatter import terminal_formatter
+# Updated imports to use API layer
+from angela.api.context import get_context_manager
+from angela.api.ai import get_gemini_client, GeminiRequest
+from angela.api.shell import get_terminal_formatter
+from angela.api.execution import get_execution_engine
 
 logger = get_logger(__name__)
 
@@ -28,18 +28,25 @@ class EnhancedUniversalCLI:
     awareness and tool chaining capabilities.
     """
     
+    def __init__(self):
+        """Initialize the enhanced universal CLI."""
+        self._logger = logger
+        self._command_history = {}  # Tool -> List of recent commands
+        self._translator = None
+    
     def initialize(self):
         """Initialize the translator."""
         self._translator = registry.get("universal_cli_translator")
         if not self._translator:
             try:
-                # Try direct import first
-                from angela.toolchain.universal_cli import universal_cli_translator
-                self._translator = universal_cli_translator
+                # Updated to use API layer
+                from angela.api.toolchain import get_universal_cli_translator
+                self._translator = get_universal_cli_translator()
                 
                 # If the import worked but returned None, create a new instance
                 if self._translator is None:
-                    from angela.toolchain.universal_cli import UniversalCLITranslator
+                    # Fall back to direct import if API doesn't return an instance
+                    from angela.components.toolchain.universal_cli import UniversalCLITranslator
                     self._translator = UniversalCLITranslator()
                     self._logger.warning("Created new UniversalCLITranslator instance as fallback")
                     
@@ -83,6 +90,8 @@ class EnhancedUniversalCLI:
         
         # Get context if not provided
         if context is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
         
         # Extract tool from request if not specified
@@ -163,6 +172,9 @@ Return just the tool name in lowercase, nothing else.
 """
 
         try:
+            # Get gemini client from API
+            gemini_client = get_gemini_client()
+            
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=10)
             response = await gemini_client.generate_text(api_request)
@@ -203,7 +215,9 @@ Return just the tool name in lowercase, nothing else.
         else:
             # Get Git status
             try:
-                from angela.execution.engine import execution_engine
+                # Get execution engine from API
+                execution_engine = get_execution_engine()
+                
                 stdout, stderr, return_code = await execution_engine.execute_command(
                     command="git status --porcelain",
                     check_safety=True,
@@ -601,7 +615,6 @@ Format as JSON:
             
             return common_commands.get(tool, [])
 
-# Create a global instance
 enhanced_universal_cli = EnhancedUniversalCLI()
 
 # Register it in the service registry
