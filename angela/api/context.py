@@ -98,11 +98,23 @@ def get_context_enhancer():
     from angela.components.context.enhancer import context_enhancer
     return registry.get_or_create("context_enhancer", lambda: context_enhancer)
 
+# Get file detector function
+def get_file_detector_func():
+    """Get the file detection function."""
+    from angela.components.context.file_detector import detect_file_type
+    return detect_file_type
+
 # Initialize functions
 def initialize_project_inference():
     """Initialize project inference for the current project in background."""
     import asyncio
-    if get_context_manager().project_root:
+    project_root = get_context_manager().project_root
+    if project_root:
         asyncio.create_task(
-            get_project_inference().infer_project_info(get_context_manager().project_root)
+            get_project_inference().infer_project_info(project_root)
+        )
+        
+        # Also initialize semantic context
+        asyncio.create_task(
+            get_semantic_context_manager().refresh_context(force=True)
         )

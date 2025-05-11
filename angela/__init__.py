@@ -16,7 +16,7 @@ def init_application():
     from angela.api.cli import get_app
     from angela.api.execution import get_execution_engine, get_adaptive_engine
     from angela.api.safety import get_command_validator
-    from angela.api.context import get_context_manager
+    from angela.api.context import get_context_manager, get_semantic_context_manager
     from angela.orchestrator import orchestrator
     
     # Register critical components
@@ -25,9 +25,18 @@ def init_application():
     registry.register("adaptive_engine", get_adaptive_engine())
     registry.register("orchestrator", orchestrator)
     
-    # Initialize context
+    # Initialize context and semantic context
+    context_manager = get_context_manager()
+    semantic_context_manager = get_semantic_context_manager()
+    
+    # Initialize project inference
     from angela.api.context import initialize_project_inference
     initialize_project_inference()
+    
+    # Log initialization completion
+    from angela.utils.logging import get_logger
+    logger = get_logger(__name__)
+    logger.info("Application initialization completed")
 
 
 # Export the main app and initialization function

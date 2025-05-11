@@ -52,6 +52,17 @@ class SemanticContextManager:
         
         # Register this service
         registry.register("semantic_context_manager", self)
+        
+        # Try to get and register with context enhancer - this ensures we're integrated
+        try:
+            from angela.api.context import get_context_enhancer
+            context_enhancer = get_context_enhancer()
+            if context_enhancer:
+                # Register our enhancer function
+                context_enhancer.register_enhancer(self.get_enriched_context)
+                self._logger.info("Registered semantic context enhancer function")
+        except Exception as e:
+            self._logger.error(f"Failed to register with context_enhancer: {str(e)}")
     
     async def refresh_context(self, force: bool = False) -> None:
         """
@@ -61,6 +72,7 @@ class SemanticContextManager:
             force: Whether to force a refresh even if the cache is valid
         """
         # Get the current project root
+        context_manager = get_context_manager()
         project_root = context_manager.project_root
         if not project_root:
             self._logger.debug("No project root detected, skipping semantic context refresh")
@@ -84,6 +96,12 @@ class SemanticContextManager:
         try:
             self._logger.info(f"Refreshing semantic context for {project_root}")
             
+            # Get project state analyzer
+            project_state_analyzer = get_project_state_analyzer()
+            
+            # Get semantic analyzer
+            semantic_analyzer = get_semantic_analyzer()
+            
             # Get project state asynchronously
             project_state_task = asyncio.create_task(
                 project_state_analyzer.get_project_state(project_root)
@@ -101,13 +119,13 @@ class SemanticContextManager:
             )
             
             # Store the results
-            self._analysis_cache[project_root] = {
+            self._analysis_cache[str(project_root)] = {
                 "project_state": project_state,
                 "semantic_analysis": semantic_analysis,
                 "timestamp": datetime.now().isoformat()
             }
             
-            self._last_analysis_time[project_root] = datetime.now().timestamp()
+            self._last_analysis_time[str(project_root)] = datetime.now().timestamp()
             self._logger.info(f"Semantic context refresh completed for {project_root}")
             
         except Exception as e:
@@ -127,6 +145,9 @@ class SemanticContextManager:
         """
         # Get key files to analyze
         key_files = await self._identify_key_files(project_root)
+        
+        # Get semantic analyzer
+        semantic_analyzer = get_semantic_analyzer()
         
         # Perform semantic analysis
         modules = {}
@@ -198,6 +219,9 @@ class SemanticContextManager:
         """
         key_files = set()
         
+        # Get file activity tracker
+        file_activity_tracker = get_file_activity_tracker()
+        
         # Get recently accessed files
         recent_activities = file_activity_tracker.get_recent_activities(limit=20)
         for activity in recent_activities:
@@ -238,22 +262,29 @@ class SemanticContextManager:
         # Limit to 100 files to avoid excessive analysis
         return list(key_files)[:100]
     
-    async def get_enriched_context(self) -> Dict[str, Any]:
+    async def get_enriched_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
         Get an enriched context dictionary with semantic information.
+        This function is registered as a context enhancer.
         
+        Args:
+            context: Base context dictionary
+            
         Returns:
             Dictionary with enriched context information
         """
+        # Get context manager
+        context_manager = get_context_manager()
+        
         project_root = context_manager.project_root
         if not project_root:
-            return {"semantic_context_available": False}
-        
+            return context  # Return original context if no project root
+
         # Ensure we have up-to-date analysis
         await self.refresh_context()
         
         if str(project_root) not in self._analysis_cache:
-            return {"semantic_context_available": False}
+            return context  # Return original context if no analysis available
         
         # Get the analysis results
         analysis = self._analysis_cache[str(project_root)]
@@ -274,9 +305,11 @@ class SemanticContextManager:
             }
         
         # Build the enriched context
-        return {
-            "semantic_context_available": True,
-            "project_semantic_info": {
+        enhanced_context = dict(context)  # Copy the original context
+        
+        enhanced_context["semantic_context"] = {
+            "available": True,
+            "project_info": {
                 "analyzed_files": analysis["semantic_analysis"]["analyzed_files_count"],
                 "entity_counts": analysis["semantic_analysis"]["entities"],
                 "key_metrics": {
@@ -309,8 +342,10 @@ class SemanticContextManager:
                 },
                 "todos_count": len(analysis["project_state"]["todo_items"])
             },
-            "current_file_semantic": current_file_entities
+            "current_file": current_file_entities
         }
+        
+        return enhanced_context
     
     async def track_entity_access(self, entity_name: str, file_path: Optional[Path] = None) -> None:
         """
@@ -343,6 +378,7 @@ class SemanticContextManager:
             self._recent_entity_usages = self._recent_entity_usages[-100:]
         
         # Also track file access at the file level
+        file_activity_tracker = get_file_activity_tracker()
         file_activity_tracker.track_file_viewing(file_path, None, {
             "entity_name": entity_name,
             "entity_type": "code_entity",
@@ -359,6 +395,9 @@ class SemanticContextManager:
         Returns:
             Dictionary with entity information or None if not found
         """
+        # Get context manager
+        context_manager = get_context_manager()
+        
         project_root = context_manager.project_root
         if not project_root:
             return None
@@ -445,6 +484,9 @@ class SemanticContextManager:
         Returns:
             List of entity information dictionaries
         """
+        # Get context manager
+        context_manager = get_context_manager()
+        
         project_root = context_manager.project_root
         if not project_root:
             return []
@@ -581,6 +623,9 @@ class SemanticContextManager:
             Dictionary with code summary information
         """
         path_obj = Path(file_path)
+        
+        # Get context manager
+        context_manager = get_context_manager()
         project_root = context_manager.project_root
         
         if not project_root:
@@ -597,6 +642,7 @@ class SemanticContextManager:
         if file_str not in self._project_modules[str(project_root)]:
             # Try to analyze the file now
             try:
+                semantic_analyzer = get_semantic_analyzer()
                 module = await semantic_analyzer.analyze_file(path_obj)
                 if module:
                     self._project_modules[str(project_root)][file_str] = module
@@ -642,7 +688,10 @@ class SemanticContextManager:
         Returns:
             Dictionary with project summary information
         """
+        # Get context manager
+        context_manager = get_context_manager()
         project_root = context_manager.project_root
+        
         if not project_root:
             return {"error": "No project root detected"}
         
