@@ -888,16 +888,16 @@ result = transform_value(value)
         
         # Use AI to detect required tools
         prompt = f"""
-Analyze this workflow request to determine which command-line tools would be needed:
-"{request}"
-
-Return a JSON array with the names of the required CLI tools (e.g., git, docker, aws, etc.)
-Sort them by importance (most important first).
-
-Format:
-["tool1", "tool2", "tool3"]
-"""
-
+    Analyze this workflow request to determine which command-line tools would be needed:
+    "{request}"
+    
+    Return a JSON array with the names of the required CLI tools (e.g., git, docker, aws, etc.)
+    Sort them by importance (most important first).
+    
+    Format:
+    ["tool1", "tool2", "tool3"]
+    """
+    
         try:
             # Get gemini client from API
             gemini_client = get_gemini_client()
@@ -939,7 +939,7 @@ Format:
                 if tool in request.lower():
                     detected.append(tool)
             
-            return detected or ["bash"]  
+            return detected or ["bash"]
     
     async def _generate_workflow(
         self,
@@ -969,69 +969,69 @@ Format:
         tool_info = await self._get_tool_info(tools)
         
         prompt = f"""
-You are an expert workflow designer. Create a detailed cross-tool workflow for this request:
-"{request}"
-
-Project information:
-{project_info}
-
-Tools to use: {', '.join(tools)}
-
-Tool information:
-{tool_info}
-
-Maximum steps: {max_steps}
-
-Create a complete workflow specification in JSON format with the following structure:
-{{
-  "id": "unique_id",
-  "name": "Workflow Name",
-  "description": "Detailed description of what the workflow does",
-  "steps": {{
-    "step1": {{
-      "name": "Step 1 Name",
-      "description": "What this step does",
-      "tool": "tool_name",
-      "command": "command to execute",
-      "transform_output": "optional code to transform output",
-      "export_variables": ["variable1", "variable2"],
-      "required_variables": ["dependency1", "dependency2"],
-      "continue_on_failure": false
-    }},
-    // More steps...
-  }},
-  "dependencies": {{
-    "step2": ["step1"],  // Step2 depends on step1
-    "step3": ["step1", "step2"]  // Step3 depends on both step1 and step2
-  }},
-  "data_flow": [
+    You are an expert workflow designer. Create a detailed cross-tool workflow for this request:
+    "{request}"
+    
+    Project information:
+    {project_info}
+    
+    Tools to use: {', '.join(tools)}
+    
+    Tool information:
+    {tool_info}
+    
+    Maximum steps: {max_steps}
+    
+    Create a complete workflow specification in JSON format with the following structure:
     {{
-      "source_step": "step1",
-      "target_step": "step2",
-      "source_variable": "variable1",
-      "target_variable": "input1",
-      "transformation": "optional transformation code"
+      "id": "unique_id",
+      "name": "Workflow Name",
+      "description": "Detailed description of what the workflow does",
+      "steps": {{
+        "step1": {{
+          "name": "Step 1 Name",
+          "description": "What this step does",
+          "tool": "tool_name",
+          "command": "command to execute",
+          "transform_output": "optional code to transform output",
+          "export_variables": ["variable1", "variable2"],
+          "required_variables": ["dependency1", "dependency2"],
+          "continue_on_failure": false
+        }},
+        // More steps...
+      }},
+      "dependencies": {{
+        "step2": ["step1"],  // Step2 depends on step1
+        "step3": ["step1", "step2"]  // Step3 depends on both step1 and step2
+      }},
+      "data_flow": [
+        {{
+          "source_step": "step1",
+          "target_step": "step2",
+          "source_variable": "variable1",
+          "target_variable": "input1",
+          "transformation": "optional transformation code"
+        }}
+        // More data flows...
+      ],
+      "entry_points": ["step1"],  // Steps to start execution with
+      "variables": {{
+        "initial_var1": "value1",
+        "initial_var2": "value2"
+      }}
     }}
-    // More data flows...
-  ],
-  "entry_points": ["step1"],  // Steps to start execution with
-  "variables": {{
-    "initial_var1": "value1",
-    "initial_var2": "value2"
-  }}
-}}
-
-Ensure the workflow:
-1. Uses the correct syntax for each tool
-2. Includes proper command validation and error handling
-3. Correctly passes data between steps using the data_flow section
-4. Has meaningful step names and descriptions
-5. Uses absolute paths for file references whenever possible
-6. Has a logical sequence of steps with proper dependencies
-7. Uses as few steps as possible to accomplish the goal efficiently
-8. Makes proper use of variables for data that needs to be shared between steps
-"""
-
+    
+    Ensure the workflow:
+    1. Uses the correct syntax for each tool
+    2. Includes proper command validation and error handling
+    3. Correctly passes data between steps using the data_flow section
+    4. Has meaningful step names and descriptions
+    5. Uses absolute paths for file references whenever possible
+    6. Has a logical sequence of steps with proper dependencies
+    7. Uses as few steps as possible to accomplish the goal efficiently
+    8. Makes proper use of variables for data that needs to be shared between steps
+    """
+    
         try:
             # Get gemini client from API
             gemini_client = get_gemini_client()
@@ -1254,27 +1254,30 @@ Ensure the workflow:
         
         # Create an enhancing prompt
         prompt = f"""
-You are updating an existing workflow to incorporate new requirements.
-
-Original workflow:
-{json.dumps(workflow.dict(), indent=2)}
-
-New requirements:
-"{request}"
-
-Tools available: {', '.join(tools)}
-
-Update the workflow to incorporate the new requirements while preserving as much of the original workflow as possible.
-You should:
-1. Modify existing steps if they need to change
-2. Add new steps as needed
-3. Update dependencies and data flow
-4. Ensure the workflow remains coherent and efficient
-
-Return the complete updated workflow in the same JSON format as the original.
-"""
-
+    You are updating an existing workflow to incorporate new requirements.
+    
+    Original workflow:
+    {json.dumps(workflow.dict(), indent=2)}
+    
+    New requirements:
+    "{request}"
+    
+    Tools available: {', '.join(tools)}
+    
+    Update the workflow to incorporate the new requirements while preserving as much of the original workflow as possible.
+    You should:
+    1. Modify existing steps if they need to change
+    2. Add new steps as needed
+    3. Update dependencies and data flow
+    4. Ensure the workflow remains coherent and efficient
+    
+    Return the complete updated workflow in the same JSON format as the original.
+    """
+    
         try:
+            # Get gemini client from API
+            gemini_client = get_gemini_client()
+            
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=4000)
             response = await gemini_client.generate_text(api_request)

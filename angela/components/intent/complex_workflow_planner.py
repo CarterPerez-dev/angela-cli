@@ -224,67 +224,73 @@ class ComplexWorkflowPlanner(EnhancedTaskPlanner):
         project_type = context.get("project_type", "unknown")
         
         # Include available tools
+        # Get universal CLI translator from API
+        universal_cli_translator = get_universal_cli_translator()
         available_tools = await universal_cli_translator.get_tool_suggestions()
         tools_str = ", ".join(available_tools[:15])
         if len(available_tools) > 15:
             tools_str += f" and {len(available_tools) - 15} more"
         
         prompt = f"""
-You are an expert DevOps engineer and workflow automation specialist. Create a detailed workflow plan for this request:
-
-REQUEST: "{request}"
-
-CONTEXT:
-- Current directory: {cwd}
-- Project root: {project_root}
-- Project type: {project_type}
-- Available tools: {tools_str}
-
-Design a comprehensive workflow that addresses all aspects of the request. Follow these guidelines:
-1. Break down the workflow into logical steps with clear dependencies
-2. Identify exact tools and commands needed for each step
-3. Define variables needed throughout the workflow
-4. Include appropriate validation and error handling
-5. Structure the plan with parallel execution where possible
-6. Ensure proper sequencing with dependencies
-
-Return a structured JSON object with:
-- name: A descriptive name for the workflow
-- description: Detailed explanation of what this workflow accomplishes
-- steps: Object mapping step IDs to step details (see step structure below)
-- variables: Object mapping variable names to details (see variable structure below)
-- entry_points: Array of step IDs that start the workflow
-- exit_points: Array of step IDs that conclude the workflow
-
-Step structure:
-{{
-  "id": "unique_step_id",
-  "name": "Human-readable step name",
-  "type": "command|tool|api|decision|wait|parallel|custom_code|notification|validation",
-  "description": "Detailed description of this step",
-  "tool": "Tool name for TOOL type",
-  "command": "Command to execute",
-  "condition": "Condition for DECISION or VALIDATION type",
-  "dependencies": [
-    {{ "step_id": "another_step_id", "type": "success|completion|failure" }}
-  ],
-  "inputs": {{ "key": "value" }},
-  "outputs": ["variable_name1", "variable_name2"],
-  "estimated_risk": 0-4
-}}
-
-Variable structure:
-{{
-  "name": "variable_name",
-  "description": "Purpose of this variable",
-  "default_value": "default if any",
-  "required": true|false,
-  "type": "string|number|boolean",
-  "source_step": "step_id that produces this variable"
-}}
-
-Ensure the workflow is complete, practical, and executable. Include approximately {max_steps} steps or fewer, favoring quality over quantity.
-"""
+    You are an expert DevOps engineer and workflow automation specialist. Create a detailed workflow plan for this request:
+    
+    REQUEST: "{request}"
+    
+    CONTEXT:
+    - Current directory: {cwd}
+    - Project root: {project_root}
+    - Project type: {project_type}
+    - Available tools: {tools_str}
+    
+    Design a comprehensive workflow that addresses all aspects of the request. Follow these guidelines:
+    1. Break down the workflow into logical steps with clear dependencies
+    2. Identify exact tools and commands needed for each step
+    3. Define variables needed throughout the workflow
+    4. Include appropriate validation and error handling
+    5. Structure the plan with parallel execution where possible
+    6. Ensure proper sequencing with dependencies
+    
+    Return a structured JSON object with:
+    - name: A descriptive name for the workflow
+    - description: Detailed explanation of what this workflow accomplishes
+    - steps: Object mapping step IDs to step details (see step structure below)
+    - variables: Object mapping variable names to details (see variable structure below)
+    - entry_points: Array of step IDs that start the workflow
+    - exit_points: Array of step IDs that conclude the workflow
+    
+    Step structure:
+    {{
+      "id": "unique_step_id",
+      "name": "Human-readable step name",
+      "type": "command|tool|api|decision|wait|parallel|custom_code|notification|validation",
+      "description": "Detailed description of this step",
+      "tool": "Tool name for TOOL type",
+      "command": "Command to execute",
+      "condition": "Condition for DECISION or VALIDATION type",
+      "dependencies": [
+        {{ "step_id": "another_step_id", "type": "success|completion|failure" }}
+      ],
+      "inputs": {{ "key": "value" }},
+      "outputs": ["variable_name1", "variable_name2"],
+      "estimated_risk": 0-4
+    }}
+    
+    Variable structure:
+    {{
+      "name": "variable_name",
+      "description": "Purpose of this variable",
+      "default_value": "default if any",
+      "required": true|false,
+      "type": "string|number|boolean",
+      "source_step": "step_id that produces this variable"
+    }}
+    
+    Ensure the workflow is complete, practical, and executable. Include approximately {max_steps} steps or fewer, favoring quality over quantity.
+    """
+        
+        # Get gemini client from API
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
         
         # Call AI service
         api_request = GeminiRequest(prompt=prompt, max_tokens=4000)
@@ -838,6 +844,8 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
         
         # Get context if not provided
         if context is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             context = context_manager.get_context_dict()
         
         # Set default environments if not provided
@@ -889,14 +897,16 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
             Tool information string or None if not available
         """
         try:
-            from angela.toolchain.universal_cli import universal_cli_translator
+            # Get universal CLI translator from API
+            universal_cli_translator = get_universal_cli_translator()
             suggestions = await universal_cli_translator.get_tool_suggestions(tool)
             
             if tool in suggestions:
                 # Tool exists, try to get its help info
                 help_cmd = f"{tool} --help"
                 
-                from angela.execution.engine import execution_engine
+                # Get execution engine from API
+                execution_engine = get_execution_engine()
                 stdout, stderr, return_code = await execution_engine.execute_command(
                     command=help_cmd,
                     check_safety=True
@@ -999,6 +1009,9 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
         
         # Execute the command using the adaptive engine
         try:
+            # Get adaptive engine from API
+            adaptive_engine = get_adaptive_engine()
+            
             # Execute using proper engine
             result = await adaptive_engine.execute_command(
                 command=command,
@@ -1099,6 +1112,9 @@ Ensure the workflow is complete, practical, and executable. Include approximatel
         
         # Execute the command using the adaptive engine
         try:
+            # Get adaptive engine from API
+            adaptive_engine = get_adaptive_engine()
+            
             # Execute using proper engine
             result = await adaptive_engine.execute_command(
                 command=full_command,

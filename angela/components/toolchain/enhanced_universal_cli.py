@@ -297,7 +297,8 @@ Return just the tool name in lowercase, nothing else.
         
         # Get running containers
         try:
-            from angela.execution.engine import execution_engine
+            # Updated to use API layer
+            execution_engine = get_execution_engine()
             stdout, stderr, return_code = await execution_engine.execute_command(
                 command="docker ps --format '{{.Names}}'",
                 check_safety=True
@@ -345,7 +346,8 @@ Return just the tool name in lowercase, nothing else.
         try:
             # Get current profile/account/project
             if tool == "aws":
-                from angela.execution.engine import execution_engine
+                # Updated to use API layer
+                execution_engine = get_execution_engine()
                 stdout, stderr, return_code = await execution_engine.execute_command(
                     command="aws configure get region",
                     check_safety=True
@@ -365,7 +367,8 @@ Return just the tool name in lowercase, nothing else.
                     config_info += f"AWS Profile: {profile}. "
             
             elif tool == "gcloud":
-                from angela.execution.engine import execution_engine
+                # Updated to use API layer
+                execution_engine = get_execution_engine()
                 stdout, stderr, return_code = await execution_engine.execute_command(
                     command="gcloud config get-value project",
                     check_safety=True
@@ -385,7 +388,8 @@ Return just the tool name in lowercase, nothing else.
                     config_info += f"GCP Account: {account}. "
             
             elif tool == "az":
-                from angela.execution.engine import execution_engine
+                # Updated to use API layer
+                execution_engine = get_execution_engine()
                 stdout, stderr, return_code = await execution_engine.execute_command(
                     command="az account show --query name -o tsv",
                     check_safety=True
@@ -554,26 +558,29 @@ Return just the tool name in lowercase, nothing else.
         project_root = context.get("project_root", "unknown")
         
         prompt = f"""
-Suggest 5 commonly used commands for the CLI tool "{tool}" that would be most relevant for a {project_type} project.
-
-Current context:
-- Project type: {project_type}
-- Project directory: {project_root}
-
-For each command, provide:
-1. The exact command syntax (no explanations in the command itself)
-2. A one-line description of what the command does
-
-Format as JSON:
-{{
-  "commands": [
-    {{ "command": "command syntax", "description": "what it does" }},
-    ...
-  ]
-}}
-"""
-
+    Suggest 5 commonly used commands for the CLI tool "{tool}" that would be most relevant for a {project_type} project.
+    
+    Current context:
+    - Project type: {project_type}
+    - Project directory: {project_root}
+    
+    For each command, provide:
+    1. The exact command syntax (no explanations in the command itself)
+    2. A one-line description of what the command does
+    
+    Format as JSON:
+    {{
+      "commands": [
+        {{ "command": "command syntax", "description": "what it does" }},
+        ...
+      ]
+    }}
+    """
+    
         try:
+            # Get gemini client from API
+            gemini_client = get_gemini_client()
+            
             # Call AI service
             api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
             response = await gemini_client.generate_text(api_request)

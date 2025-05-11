@@ -396,6 +396,9 @@ class PackageManagerIntegration:
             "errors": []
         }
         
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
+        
         # Initialize npm project if package.json doesn't exist
         package_json = path / "package.json"
         if not package_json.exists() and update_dependency_file:
