@@ -131,6 +131,7 @@ class TerminalFormatter:
         """Initialize the terminal formatter."""
         self._console = Console()
         self._logger = logger
+        self._active_displays = set()
     
     def print_command(self, command: str, title: Optional[str] = None) -> None:
         """
@@ -380,8 +381,11 @@ class TerminalFormatter:
             confidence_score: Optional AI confidence score (0-1)
             execution_time: Optional execution time if this is post-execution
         """
-        # Create a master panel to contain everything
-        self._console.print("\n")
+        from rich import box
+        
+        # Get console width to ensure proper text wrapping
+        console_width = self._console.width
+        max_text_width = min(console_width - 10, 80)  # Leave some margin
         
         # Risk level styling
         risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
@@ -392,17 +396,28 @@ class TerminalFormatter:
             Syntax(command, "bash", theme="monokai", word_wrap=True),
             title=f"Execute [{risk_name} Risk]",
             border_style=risk_color,
+            box=box.ROUNDED,
             expand=False
         ))
         
+        # Add spacing
+        self._console.print("")
+        
         # 2. Explanation panel if provided
         if explanation:
+            # Ensure explanation doesn't get cut off
+            wrapped_explanation = textwrap.fill(explanation, width=max_text_width)
+            
             self._console.print(Panel(
-                explanation,
+                wrapped_explanation,
                 title="Explanation",
                 border_style="blue",
+                box=box.ROUNDED,
                 expand=False
             ))
+            
+            # Add spacing
+            self._console.print("")
         
         # 3. Confidence score if available
         if confidence_score is not None:
@@ -415,8 +430,12 @@ class TerminalFormatter:
                 "[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]",
                 title="AI Confidence",
                 border_style=confidence_color,
+                box=box.ROUNDED,
                 expand=False
             ))
+            
+            # Add spacing
+            self._console.print("")
         
         # 4. Risk assessment panel
         risk_info = f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}\n"
@@ -426,55 +445,39 @@ class TerminalFormatter:
             risk_info,
             title="Risk Assessment",
             border_style=risk_color,
+            box=box.ROUNDED,
             expand=False
         ))
         
-        # 5. Impact analysis panel
-        try:
-            # Import the function directly to avoid circular imports
-            from angela.components.safety.confirmation import format_impact_analysis
-            impact_table = format_impact_analysis(impact)
-            
-            self._console.print(Panel(
-                impact_table,
-                title="Impact Analysis",
-                border_style="blue",
-                expand=False
-            ))
-        except ImportError:
-            # Fallback if we can't import the function
-            self._logger.warning("Could not import format_impact_analysis, using simplified impact display")
-            impact_str = "\n".join([f"• {k}: {v}" for k, v in impact.items() if isinstance(v, (str, int, bool))])
-            
-            if impact_str:
-                self._console.print(Panel(
-                    impact_str,
-                    title="Impact Analysis",
-                    border_style="blue",
-                    expand=False
-                ))
+        # Add spacing
+        self._console.print("")
         
-        # 6. Preview panel if available
+        # 5. Preview panel if available
         if preview:
+            # Ensure preview is properly formatted
             self._console.print(Panel(
                 preview,
                 title="Command Preview",
                 border_style="blue",
+                box=box.ROUNDED,
                 expand=False
             ))
+            
+            # Add spacing
+            self._console.print("")
         
-        # 7. Warning for critical operations
+        # 6. Warning for critical operations
         if risk_level >= 4:  # CRITICAL
             self._console.print(Panel(
                 "⚠️  [bold red]This is a CRITICAL risk operation[/bold red] ⚠️\n"
                 "It may cause significant changes to your system or data loss.",
                 border_style="red",
+                box=box.ROUNDED,
                 expand=False
             ))
-        
-        # 8. Execution time if provided (for post-execution display)
-        if execution_time is not None:
-            self._console.print(f"[bold green]Completed in {execution_time:.2f}s[/bold green]")
+            
+            # Add spacing
+            self._console.print("")
 
     async def display_inline_confirmation(
         self,
@@ -490,22 +493,34 @@ class TerminalFormatter:
             True if confirmed, False otherwise
         """
         # Create a fancy confirmation prompt
-        border_line = "─" * (len(prompt_text) + 10)
-        self._console.print(f"\n[cyan]{border_line}[/cyan]")
-        self._console.print(f"[cyan]┌{'─' * (len(prompt_text) + 8)}┐[/cyan]")
-        self._console.print(f"[cyan]│[/cyan]  [bold]{prompt_text}[/bold] [green](y/n)[/green]  [cyan]│[/cyan]")
-        self._console.print(f"[cyan]└{'─' * (len(prompt_text) + 8)}┘[/cyan]")
+        from rich import box
+        from rich.panel import Panel
+        from rich.text import Text
+        
+        prompt_panel = Text(prompt_text)
+        prompt_panel.append(" (", style="cyan")
+        prompt_panel.append("y", style="green")
+        prompt_panel.append("/", style="cyan")
+        prompt_panel.append("n", style="red")
+        prompt_panel.append(")", style="cyan")
+        
+        self._console.print(Panel(
+            prompt_panel,
+            box=box.ROUNDED,
+            border_style="cyan",
+            expand=False
+        ))
         
         # Get the user's response
-        self._console.print("[cyan]▶[/cyan] ", end="")
+        self._console.print(">>> ", end="", style="red")
         response = input().strip().lower()
         
-        # Consider empty response as "yes"
-        if not response:
+        # Consider empty response or y/yes as "yes"
+        if not response or response in ("y", "yes"):
             return True
         
-        # Check if the response is affirmative
-        return response in ("y", "yes")
+        # Everything else is "no"
+        return False
 
     async def display_execution_timer(
         self,
@@ -526,14 +541,53 @@ class TerminalFormatter:
         import time
         from rich.live import Live
         from rich.panel import Panel
-        from rich.columns import Columns
-        from rich.layout import Layout
+        from rich.text import Text
+        from rich.console import Group
         from rich.spinner import Spinner
+        from rich import box
         
         start_time = time.time()
         
         # Choose a random philosophy quote
         quote = random.choice(self.PHILOSOPHY_QUOTES) if with_philosophy else ""
+        
+        # Create a layout for execution display
+        def get_layout():
+            elapsed = time.time() - start_time
+            
+            if with_philosophy:
+                # Use actual Text objects with direct styling
+                quote_text = Text(quote, style="italic cyan")
+                
+                # Add an empty line for spacing
+                spacer = Text("")
+                
+                # Create spinner with proper formatting
+                spinner_text = Text()
+                spinner_text.append(Spinner("dots"))
+                spinner_text.append(f" {elapsed:.2f}s", style="bold")
+                spinner_text.append(" - Executing command...")
+                
+                # Group them together with proper spacing
+                content = Group(quote_text, spacer, spinner_text)
+            else:
+                # Create spinner with proper formatting
+                spinner_text = Text()
+                spinner_text.append(Spinner("dots"))
+                spinner_text.append(f" {elapsed:.2f}s", style="bold")
+                spinner_text.append(" - Executing command...")
+                
+                content = spinner_text
+            
+            panel = Panel(
+                content,
+                title="Command Execution",
+                border_style="magenta",  # New color
+                box=box.ROUNDED,
+                padding=(1, 2)
+            )
+            
+            return panel
         
         # Use asyncio.create_subprocess_shell to execute the command
         process = await asyncio.create_subprocess_shell(
@@ -569,44 +623,47 @@ class TerminalFormatter:
         stdout_task = asyncio.create_task(read_stream(process.stdout, True))
         stderr_task = asyncio.create_task(read_stream(process.stderr, False))
         
-        # Create a layout for live display
-        def get_layout():
-            elapsed = time.time() - start_time
-            layout = Layout()
+        # Reset any existing console state
+        if hasattr(self._console, "_live") and self._console._live:
+            self._console._live = None
             
-            # Create a spinner
-            spinner = Spinner("dots", text="[bold blue]Executing command...[/bold blue]")
-            
-            # For very short operations, this might not show at all
-            if with_philosophy:
-                layout.split_column(
-                    Panel(f"[italic cyan]{quote}[/italic cyan]", title="Philosophical Insight", border_style="blue", expand=False),
-                    Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Execution Time", border_style="yellow", expand=False)
-                )
-            else:
-                layout.split(Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Execution Time", border_style="yellow", expand=False))
+        # Create a live display to show progress
+        try:
+            with Live(get_layout(), refresh_per_second=10, console=self._console) as live:
+                # Wait for the command to complete while updating the display
+                return_code = await process.wait()
                 
-            return layout
-        
-        # Display progress with Live
-        with Live(get_layout(), refresh_per_second=10) as live:
-            # Wait for the command to complete while updating the display
-            return_code = await process.wait()
+                # Wait for the streams to complete
+                await stdout_task
+                await stderr_task
+                
+                # Update once more when done
+                execution_time = time.time() - start_time
+                live.update(
+                    Panel(
+                        Text(f"Completed in {execution_time:.2f}s", style="bold green"),
+                        title="Process Complete",
+                        border_style="green",
+                        box=box.ROUNDED,
+                        expand=False
+                    )
+                )
+                
+                # Brief pause to show completion
+                await asyncio.sleep(0.5)
+        except Exception as e:
+            self._logger.error(f"Error in execution timer: {str(e)}")
+            # Ensure we still wait for the process
+            if process.returncode is None:
+                return_code = await process.wait()
+            else:
+                return_code = process.returncode
             
             # Wait for the streams to complete
             await stdout_task
             await stderr_task
             
-            # Update once more when done
             execution_time = time.time() - start_time
-            live.update(
-                Panel(
-                    f"[bold green]Completed in {execution_time:.2f}s[/bold green]",
-                    title="Execution Complete",
-                    border_style="green",
-                    expand=False
-                )
-            )
         
         # Return the results
         return (
@@ -634,39 +691,88 @@ class TerminalFormatter:
         from rich.panel import Panel
         from rich.layout import Layout
         from rich.spinner import Spinner
+        from rich.console import Group
+        from rich.text import Text
+        from rich import box
+        
+        start_time = time.time()
         
         # Choose a random philosophy quote
         quote = random.choice(self.PHILOSOPHY_QUOTES) if with_philosophy else ""
         
-        start_time = time.time()
-        
-        # Create a layout for live display
+        # Create a layout function for a single compact panel
         def get_layout():
             elapsed = time.time() - start_time
-            layout = Layout()
             
-            # Display spinner with message
-            spinner = Spinner("dots", text=f"[bold blue]{message}[/bold blue]")
-            
+            # Create content with proper rich formatting
             if with_philosophy:
-                layout.split_column(
-                    Panel(f"[italic cyan]{quote}[/italic cyan]", title="Philosophical Insight", border_style="blue", expand=False),
-                    Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Processing Time", border_style="yellow", expand=False)
-                )
-            else:
-                layout.split(Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Processing Time", border_style="yellow", expand=False))
+                # Important: Use actual Text objects with direct styling
+                quote_text = Text(quote, style="italic cyan")
                 
-            return layout
+                # Add an empty line for spacing
+                spacer = Text("")
+                
+                # Create spinner with proper formatting
+                spinner_text = Text()
+                spinner_text.append(Spinner("dots"))
+                spinner_text.append(f" {elapsed:.2f}s", style="bold")
+                spinner_text.append(f" - {message}")
+                
+                # Group them together with proper spacing
+                content = Group(quote_text, spacer, spinner_text)
+            else:
+                # Create spinner with proper formatting
+                spinner_text = Text()
+                spinner_text.append(Spinner("dots"))
+                spinner_text.append(f" {elapsed:.2f}s", style="bold")
+                spinner_text.append(f" - {message}")
+                
+                content = spinner_text
+            
+            panel = Panel(
+                content,
+                title="Angela is thinking...",
+                border_style="magenta",  # New color
+                box=box.ROUNDED,
+                padding=(1, 2)
+            )
+            
+            return panel
         
         # Use try-except with asyncio.sleep to make it cancellable
         try:
-            with Live(get_layout(), refresh_per_second=10) as live:
-                while True:
-                    await asyncio.sleep(0.1)  # Small sleep to allow cancellation
-                    live.update(get_layout())
+            # Reset any existing console state
+            if hasattr(self._console, "_live") and self._console._live:
+                self._console._live = None
+            
+            with Live(get_layout(), refresh_per_second=10, console=self._console) as live:
+                try:
+                    while True:
+                        await asyncio.sleep(0.1)  # Small sleep to allow cancellation
+                        live.update(get_layout())
+                except asyncio.CancelledError:
+                    # Handle cancellation gracefully
+                    self._logger.debug("Loading display cancelled")
+                    raise  # Re-raise to ensure proper cleanup
         except asyncio.CancelledError:
-            # Handle cancellation gracefully
+            # Expected when cancelled from outside
             pass
+        except Exception as e:
+            self._logger.error(f"Error displaying loading timer: {str(e)}")
+    
+    def _ensure_no_active_live(self):
+        """Ensure no active Live displays by checking and resetting console state."""
+        # Access the internal console state to check if it has an active Live
+        if hasattr(self._console, "_live") and self._console._live:
+            self._logger.warning("Detected active Live display. Attempting cleanup.")
+            # Try to gracefully close any existing live display
+            try:
+                self._console._live = None
+                # Reset other potentially problematic console state
+                if hasattr(self._console, "_buffer"):
+                    self._console._buffer = []
+            except Exception as e:
+                self._logger.error(f"Error cleaning up console state: {str(e)}")
             
     def create_table(
         self, 

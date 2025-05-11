@@ -139,11 +139,34 @@ async def _show_auto_execution_notice(
     
     # Only show preview if it's enabled in preferences
     if preview and preferences_manager.preferences.ui.show_command_preview:
-        console.print(preview)
+        console.print(Panel(
+            preview,
+            title="Command Preview",
+            border_style="blue",
+            expand=False
+        ))
     
-    # Display execution loading animation with timer
-    await terminal_formatter.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
-
+    # Create the loading task
+    loading_task = asyncio.create_task(
+        terminal_formatter.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
+    )
+    
+    try:
+        # Wait a minimum amount of time for visual feedback
+        await asyncio.sleep(0.5)
+        
+        # Now we're ready to continue, cancel the loading task
+        loading_task.cancel()
+        try:
+            await loading_task
+        except asyncio.CancelledError:
+            pass  # Expected
+    except Exception as e:
+        logger.error(f"Error managing loading display: {str(e)}")
+        # Ensure the task is cancelled
+        if not loading_task.done():
+            loading_task.cancel()
+            
 
 async def _get_simple_confirmation(
     command: str, 
@@ -267,14 +290,15 @@ async def offer_command_learning(command: str) -> None:
             from angela.api.shell import get_terminal_formatter
             terminal_formatter = get_terminal_formatter()
             
-            # Create a fancy learning prompt
+            # Create a fancy learning prompt with purple styling
             console.print(Panel(
                 f"I noticed you've used [bold cyan]{base_command}[/bold cyan] {pattern.count} times.",
                 title="Command Learning",
-                border_style="blue",
+                border_style="magenta",  # Changed to magenta
                 expand=False
             ))
             
+            # Use the new custom y/n formatting
             prompt_text = f"Would you like to auto-execute this command in the future?"
             add_to_trusted = await terminal_formatter.display_inline_confirmation(prompt_text)
             

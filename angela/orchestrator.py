@@ -1773,7 +1773,7 @@ class Orchestrator:
         
         # Start a loading timer for initial processing
         loading_task = asyncio.create_task(
-            terminal_formatter.display_loading_timer("Processing your request...")
+            terminal_formatter.display_loading_timer("Angela is initializing satellite uplink....")
         )
         
         try:
@@ -1800,7 +1800,11 @@ class Orchestrator:
             
             # Cancel the loading display
             loading_task.cancel()
-            
+            try:
+                await loading_task
+            except asyncio.CancelledError:
+                pass
+                
             # Analyze command risk and impact
             risk_level, risk_reason = classify_command_risk(suggestion.command)
             impact = analyze_command_impact(suggestion.command)
@@ -1953,7 +1957,11 @@ class Orchestrator:
             # Cancel the loading display if it's still running
             if loading_task and not loading_task.done():
                 loading_task.cancel()
-                
+                try:
+                    await loading_task
+                except asyncio.CancelledError:
+                    pass  # Expected
+                    
             self._logger.exception(f"Error processing command request: {str(e)}")
             return {
                 "request": request,
