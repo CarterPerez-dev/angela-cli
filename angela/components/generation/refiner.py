@@ -15,13 +15,14 @@ import difflib
 
 from angela.utils.logging import get_logger
 from angela.api.ai import get_gemini_client, get_gemini_request_class
-from angela.api.generation import get_code_file_class
+from angela.api.generation import get_code_file_class, get_code_project_class
 from angela.api.review import get_feedback_manager, get_diff_manager
 from angela.api.generation import get_generation_context_manager
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
 CodeFile = get_code_file_class()
+CodeProject = get_code_project_class()
 
 class InteractiveRefiner:
     """
@@ -38,9 +39,9 @@ class InteractiveRefiner:
     async def process_refinement_feedback(
         self, 
         feedback: str,
-        project: "CodeProject",
+        project: CodeProject,
         focus_files: Optional[List[str]] = None
-    ) -> Tuple["CodeProject", Dict[str, Any]]:
+    ) -> Tuple[CodeProject, Dict[str, Any]]:
         """
         Process feedback to refine a generated project.
         
@@ -301,7 +302,7 @@ Only include files that are directly relevant to the feedback.
         self, 
         feedback: str,
         file: CodeFile,
-        project: "CodeProject"
+        project: CodeProject
     ) -> Dict[str, Any]:
         """
         Process feedback for a specific file.
@@ -328,7 +329,7 @@ Only include files that are directly relevant to the feedback.
         
         return result
     
-    async def _build_file_context(self, file: CodeFile, project: "CodeProject") -> Dict[str, Any]:
+    async def _build_file_context(self, file: CodeFile, project: CodeProject) -> Dict[str, Any]:
         """
         Build context for a file for feedback processing.
         

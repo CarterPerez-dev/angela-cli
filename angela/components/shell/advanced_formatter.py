@@ -1,4 +1,4 @@
-# angela/shell/advanced_formatter.py
+# angela/components/shell/advanced_formatter.py
 """
 Terminal formatter extensions for displaying advanced task plans.
 
@@ -19,7 +19,7 @@ from rich.markdown import Markdown
 from rich.text import Text
 from rich import box
 from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
-from angela.shell.formatter import terminal_formatter, OutputType
+from angela.components.shell.formatter import terminal_formatter, OutputType
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
