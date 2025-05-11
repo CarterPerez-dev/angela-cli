@@ -6,6 +6,7 @@ This module provides functions to access safety components with lazy initializat
 from typing import Optional, Type, Any, Dict, List, Union, Callable, Tuple
 
 from angela.core.registry import registry
+from angela.components.safety.adaptive_confirmation import offer_command_learning
 
 # Command Validator API
 def get_command_validator():
