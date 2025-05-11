@@ -11,6 +11,7 @@ import time
 from typing import Optional, List, Dict, Any, Callable, Awaitable, Tuple, Set
 from enum import Enum
 from pathlib import Path
+import textwrap
 
 from rich.console import Console
 from rich.panel import Panel
