@@ -14,8 +14,8 @@ from rich import print as rich_print
 from rich.prompt import Confirm
 from rich.syntax import Syntax
 
-from angela.execution.rollback import rollback_manager
-from angela.utils.logging import get_logger
+from angela.api.execution import get_rollback_manager
+from angela.api.utils import get_logger
 
 logger = get_logger(__name__)
 console = Console()
@@ -28,6 +28,9 @@ def list_operations(
     transactions: bool = typer.Option(False, help="Show transactions instead of individual operations")
 ):
     """List recent operations or transactions that can be rolled back."""
+    # Get rollback_manager through API
+    rollback_manager = get_rollback_manager()
+    
     if transactions:
         # Show transactions
         transaction_list = asyncio.run(rollback_manager.get_recent_transactions(limit))
@@ -108,6 +111,9 @@ def rollback_operation(
     force: bool = typer.Option(False, help="Skip confirmation prompt")
 ):
     """Roll back a specific operation by ID."""
+    # Get rollback_manager through API
+    rollback_manager = get_rollback_manager()
+    
     # Get operation details
     operation_list = asyncio.run(rollback_manager.get_recent_operations(100))
     
@@ -158,6 +164,9 @@ def rollback_transaction(
     force: bool = typer.Option(False, help="Skip confirmation prompt")
 ):
     """Roll back all operations in a transaction."""
+    # Get rollback_manager through API
+    rollback_manager = get_rollback_manager()
+    
     # Get transaction details
     transaction_list = asyncio.run(rollback_manager.get_recent_transactions(100))
     
@@ -219,6 +228,9 @@ def rollback_last(
     force: bool = typer.Option(False, help="Skip confirmation prompt")
 ):
     """Roll back the most recent operation or transaction."""
+    # Get rollback_manager through API
+    rollback_manager = get_rollback_manager()
+    
     if transaction:
         # Get the most recent transaction
         transactions = asyncio.run(rollback_manager.get_recent_transactions(1))
@@ -245,8 +257,8 @@ def rollback_last(
         
         # Call the rollback_operation function
         rollback_operation(operation_id, force)
-
-
+        
+        
 # To be used for integration with the main CLI
 def register_commands(parent_app: typer.Typer):
     """Register rollback commands with a parent Typer app."""

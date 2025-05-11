@@ -11,11 +11,14 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple, Union
 import json
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.review.diff_manager import diff_manager
-from angela.utils.logging import get_logger
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.review import get_diff_manager
+from angela.api.utils import get_logger
 
 logger = get_logger(__name__)
+
+gemini_client = get_gemini_client()
+GeminiRequest = get_gemini_request_class()
 
 class FeedbackManager:
     """
@@ -62,7 +65,7 @@ class FeedbackManager:
             context
         )
         
-        # Call AI service
+        # Call AI service using API
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=16000,  # Large token limit for code
@@ -73,6 +76,9 @@ class FeedbackManager:
         
         # Extract improved code and explanation
         improved_code, explanation = self._extract_improved_code(response.text, original_code)
+        
+        # Get diff_manager through API
+        diff_manager = get_diff_manager()
         
         # Generate diff
         diff = diff_manager.generate_diff(original_code, improved_code)
@@ -197,6 +203,9 @@ class FeedbackManager:
         # Extract project directory and results
         project_dir = Path(refinements["project_dir"])
         results = refinements["results"]
+        
+        # Get diff_manager through API
+        diff_manager = get_diff_manager()
         
         # Apply changes to each file
         applied_results = []

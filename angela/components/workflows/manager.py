@@ -15,11 +15,14 @@ from dataclasses import dataclass, field, asdict
 
 from pydantic import BaseModel, Field
 
-from angela.config import config_manager
-from angela.intent.planner import TaskPlan, PlanStep
-from angela.utils.logging import get_logger
+from angela.api.config import get_config_manager
+from angela.api.utils import get_logger
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.intent import get_task_planner
 
 logger = get_logger(__name__)
+
+config_manager = get_config_manager()
 
 # File for storing workflows
 WORKFLOWS_FILE = config_manager.CONFIG_DIR / "workflows.json"
@@ -197,9 +200,8 @@ class WorkflowManager:
         Returns:
             The created Workflow
         """
-        # Import here to avoid circular imports
-        from angela.intent.planner import task_planner
-        from angela.ai.client import gemini_client, GeminiRequest
+        # Get task_planner through API
+        task_planner = get_task_planner()
         
         self._logger.info(f"Creating workflow from natural language: {name}")
         
@@ -268,32 +270,34 @@ class WorkflowManager:
         
         # Build prompt for variable identification
         prompt = f"""
-Identify potential variables in the following workflow commands:
-
-Commands:
-{json.dumps(commands, indent=2)}
-
-Original description:
-{natural_language}
-
-Identify parameters or values that might change each time the workflow is run.
-For each variable, provide:
-1. A variable name (use format like $NAME or {{NAME}})
-2. A description of what the variable represents
-
-Format your response as JSON:
-{{
-  "variables": {{
-    "$VARIABLE1": "Description of variable 1",
-    "$VARIABLE2": "Description of variable 2",
-    ...
-  }}
-}}
-"""
+    Identify potential variables in the following workflow commands:
+    
+    Commands:
+    {json.dumps(commands, indent=2)}
+    
+    Original description:
+    {natural_language}
+    
+    Identify parameters or values that might change each time the workflow is run.
+    For each variable, provide:
+    1. A variable name (use format like $NAME or {{NAME}})
+    2. A description of what the variable represents
+    
+    Format your response as JSON:
+    {{
+      "variables": {{
+        "$VARIABLE1": "Description of variable 1",
+        "$VARIABLE2": "Description of variable 2",
+        ...
+      }}
+    }}
+    """
+        
+        # Get AI components through API
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
         
         # Call AI service
-        from angela.ai.client import gemini_client, GeminiRequest
-        
         api_request = GeminiRequest(prompt=prompt, max_tokens=2000)
         response = await gemini_client.generate_text(api_request)
         
@@ -412,8 +416,12 @@ Format your response as JSON:
                 "error": f"Workflow not found: {workflow_name}"
             }
         
-        # Import here to avoid circular imports
-        from angela.intent.planner import TaskPlan, PlanStep, task_planner
+        # Get task_planner through API
+        task_planner = get_task_planner()
+        
+        # Import task plan models through API
+        from angela.api.intent import get_task_plan_classes
+        TaskPlan, PlanStep = get_task_plan_classes()
         
         # Convert workflow to a task plan
         plan_steps = []

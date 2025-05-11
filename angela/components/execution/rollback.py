@@ -20,14 +20,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Union, Set
 
-from angela.utils.logging import get_logger
-from angela.execution.filesystem import BACKUP_DIR
-from angela.review.diff_manager import diff_manager
-from angela.execution.engine import execution_engine
+
+from angela.api.utils import get_logger
+from angela.api.review import get_diff_manager
+from angela.api.execution import get_execution_engine, get_backup_dir
 
 logger = get_logger(__name__)
 
 # File to store operation history for rollback
+BACKUP_DIR = get_backup_dir()
 HISTORY_FILE = BACKUP_DIR / "operation_history.json"
 TRANSACTION_DIR = BACKUP_DIR / "transactions"
 
@@ -963,6 +964,9 @@ class RollbackManager:
                 else:
                     reversed_diff += line + '\n'
             
+            # Get diff_manager through API
+            diff_manager = get_diff_manager()
+            
             # Try to apply the reversed diff
             result, success = diff_manager.apply_diff(current_content, reversed_diff)
             
@@ -1004,6 +1008,9 @@ class RollbackManager:
             
             # Get the working directory
             cwd = op.params.get("cwd")
+            
+            # Get execution_engine through API
+            execution_engine = get_execution_engine()
             
             # Execute the compensating action
             logger.info(f"Executing compensating action: {compensating_action}")

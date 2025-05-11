@@ -14,11 +14,14 @@ import hashlib
 
 from pydantic import BaseModel, Field
 
-from angela.workflows.manager import Workflow, WorkflowManager, workflow_manager
-from angela.config import config_manager
-from angela.utils.logging import get_logger
+from angela.api.config import get_config_manager
+from angela.api.utils import get_logger
+from angela.api.workflows import get_workflow_manager, get_workflow_model_classes
 
 logger = get_logger(__name__)
+
+config_manager = get_config_manager()
+Workflow, _ = get_workflow_model_classes()
 
 # Constants
 WORKFLOW_EXPORT_DIR = config_manager.CONFIG_DIR / "exported_workflows"
@@ -40,14 +43,15 @@ class WorkflowExportMetadata(BaseModel):
 class WorkflowSharingManager:
     """Manager for workflow sharing, importing, and exporting."""
     
-    def __init__(self, workflow_manager: WorkflowManager):
+    def __init__(self, workflow_manager=None):
         """
         Initialize the workflow sharing manager.
         
         Args:
-            workflow_manager: The workflow manager instance
+            workflow_manager: Optional workflow manager instance (for testing)
         """
-        self._workflow_manager = workflow_manager
+        # Get workflow_manager through API if not provided
+        self._workflow_manager = workflow_manager or get_workflow_manager()
         self._logger = logger
         
         # Ensure directories exist
