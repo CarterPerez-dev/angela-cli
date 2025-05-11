@@ -1,15 +1,3 @@
-Okay, Principal Architect, this is a fantastic and highly ambitious vision! To test the "phases 1-12" (which I'm interpreting as the foundational CLI engine, context awareness, basic NLU, and initial tool integrations before the full-blown AGI capabilities), we need commands that probe these diverse aspects.
-
-Here's a list of ~30 commands designed to cover a wide range of Angela CLI's envisioned abilities. These commands assume that the underlying NLU can map these natural language requests to the appropriate internal actions, even if the full "AGI" decision-making isn't there yet.
-
-**Assumptions for these test commands:**
-*   Angela CLI is invoked by typing `Angela ...` or that the shell hook correctly passes the entire line to your Python backend.
-*   Phases 1-12 have implemented at least rudimentary versions of context detection (project root, current dir), argument parsing, file system interaction, and basic integrations with tools like Git and Docker.
-*   The NLU can differentiate between a command *for* Angela and a command Angela should *translate* or *execute*.
-
----
-
-### Angela CLI Test Commands (Phases 1-12 Focus)
 
 **I. Basic Interaction & Context Awareness:**
 
@@ -170,4 +158,3 @@ Okay, here are 50 commands and natural language scenarios to test out Angela, de
 48. `angela shell` (Then type a few commands like `list files in /tmp` or `what is the current git branch?`)
 49. "angela I want to create a file named 'test.txt' and then another one called 'test.txt'. What happens?" (Tests error handling or overwrite logic for file creation)
 50. "angela I need to find a document about 'API rate limits' or maybe it was 'throttling', it's a markdown file in the 'docs' or 'wiki' folder." (Tests ambiguous file reference and content search)
-This list should provide a solid starting point for testing the breadth of functionalities you're aiming for in the initial phases. As you test, you'll naturally identify more specific edge cases and variations for each command. Remember to adapt these based on what's actually implemented in your "phases 1-12."

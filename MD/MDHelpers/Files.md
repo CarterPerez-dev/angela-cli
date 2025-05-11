@@ -384,145 +384,183 @@
 # Project Tree
 ```
 .
+├── MD
+│   ├── MDHelpers
+│   │   ├── Files.md
+│   │   ├── commands.md
+│   │   └── dependency_map.md
+│   ├── assets
+│   │   └── angela.webp
+│   ├── explanantions
+│   │   ├── ai
+│   │   │   ├── analyzer.md
+│   │   │   ├── client.md
+│   │   │   └── confidence.md
+│   │   ├── code.md
+│   │   ├── orhcestrator.md
+│   │   └── overall.md
+│   ├── plan-commands.md
+│   └── plan.md
 ├── Makefile
 ├── QUICKSTART.md
 ├── README.md
 ├── angela
 │   ├── __init__.py
 │   ├── __main__.py
-│   ├── ai
+│   ├── api
 │   │   ├── __init__.py
-│   │   ├── analyzer.py
-│   │   ├── client.py
-│   │   ├── confidence.py
-│   │   ├── content_analyzer.py
-│   │   ├── content_analyzer_extensions.py
-│   │   ├── enhanced_prompts.py
-│   │   ├── file_integration.py
-│   │   ├── intent_analyzer.py
-│   │   ├── parser.py
-│   │   ├── prompts.py
-│   │   └── semantic_analyzer.py
-│   ├── cli
-│   │   ├── __init__.py
-│   │   ├── docker.py
-│   │   ├── files.py
-│   │   ├── files_extensions.py
+│   │   ├── ai.py
+│   │   ├── cli.py
+│   │   ├── context.py
+│   │   ├── execution.py
 │   │   ├── generation.py
-│   │   ├── main.py
+│   │   ├── intent.py
+│   │   ├── interfaces.py
+│   │   ├── monitoring.py
+│   │   ├── review.py
+│   │   ├── safety.py
+│   │   ├── shell.py
+│   │   ├── toolchain.py
 │   │   └── workflows.py
+│   ├── components
+│   │   ├── ai
+│   │   │   ├── __init__.py
+│   │   │   ├── analyzer.py
+│   │   │   ├── client.py
+│   │   │   ├── confidence.py
+│   │   │   ├── content_analyzer.py
+│   │   │   ├── content_analyzer_extensions.py
+│   │   │   ├── enhanced_prompts.py
+│   │   │   ├── file_integration.py
+│   │   │   ├── intent_analyzer.py
+│   │   │   ├── parser.py
+│   │   │   ├── prompts.py
+│   │   │   └── semantic_analyzer.py
+│   │   ├── cli
+│   │   │   ├── __init__.py
+│   │   │   ├── docker.py
+│   │   │   ├── files.py
+│   │   │   ├── files_extensions.py
+│   │   │   ├── generation.py
+│   │   │   ├── main.py
+│   │   │   └── workflows.py
+│   │   ├── context
+│   │   │   ├── __init__.py
+│   │   │   ├── enhanced_file_activity.py
+│   │   │   ├── enhancer.py
+│   │   │   ├── file_activity.py
+│   │   │   ├── file_detector.py
+│   │   │   ├── file_resolver.py
+│   │   │   ├── history.py
+│   │   │   ├── manager.py
+│   │   │   ├── preferences.py
+│   │   │   ├── project_inference.py
+│   │   │   ├── project_state_analyzer.py
+│   │   │   ├── semantic_context_manager.py
+│   │   │   └── session.py
+│   │   ├── execution
+│   │   │   ├── __init__.py
+│   │   │   ├── adaptive_engine.py
+│   │   │   ├── engine.py
+│   │   │   ├── error_recovery.py
+│   │   │   ├── filesystem.py
+│   │   │   ├── hooks.py
+│   │   │   ├── rollback.py
+│   │   │   └── rollback_commands.py
+│   │   ├── generation
+│   │   │   ├── __init__.py
+│   │   │   ├── architecture.py
+│   │   │   ├── context_manager.py
+│   │   │   ├── documentation.py
+│   │   │   ├── engine.py
+│   │   │   ├── frameworks.py
+│   │   │   ├── models.py
+│   │   │   ├── planner.py
+│   │   │   ├── refiner.py
+│   │   │   └── validators.py
+│   │   ├── intent
+│   │   │   ├── __init__.py
+│   │   │   ├── complex_workflow_planner.py
+│   │   │   ├── enhanced_task_planner.py
+│   │   │   ├── models.py
+│   │   │   ├── planner.py
+│   │   │   └── semantic_task_planner.py
+│   │   ├── interfaces
+│   │   │   ├── __init__.py
+│   │   │   ├── execution.py
+│   │   │   └── safety.py
+│   │   ├── monitoring
+│   │   │   ├── __init__.py
+│   │   │   ├── background.py
+│   │   │   ├── network_monitor.py
+│   │   │   ├── notification_handler.py
+│   │   │   └── proactive_assistant.py
+│   │   ├── review
+│   │   │   ├── __init__.py
+│   │   │   ├── diff_manager.py
+│   │   │   └── feedback.py
+│   │   ├── safety
+│   │   │   ├── __init__.py
+│   │   │   ├── adaptive_confirmation.py
+│   │   │   ├── classifier.py
+│   │   │   ├── confirmation.py
+│   │   │   ├── preview.py
+│   │   │   └── validator.py
+│   │   ├── shell
+│   │   │   ├── __init__.py
+│   │   │   ├── advanced_formatter.py
+│   │   │   ├── angela.bash
+│   │   │   ├── angela.tmux
+│   │   │   ├── angela.zsh
+│   │   │   ├── angela_enhanced.bash
+│   │   │   ├── angela_enhanced.zsh
+│   │   │   ├── completion.py
+│   │   │   ├── formatter.py
+│   │   │   └── inline_feedback.py
+│   │   ├── toolchain
+│   │   │   ├── __init__.py
+│   │   │   ├── ci_cd.py
+│   │   │   ├── cross_tool_workflow_engine.py
+│   │   │   ├── docker.py
+│   │   │   ├── enhanced_universal_cli.py
+│   │   │   ├── git.py
+│   │   │   ├── package_managers.py
+│   │   │   ├── test_frameworks.py
+│   │   │   └── universal_cli.py
+│   │   ├── utils
+│   │   │   ├── __init__.py
+│   │   │   ├── enhanced_logging.py
+│   │   │   └── logging.py
+│   │   └── workflows
+│   │       ├── __init__.py
+│   │       ├── manager.py
+│   │       └── sharing.py
 │   ├── config.py
 │   ├── constants.py
-│   ├── context
-│   │   ├── __init__.py
-│   │   ├── enhanced_file_activity.py
-│   │   ├── enhancer.py
-│   │   ├── file_activity.py
-│   │   ├── file_detector.py
-│   │   ├── file_resolver.py
-│   │   ├── history.py
-│   │   ├── manager.py
-│   │   ├── preferences.py
-│   │   ├── project_inference.py
-│   │   ├── project_state_analyzer.py
-│   │   ├── semantic_context_manager.py
-│   │   └── session.py
 │   ├── core
 │   │   ├── __init__.py
-│   │   ├── events.py
 │   │   └── registry.py
-│   ├── execution
-│   │   ├── __init__.py
-│   │   ├── adaptive_engine.py
-│   │   ├── engine.py
-│   │   ├── error_recovery.py
-│   │   ├── filesystem.py
-│   │   ├── hooks.py
-│   │   ├── rollback.py
-│   │   └── rollback_commands.py
-│   ├── generation
-│   │   ├── __init__.py
-│   │   ├── architecture.py
-│   │   ├── context_manager.py
-│   │   ├── documentation.py
-│   │   ├── engine.py
-│   │   ├── frameworks.py
-│   │   ├── planner.py
-│   │   ├── refiner.py
-│   │   └── validators.py
-│   ├── integrations
-│   │   ├── __init__.py
-│   │   ├── enhanced_planner_integration.py
-│   │   ├── phase12_integration.py
-│   │   └── semantic_integration.py
-│   ├── intent
-│   │   ├── __init__.py
-│   │   ├── complex_workflow_planner.py
-│   │   ├── enhanced_task_planner.py
-│   │   ├── models.py
-│   │   ├── planner.py
-│   │   └── semantic_task_planner.py
-│   ├── interfaces
-│   │   ├── __init__.py
-│   │   ├── execution.py
-│   │   └── safety.py
-│   ├── monitoring
-│   │   ├── __init__.py
-│   │   ├── background.py
-│   │   ├── network_monitor.py
-│   │   ├── notification_handler.py
-│   │   └── proactive_assistant.py
 │   ├── orchestrator.py
-│   ├── repomix-output.xml
-│   ├── review
-│   │   ├── __init__.py
-│   │   ├── diff_manager.py
-│   │   └── feedback.py
-│   ├── safety
-│   │   ├── __init__.py
-│   │   ├── adaptive_confirmation.py
-│   │   ├── classifier.py
-│   │   ├── confirmation.py
-│   │   ├── preview.py
-│   │   └── validator.py
-│   ├── shell
-│   │   ├── __init__.py
-│   │   ├── advanced_formatter.py
-│   │   ├── angela.bash
-│   │   ├── angela.tmux
-│   │   ├── angela.zsh
-│   │   ├── angela_enhanced.bash
-│   │   ├── angela_enhanced.zsh
-│   │   ├── completion.py
-│   │   ├── formatter.py
-│   │   └── inline_feedback.py
-│   ├── toolchain
-│   │   ├── __init__.py
-│   │   ├── ci_cd.py
-│   │   ├── cross_tool_workflow_engine.py
-│   │   ├── docker.py
-│   │   ├── enhanced_universal_cli.py
-│   │   ├── git.py
-│   │   ├── package_managers.py
-│   │   └── universal_cli.py
-│   ├── utils
-│   │   ├── __init__.py
-│   │   ├── enhanced_logging.py
-│   │   └── logging.py
-│   └── workflows
-│       ├── __init__.py
-│       ├── manager.py
-│       └── sharing.py
+│   └── utils
+│       └── logging.py
 ├── docs
 │   ├── Makefile
 │   ├── make.bat
 │   └── source
 │       ├── _static
 │       ├── _templates
+│       │   └── example-template.rst
 │       ├── conf.py
+│       ├── contributing.rst
+│       ├── examples.rst
 │       ├── ext
 │       │   └── usage_examples.py
-│       └── index.rst
+│       ├── index.rst
+│       ├── installation.rst
+│       ├── introduction.rst
+│       ├── quickstart.rst
+│       └── usage.rst
+├── improve.md
 ├── pyproject.toml
 ├── pytest.ini
 ├── requirements.txt
@@ -532,5 +570,39 @@
 │   ├── install.sh
 │   └── uninstall.sh
 ├── setup.py
+└── tests
+    ├── __init__.py
+    ├── conftest.py
+    ├── test_ai_client.py
+    ├── test_basic.py
+    ├── test_context.py
+    ├── test_context_enhancer.py
+    ├── test_enhanced_planner.py
+    ├── test_enhanced_rollback.py
+    ├── test_execution.py
+    ├── test_file_activity.py
+    ├── test_file_detector.py
+    ├── test_file_resolver.py
+    ├── test_filesystem.py
+    ├── test_integration.py
+    ├── test_integrations.py
+    ├── test_multi_step.py
+    ├── test_orchestration.py
+    ├── test_prompt_building.py
+    ├── test_response_parsing.py
+    ├── test_safety.py
+    └── usage_examples
+        ├── advanced_features.py
+        ├── command_execution.py
+        ├── context_awareness.py
+        ├── error_recovery.py
+        ├── file_operations.py
+        ├── git_operations.py
+        ├── safety_features.py
+        ├── testing_debugging.py
+        ├── tools_integration.py
+        └── workflows.py
+
+33 directories, 186 files
 
 ```

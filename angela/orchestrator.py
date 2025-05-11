@@ -23,7 +23,7 @@ from angela.api.ai import get_confidence_scorer
 from angela.api.context import get_context_manager, get_session_manager, get_history_manager, get_file_resolver
 from angela.api.context import get_file_activity_tracker, get_activity_type, get_context_enhancer
 from angela.api.execution import get_execution_engine, get_adaptive_engine, get_rollback_manager, get_execution_hooks
-from angela.api.intent import get_task_planner, get_plan_model_classes
+from angela.api.intent import get_task_planner, get_plan_model_classes, get_enhanced_task_planner
 from angela.api.workflows import get_workflow_manager
 from angela.api.shell import get_terminal_formatter, get_output_type_enum, get_advanced_formatter
 from angela.api.monitoring import get_background_monitor, get_network_monitor
@@ -62,6 +62,7 @@ network_monitor = get_network_monitor()
 content_analyzer = get_content_analyzer()
 context_enhancer = get_context_enhancer()
 gemini_client = get_gemini_client()
+enhanced_task_planner = get_enhanced_task_planner()
 
 # Get classification and confirmation from API
 classify_command_risk = get_command_risk_classifier().classify
@@ -72,7 +73,7 @@ get_adaptive_confirmation = get_adaptive_confirmation()
 docker_integration = get_docker_integration()
 
 # Get necessary plan model classes
-AdvancedTaskPlan, TaskPlan = get_plan_model_classes()[3:5]
+PlanStepType, AdvancedTaskPlan, TaskPlan = get_plan_model_classes()[3:5]
 
 logger = get_logger(__name__)
 
@@ -1838,7 +1839,7 @@ class Orchestrator:
                 
                 # Record the plan in the transaction
                 if transaction_id:
-                    await rollback_manager.record_plan_execution(
+                    await self._record_plan_in_transaction(
                         plan_id=plan.id,
                         goal=plan.goal,
                         plan_data=plan.dict(),
@@ -1878,7 +1879,7 @@ class Orchestrator:
                         await terminal_formatter.display_advanced_plan(plan)
                         
                         # Get confirmation for plan execution
-                        confirmed = await self._confirm_advanced_plan(plan, dry_run)
+                        confirmed = await self._confirm_advanced_plan_execution(plan, dry_run)
                         
                         if confirmed or dry_run:
                             # Execute the plan with transaction support
@@ -1903,11 +1904,11 @@ class Orchestrator:
                                 await rollback_manager.end_transaction(transaction_id, "cancelled")
                 else:
                     # Basic plan (fallback)
-                    result = await self._process_basic_multi_step(plan, request, context, execute, dry_run, transaction_id)
+                    result = await self._handle_basic_plan_execution(plan, request, context, execute, dry_run, transaction_id)
             else:
                 # Use the basic planner for simple tasks
                 plan = await task_planner.plan_task(request, context)
-                result = await self._process_basic_multi_step(plan, request, context, execute, dry_run, transaction_id)
+                result = await self._handle_basic_plan_execution(plan, request, context, execute, dry_run, transaction_id)
             
             return result
         
@@ -2011,6 +2012,423 @@ class Orchestrator:
                     await rollback_manager.end_transaction(transaction_id, "cancelled")
         
         return result
+
+
+
+    async def _handle_advanced_plan_execution(
+        self,
+        plan: AdvancedTaskPlan,
+        request: str,
+        context: Dict[str, Any],
+        execute: bool,
+        dry_run: bool,
+        transaction_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Handle execution of an advanced plan.
+        
+        Args:
+            plan: The advanced plan to execute
+            request: The original request
+            context: Context information
+            execute: Whether to execute commands
+            dry_run: Whether to simulate execution
+            transaction_id: Transaction ID for rollback
+            
+        Returns:
+            Dictionary with results
+        """
+        # Create result structure with the plan
+        result = {
+            "request": request,
+            "type": "advanced_multi_step",
+            "context": context,
+            "plan": {
+                "id": plan.id,
+                "goal": plan.goal,
+                "description": plan.description,
+                "steps": [
+                    {
+                        "id": step_id,
+                        "type": step.type,
+                        "description": step.description,
+                        "command": getattr(step, "command", None),
+                        "dependencies": step.dependencies,
+                        "risk": step.estimated_risk
+                    }
+                    for step_id, step in plan.steps.items()
+                ],
+                "entry_points": plan.entry_points,
+                "step_count": len(plan.steps)
+            }
+        }
+        
+        # Display the plan for the user
+        await self._display_advanced_plan(plan)
+        
+        # Execute the plan if requested
+        if execute or dry_run:
+            # Get confirmation for plan execution
+            confirmed = await self._confirm_advanced_plan_execution(plan, dry_run)
+            
+            if confirmed or dry_run:
+                # Execute the plan with initial variables from context if needed
+                initial_variables = self._extract_initial_variables(context)
+                
+                execution_results = await enhanced_task_planner.execute_plan(
+                    plan, 
+                    dry_run=dry_run,
+                    transaction_id=transaction_id,
+                    initial_variables=initial_variables
+                )
+                
+                result["execution_results"] = execution_results
+                result["success"] = execution_results.get("success", False)
+                
+                # Update transaction status
+                if transaction_id:
+                    rollback_manager = self._get_rollback_manager()
+                    if rollback_manager:
+                        status = "completed" if result["success"] else "failed"
+                        await rollback_manager.end_transaction(transaction_id, status)
+                        
+                # For failed steps, show error information
+                if not result["success"]:
+                    failed_step = execution_results.get("failed_step")
+                    if failed_step and failed_step in execution_results.get("results", {}):
+                        step_result = execution_results["results"][failed_step]
+                        error_msg = step_result.get("error", "Unknown error")
+                        self._logger.error(f"Step {failed_step} failed: {error_msg}")
+                        
+                        # Format error for display
+                        await terminal_formatter.display_step_error(
+                            failed_step,
+                            error_msg,
+                            step_result.get("type", "unknown"),
+                            step_result.get("description", "")
+                        )
+            else:
+                result["cancelled"] = True
+                result["success"] = False
+                
+                # End the transaction as cancelled
+                if transaction_id:
+                    rollback_manager = self._get_rollback_manager()
+                    if rollback_manager:
+                        await rollback_manager.end_transaction(transaction_id, "cancelled")
+        
+        return result
+    
+    async def _handle_basic_plan_execution(
+        self,
+        plan: TaskPlan,
+        request: str,
+        context: Dict[str, Any],
+        execute: bool,
+        dry_run: bool,
+        transaction_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Handle execution of a basic plan."""
+        # Create result with the plan
+        result = {
+            "request": request,
+            "type": "multi_step",
+            "context": context,
+            "plan": {
+                "goal": plan.goal,
+                "steps": [
+                    {
+                        "command": step.command,
+                        "explanation": step.explanation,
+                        "dependencies": step.dependencies,
+                        "risk": step.estimated_risk
+                    }
+                    for step in plan.steps
+                ],
+                "step_count": len(plan.steps)
+            }
+        }
+        
+        # Execute the plan if requested
+        if execute or dry_run:
+            # Display the plan
+            await terminal_formatter.display_task_plan(plan)
+            
+            # Get confirmation for plan execution
+            from prompt_toolkit.shortcuts import yes_no_dialog
+            confirmed = dry_run or yes_no_dialog(
+                title="Confirm Plan Execution",
+                text=f"Do you want to execute this {len(plan.steps)}-step plan?",
+            ).run()
+            
+            if confirmed or dry_run:
+                # Execute the plan
+                execution_results = await enhanced_task_planner.execute_plan(
+                    plan, 
+                    dry_run=dry_run,
+                    transaction_id=transaction_id
+                )
+                
+                result["execution_results"] = execution_results
+                result["success"] = all(r.get("success", False) for r in execution_results)
+                
+                # Update transaction status
+                if transaction_id:
+                    rollback_manager = self._get_rollback_manager()
+                    if rollback_manager:
+                        status = "completed" if result["success"] else "failed"
+                        await rollback_manager.end_transaction(transaction_id, status)
+            else:
+                result["cancelled"] = True
+                result["success"] = False
+                
+                # End the transaction as cancelled
+                if transaction_id:
+                    rollback_manager = self._get_rollback_manager()
+                    if rollback_manager:
+                        await rollback_manager.end_transaction(transaction_id, "cancelled")
+        
+        return result
+    
+
+    async def _display_advanced_plan(
+        self,
+        plan: AdvancedTaskPlan
+    ) -> None:
+        """
+        Display an advanced task plan to the user.
+        
+        Args:
+            plan: The advanced plan to display
+        """
+        await terminal_formatter.display_advanced_plan(plan)
+    
+    async def _confirm_advanced_plan(
+        self, 
+        plan: AdvancedTaskPlan, 
+        dry_run: bool = False,
+        transaction_name: Optional[str] = None
+    ) -> bool:
+        """
+        Get confirmation for executing an advanced plan with comprehensive risk assessment.
+        
+        This consolidated method provides rich feedback on plan risk and complexity,
+        allowing the user to make an informed decision before execution.
+        
+        Args:
+            plan: The advanced plan to execute
+            dry_run: Whether this is a dry run (skip confirmation if True)
+            transaction_name: Optional name of the transaction (for display purposes)
+            
+        Returns:
+            True if confirmed or dry_run is True, False otherwise
+        """
+        # Skip confirmation for dry runs
+        if dry_run:
+            self._logger.debug("Skipping confirmation for dry run")
+            return True
+        
+        # Risk assessment
+        high_risk_steps = []
+        medium_risk_steps = []
+        complex_step_types = set()
+        
+        # Count of various step types for better risk assessment
+        step_type_counts = {}
+        
+        # Analyze all steps
+        for step_id, step in plan.steps.items():
+            # Track step types
+            step_type = step.type
+            step_type_counts[step_type] = step_type_counts.get(step_type, 0) + 1
+            
+            # Risk categorization
+            risk_level = getattr(step, "estimated_risk", 0)
+            if risk_level >= 3:
+                high_risk_steps.append((step_id, getattr(step, "description", f"Step {step_id}")))
+            elif risk_level == 2:
+                medium_risk_steps.append((step_id, getattr(step, "description", f"Step {step_id}")))
+                
+            # Complex step types tracking
+            if step_type in [PlanStepType.CODE, PlanStepType.API, PlanStepType.LOOP, PlanStepType.DECISION]:
+                complex_step_types.add(step_type)
+        
+        # Import needed components
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.table import Table
+        from rich.text import Text
+        from prompt_toolkit.shortcuts import yes_no_dialog
+        
+        console = Console()
+        
+        # Create plan summary
+        summary_table = Table(title=f"Advanced Plan Summary: {plan.goal}", expand=False)
+        summary_table.add_column("Category", style="cyan")
+        summary_table.add_column("Count", style="green")
+        
+        summary_table.add_row("Total Steps", str(len(plan.steps)))
+        for step_type, count in step_type_counts.items():
+            summary_table.add_row(f"{step_type.value.capitalize()} Steps", str(count))
+            
+        # Display plan summary
+        console.print("\n")
+        console.print(summary_table)
+        
+        # Display warnings based on risk assessment
+        if high_risk_steps:
+            warning_text = "[bold red]This plan includes HIGH RISK operations:[/bold red]\n\n"
+            for step_id, desc in high_risk_steps[:5]:  # Show at most 5 high-risk steps
+                warning_text += f"• Step {step_id}: {desc}\n"
+            if len(high_risk_steps) > 5:
+                warning_text += f"...and {len(high_risk_steps) - 5} more high-risk steps\n"
+            warning_text += "\n[bold red]These steps could make significant changes to your system.[/bold red]"
+            
+            console.print(Panel(
+                warning_text,
+                title="⚠️ WARNING: High Risk Operations ⚠️",
+                border_style="red",
+                expand=False
+            ))
+        
+        # Display cautions for medium-risk steps if there are no high-risk steps
+        elif medium_risk_steps:
+            caution_text = "[bold yellow]This plan includes MEDIUM RISK operations:[/bold yellow]\n\n"
+            for step_id, desc in medium_risk_steps[:5]:  # Show at most 5 medium-risk steps
+                caution_text += f"• Step {step_id}: {desc}\n"
+            if len(medium_risk_steps) > 5:
+                caution_text += f"...and {len(medium_risk_steps) - 5} more medium-risk steps\n"
+            
+            console.print(Panel(
+                caution_text,
+                title="⚠️ CAUTION ⚠️",
+                border_style="yellow",
+                expand=False
+            ))
+        
+        # Show complexity warnings if complex step types are present
+        if complex_step_types:
+            complex_text = "This plan includes advanced execution steps:\n\n"
+            
+            if PlanStepType.CODE in complex_step_types:
+                complex_text += "• [bold blue]Code Execution[/bold blue]: Will execute custom code\n"
+            if PlanStepType.API in complex_step_types:
+                complex_text += "• [bold blue]API Calls[/bold blue]: Will make external API requests\n"
+            if PlanStepType.LOOP in complex_step_types:
+                complex_text += "• [bold blue]Loops[/bold blue]: Will repeat operations for multiple items\n"
+            if PlanStepType.DECISION in complex_step_types:
+                complex_text += "• [bold blue]Decision Points[/bold blue]: Plan flow depends on conditions\n"
+                
+            console.print(Panel(
+                complex_text,
+                title="Advanced Execution Flow",
+                border_style="blue",
+                expand=False
+            ))
+        
+        # Transaction information if provided
+        if transaction_name:
+            console.print(Panel(
+                f"This plan will execute as transaction: [bold]{transaction_name}[/bold]\n"
+                "All operations can be rolled back if needed.",
+                title="Transaction Information",
+                border_style="green",
+                expand=False
+            ))
+        
+        # Get confirmation
+        confirmation_text = f"Do you want to execute this {len(plan.steps)}-step advanced plan?"
+        if high_risk_steps:
+            confirmation_text += " (contains HIGH RISK operations)"
+        
+        confirmed = yes_no_dialog(
+            title="Confirm Advanced Plan Execution",
+            text=confirmation_text,
+        ).run()
+        
+        if confirmed:
+            self._logger.info("User confirmed advanced plan execution")
+        else:
+            self._logger.info("User declined advanced plan execution")
+            
+        return confirmed
+    
+    def _extract_initial_variables(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extract variables from context to use as initial variables for plan execution.
+        
+        Args:
+            context: Context information
+            
+        Returns:
+            Dictionary of variables
+        """
+        initial_vars = {}
+        
+        # Extract relevant information from context
+        if "cwd" in context:
+            initial_vars["current_directory"] = context["cwd"]
+        
+        if "project_root" in context:
+            initial_vars["project_root"] = context["project_root"]
+        
+        if "project_type" in context:
+            initial_vars["project_type"] = context["project_type"]
+        
+        if "enhanced_project" in context:
+            # Extract useful project information
+            project_info = context["enhanced_project"]
+            if "type" in project_info:
+                initial_vars["project_type"] = project_info["type"]
+            
+            if "frameworks" in project_info:
+                initial_vars["frameworks"] = project_info["frameworks"]
+            
+            if "dependencies" in project_info and "top_dependencies" in project_info["dependencies"]:
+                initial_vars["dependencies"] = project_info["dependencies"]["top_dependencies"]
+        
+        if "resolved_files" in context:
+            # Extract resolved file references
+            files = {}
+            for ref in context["resolved_files"]:
+                ref_name = ref.get("reference", "").replace(" ", "_")
+                if ref_name and "path" in ref:
+                    files[ref_name] = ref["path"]
+            
+            if files:
+                initial_vars["files"] = files
+        
+        # Add session-specific information
+        if "session" in context and "entities" in context["session"]:
+            entities = {}
+            for name, entity in context["session"].get("entities", {}).items():
+                if "type" in entity and "value" in entity:
+                    entities[name] = {
+                        "type": entity["type"],
+                        "value": entity["value"]
+                    }
+            
+            if entities:
+                initial_vars["entities"] = entities
+        
+        return initial_vars
+    
+    def _get_rollback_manager(self):
+        """Get the rollback manager from the registry."""
+        from angela.core.registry import registry
+        return registry.get("rollback_manager")
+    
+    async def _record_plan_in_transaction(self, plan, transaction_id):
+        """Record a plan in a transaction."""
+        rollback_manager = self._get_rollback_manager()
+        if rollback_manager:
+            await rollback_manager.record_plan_execution(
+                plan_id=plan.id,
+                goal=plan.goal,
+                plan_data=plan.dict(),
+                transaction_id=transaction_id
+            )
+
     
     async def _process_file_content_request(
         self, 
@@ -2271,57 +2689,7 @@ class Orchestrator:
         
         return recovered_results
     
-    async def _confirm_advanced_plan(self, plan: AdvancedTaskPlan, dry_run: bool) -> bool:
-        """
-        Get confirmation to execute an advanced plan.
-        
-        Args:
-            plan: The advanced task plan
-            dry_run: Whether this is a dry run
-            
-        Returns:
-            True if confirmed, False otherwise
-        """
-        if dry_run:
-            # No confirmation needed for dry run
-            return True
-        
-        # Check if any steps are high risk
-        has_high_risk = any(step.estimated_risk >= 3 for step in plan.steps.values())
-        
-        # Import here to avoid circular imports
-        from rich.console import Console
-        from prompt_toolkit.shortcuts import yes_no_dialog
-        
-        console = Console()
-        
-        if has_high_risk:
-            # Use a more prominent warning for high-risk plans
-            console.print(Panel(
-                "⚠️  [bold red]This plan includes HIGH RISK operations[/bold red] ⚠️\n"
-                "Some of these steps could make significant changes to your system.",
-                border_style="red",
-                expand=False
-            ))
-        
-        # Show complexity warning for advanced plans
-        console.print(Panel(
-            "[bold yellow]This is an advanced plan with complex execution flow.[/bold yellow]\n"
-            "It may include conditional branching and dependency-based execution.",
-            border_style="yellow",
-            expand=False
-        ))
-        
-        # Get confirmation
-        confirmed = yes_no_dialog(
-            title="Confirm Advanced Plan Execution",
-            text=f"Do you want to execute this {len(plan.steps)}-step advanced plan?",
-        ).run()
-        
-        return confirmed
-    
 
-    
     async def _process_workflow_definition(
         self, 
         request: str, 
@@ -3341,60 +3709,6 @@ Include only the JSON object with no additional text.
         
         return result
     
-    async def _confirm_advanced_plan(self, plan, dry_run: bool) -> bool:
-        """
-        Get confirmation to execute an advanced plan.
-        
-        Args:
-            plan: The advanced task plan
-            dry_run: Whether this is a dry run
-            
-        Returns:
-            True if confirmed, False otherwise
-        """
-        if dry_run:
-            # No confirmation needed for dry run
-            return True
-        
-        # Check if any steps are high risk
-        has_high_risk = any(step.estimated_risk >= 3 for step in plan.steps.values())
-        
-        # Import here to avoid circular imports
-        from rich.console import Console
-        from rich.panel import Panel
-        from prompt_toolkit.shortcuts import yes_no_dialog
-        
-        console = Console()
-        
-        if has_high_risk:
-            # Use a more prominent warning for high-risk plans
-            console.print(Panel(
-                "⚠️  [bold red]This plan includes HIGH RISK operations[/bold red] ⚠️\n"
-                "Some of these steps could make significant changes to your system.",
-                border_style="red",
-                expand=False
-            ))
-        
-        # Show complexity warning for advanced plans
-        console.print(Panel(
-            "[bold yellow]This is an advanced workflow with complex execution flow.[/bold yellow]\n"
-            "It includes multiple tools and dependencies between steps.",
-            border_style="yellow",
-            expand=False
-        ))
-        
-        # Get confirmation
-        confirmed = yes_no_dialog(
-            title="Confirm Advanced Workflow Execution",
-            text=f"Do you want to execute this {len(plan.steps)}-step workflow?",
-        ).run()
-        
-        return confirmed
-
-
-
-
-
 
     async def execute_command(
         self, 
