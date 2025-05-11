@@ -8,6 +8,13 @@ from pathlib import Path
 
 from angela.core.registry import registry
 
+# Add this function to angela/api/execution.py
+def get_error_recovery_manager():
+    """Get the error recovery manager instance."""
+    from angela.components.execution.error_recovery import error_recovery_manager
+    return registry.get_or_create("error_recovery_manager", lambda: error_recovery_manager)
+
+
 # Execution Engine API
 def get_execution_engine():
     """Get the execution engine instance."""

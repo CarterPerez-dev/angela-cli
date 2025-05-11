@@ -14,12 +14,30 @@ from typing import Dict, Any, Optional, List, Tuple, Union, BinaryIO, TextIO
 
 # Import through API layer
 from angela.utils.logging import get_logger
-from angela.api.safety import get_operation_safety_checker
 
 logger = get_logger(__name__)
 
 # Directory for storing backup files for rollback operations
 BACKUP_DIR = Path(tempfile.gettempdir()) / "angela-backups"
+
+def _get_operation_safety_checker():
+    """Get operation safety function with lazy import to avoid circular dependencies."""
+    from angela.core.registry import registry
+    # First try to get from registry
+    checker = registry.get("check_operation_safety")
+    if checker:
+        return checker
+    
+    # Fall back to direct import
+    try:
+        from angela.components.safety import check_operation_safety
+        return check_operation_safety
+    except ImportError:
+        from angela.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error("Could not import operation safety checker")
+        return None
+
 
 
 class FileSystemError(Exception):

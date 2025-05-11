@@ -1,4 +1,4 @@
-# angela/ai/content_analyzer.py
+# angela/components/ai/content_analyzer.py
 """
 File content analysis and manipulation for Angela CLI.
 
@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Union
 
 from angela.api.review import get_diff_manager
-from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.context import get_context_manager, get_file_detector_func
+from angela.config import config_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -48,6 +48,9 @@ class ContentAnalyzer:
         Returns:
             Dictionary with analysis results
         """
+        # Import here to avoid circular imports
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
         path_obj = Path(file_path)
         
         # Check if file exists
@@ -105,6 +108,9 @@ class ContentAnalyzer:
         Returns:
             Dictionary with summary results
         """
+        # Import here to avoid circular imports
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
         path_obj = Path(file_path)
         
         # Check if file exists
@@ -112,6 +118,7 @@ class ContentAnalyzer:
             return {"error": f"File not found: {path_obj}"}
         
         # Get file info
+        detect_file_type = get_file_detector_func()
         file_info = detect_file_type(path_obj)
         
         # Read file content
@@ -122,25 +129,24 @@ class ContentAnalyzer:
             self._logger.error(f"Error reading file: {str(e)}")
             return {"error": f"Error reading file: {str(e)}"}
         
-        # Generate summarization prompt
         prompt = f"""
 Provide a concise summary of the following {file_info.get('language', 'text')} file. 
 Focus on the main purpose, structure, and key components.
 Keep the summary under {max_length} characters.
-
-```
 {content[:20000]}  # Limit to first 20K chars for very large files
-```
 
 Summary:
 """
         
         # Call AI service
+        # Call AI service
+        GeminiRequest = get_gemini_request_class()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=1000
         )
         
+        gemini_client = get_gemini_client()
         response = await gemini_client.generate_text(api_request)
         
         # Return the summary
@@ -151,8 +157,6 @@ Summary:
             "summary": response.text,
             "content_length": len(content)
         }
-    
-
     
     async def manipulate_content(
         self, 
@@ -171,6 +175,9 @@ Summary:
         Returns:
             Dictionary with manipulation results including old and new content
         """
+        # Import here to avoid circular imports
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
         path_obj = Path(file_path)
         
         # Check if file exists
@@ -244,6 +251,9 @@ Summary:
         Returns:
             Dictionary with search results
         """
+        # Import here to avoid circular imports
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
         path_obj = Path(file_path)
         
         # Check if file exists
@@ -251,6 +261,7 @@ Summary:
             return {"error": f"File not found: {path_obj}"}
         
         # Get file info
+        detect_file_type = get_file_detector_func()
         file_info = detect_file_type(path_obj)
         
         # Check if this is a text file that can be searched
@@ -273,20 +284,20 @@ For each matching section, provide:
 1. Line numbers (approximate)
 2. The relevant code/text section
 3. A brief explanation of why it matches the query
-
-```
 {content[:50000]}  # Limit to first 50K chars for very large files
-```
 
 Search results:
 """
         
         # Call AI service
+        # Call AI service
+        GeminiRequest = get_gemini_request_class()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=4000
         )
         
+        gemini_client = get_gemini_client()
         response = await gemini_client.generate_text(api_request)
         
         # Parse the search results to extract matches
@@ -365,14 +376,11 @@ Search results:
 - Suggest improvements or best practices
 """
         
-        # Create prompt based on request and file type
+
         if request:
             prompt = f"""
 Analyze the following {language} file with this specific request: "{request}"
-
-```
 {content[:50000]}  # Limit to first 50K chars for very large files
-```
 
 Analysis:
 """
@@ -381,10 +389,7 @@ Analysis:
 Analyze the following {language} file.
 
 {analysis_focus}
-
-```
 {content[:50000]}  # Limit to first 50K chars for very large files
-```
 
 Analysis:
 """
@@ -414,9 +419,7 @@ Analysis:
 You are given a {language} file and a request to modify it.
 
 File content:
-```
 {content}
-```
 
 Request: {instruction}
 
@@ -425,9 +428,7 @@ Return the ENTIRE modified content, not just the changed parts.
 Only make changes that directly address the request.
 
 Modified file content:
-```
 """
-        
         return prompt
     
     def _extract_modified_content(self, response: str, original_content: str) -> str:
@@ -465,7 +466,6 @@ Modified file content:
             return original_content
         
         return response.strip()
-    
     
     def _parse_search_results(
         self, 
@@ -556,6 +556,5 @@ Modified file content:
             matches.append(match)
         
         return matches
-
-# Global content analyzer instance
+    
 content_analyzer = ContentAnalyzer()

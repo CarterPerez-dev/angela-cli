@@ -14,13 +14,20 @@ from rich import print as rich_print
 
 from angela import __version__
 from angela.config import config_manager
-from angela.context import context_manager
-from angela.orchestrator import orchestrator
-from angela.execution.engine import execution_engine
+from angela.api.context import get_context_manager
+from angela.orchestrator import orchestrator            
+from angela.api.execution import get_execution_engine
 from angela.utils.logging import setup_logging, get_logger
-from angela.shell.formatter import terminal_formatter, OutputType
-from angela.ai.analyzer import error_analyzer
-from angela.context.session import session_manager
+from angela.api.shell import get_terminal_formatter, get_output_type_enum
+from angela.api.ai import get_error_analyzer
+from angela.api.context import get_session_manager
+
+context_manager = get_context_manager()
+execution_engine = get_execution_engine()
+terminal_formatter = get_terminal_formatter()
+OutputType = get_output_type_enum()
+error_analyzer = get_error_analyzer()
+session_manager = get_session_manager()
 
 # Create the app
 app = typer.Typer(help="Angela: AI-powered command-line assistant")

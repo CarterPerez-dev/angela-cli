@@ -15,14 +15,14 @@ from dataclasses import dataclass, field, asdict
 
 from pydantic import BaseModel, Field
 
-from angela.api.config import get_config_manager
+from angela.config import config_manager  
 from angela.utils.logging import get_logger
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.intent import get_task_planner
 
 logger = get_logger(__name__)
 
-config_manager = get_config_manager()
+
 
 # File for storing workflows
 WORKFLOWS_FILE = config_manager.CONFIG_DIR / "workflows.json"

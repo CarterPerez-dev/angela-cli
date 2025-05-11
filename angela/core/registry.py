@@ -201,6 +201,34 @@ class ServiceRegistry:
             return self._initialization_order.copy()
 
 
+    def get_safe(self, name: str, fallback_import_path: Optional[str] = None) -> Optional[Any]:
+        """
+        Get a service with fallback to direct import if needed.
+        
+        Args:
+            name: Service name to retrieve
+            fallback_import_path: Optional import path to try if service not found
+            
+        Returns:
+            Service instance or None
+        """
+        # Try registry first
+        service = self.get(name)
+        if service is not None:
+            return service
+            
+        # Try fallback import if provided
+        if fallback_import_path:
+            try:
+                module_path, attr_name = fallback_import_path.rsplit('.', 1)
+                module = __import__(module_path, fromlist=[attr_name])
+                return getattr(module, attr_name)
+            except (ImportError, AttributeError) as e:
+                self._logger.error(f"Fallback import failed for {fallback_import_path}: {e}")
+        
+        return None
+        
+
 # Create global registry instance
 registry = ServiceRegistry.get_instance()
 

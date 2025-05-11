@@ -25,7 +25,8 @@ from angela.api.context import get_file_activity_tracker, get_activity_type, get
 from angela.api.execution import get_execution_engine, get_adaptive_engine, get_rollback_manager, get_execution_hooks
 from angela.api.intent import get_task_planner, get_plan_model_classes, get_enhanced_task_planner
 from angela.api.workflows import get_workflow_manager
-from angela.api.shell import get_terminal_formatter, get_output_type_enum, get_advanced_formatter
+from angela.api.shell import get_terminal_formatter, get_output_type_enum
+from angela.api.shell import display_advanced_plan, display_execution_results
 from angela.api.monitoring import get_background_monitor, get_network_monitor
 from angela.api.safety import get_command_risk_classifier, get_adaptive_confirmation
 from angela.api.toolchain import get_docker_integration
@@ -1898,7 +1899,7 @@ class Orchestrator:
                     # Execute the plan if requested
                     if execute or dry_run:
                         # Display the plan with rich formatting
-                        await terminal_formatter.display_advanced_plan(plan)
+                        await display_advanced_plan(plan)
                         
                         # Get confirmation for plan execution
                         confirmed = await self._confirm_advanced_plan_execution(plan, dry_run)
@@ -2223,7 +2224,7 @@ class Orchestrator:
         Args:
             plan: The advanced plan to display
         """
-        await terminal_formatter.display_advanced_plan(plan)
+        await display_advanced_plan(plan)
     
     async def _confirm_advanced_plan(
         self, 
@@ -3703,10 +3704,10 @@ Include only the JSON object with no additional text.
         # Execute the plan if requested
         if execute or dry_run:
             # Display the plan with rich formatting
-            await terminal_formatter.display_advanced_plan(plan)
+            await display_advanced_plan(plan)
             
             # Get confirmation for plan execution
-            confirmed = await self._confirm_advanced_plan(plan, dry_run)
+            confirmed = await self._confirm_advanced_plan_execution(plan, dry_run)
             
             if confirmed or dry_run:
                 # Execute the plan with transaction support

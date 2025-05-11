@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
 
 # Import through API layer
 from angela.utils.logging import get_logger
-from angela.api.core import get_registry
+from angela.core.registry import registry  # Fixed import
 
 if TYPE_CHECKING:
     from angela.intent.models import ActionPlan
@@ -22,6 +22,23 @@ class ExecutionEngine:
     def __init__(self):
         """Initialize the execution engine."""
         self._logger = logger
+    
+    def _get_safety_check_function(self):
+        """Get the safety check function with lazy imports to avoid circular dependencies."""
+        # Use direct import here as a fallback if registry approach fails
+        try:
+            # Try registry first
+            check_func = registry.get("check_command_safety")
+            
+            if check_func:
+                return check_func
+                
+            # Direct import as fallback (should not normally happen once initialized)
+            from angela.components.safety import check_command_safety
+            return check_command_safety
+        except ImportError:
+            self._logger.error("Could not import safety check function")
+            return None
     
     async def execute_command(
         self, 
@@ -44,13 +61,12 @@ class ExecutionEngine:
         
         # If safety checks are requested, perform them
         if check_safety:
-            # Get check_command_safety function from registry to avoid circular import
-            registry = get_registry()
-            check_command_safety_func = registry.get("check_command_safety")
+            # Get safety check function using our helper method
+            check_command_safety_func = self._get_safety_check_function()
 
             if not check_command_safety_func:
-                self._logger.error("Safety check function 'check_command_safety' not found in registry.")
-                return "", "Safety check function not configured", 1 # Or raise an error
+                self._logger.error("Safety check function not available")
+                return "", "Safety check function not configured", 1
 
             # Check if the command is safe to execute
             is_safe = await check_command_safety_func(command, dry_run)
@@ -87,20 +103,37 @@ class ExecutionEngine:
             
             # Record the operation for potential rollback
             if not dry_run and process.returncode == 0:
-                # Get rollback_manager from registry to avoid circular import
-                rollback_manager_instance = registry.get("rollback_manager")
-                if rollback_manager_instance:
-                    await rollback_manager_instance.record_operation(
-                        operation_type="execute_command",
-                        params={"command": command},
-                        backup_path=None  # Commands don't have direct file backups
-                    )
+                # Get rollback_manager safely without circular imports
+                try:
+                    # Try getting from registry first 
+                    rollback_manager_instance = registry.get("rollback_manager")
+                    
+                    if rollback_manager_instance:
+                        await rollback_manager_instance.record_operation(
+                            operation_type="execute_command",
+                            params={"command": command},
+                            backup_path=None  # Commands don't have direct file backups
+                        )
+                except Exception as e:
+                    self._logger.warning(f"Could not record operation for rollback: {e}")
             
             return stdout, stderr, process.returncode
         
         except Exception as e:
             self._logger.exception(f"Error executing command '{command}': {str(e)}")
             return "", str(e), -1
+    
+    async def dry_run_command(self, command: str) -> Tuple[str, str, int]:
+        """
+        Simulate command execution for previewing without actually running the command.
+        
+        Args:
+            command: The shell command to simulate
+            
+        Returns:
+            A tuple of (stdout, stderr, return_code)
+        """
+        return f"[DRY RUN] Would execute: {command}", "", 0
 
 # Global execution engine instance
 execution_engine = ExecutionEngine()

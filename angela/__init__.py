@@ -12,6 +12,10 @@ from angela.core.registry import registry
 
 def init_application():
     """Initialize all application components."""
+
+    from angela.components.safety import register_safety_functions
+    register_safety_functions()   
+    
     # Import and register core components
     from angela.api.cli import get_app
     from angela.api.execution import get_execution_engine, get_adaptive_engine

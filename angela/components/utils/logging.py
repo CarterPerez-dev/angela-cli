@@ -8,7 +8,7 @@ from pathlib import Path
 
 from loguru import logger
 from angela.constants import LOG_DIR, LOG_FORMAT, LOG_ROTATION, LOG_RETENTION
-from angela.utils.enhanced_logging import EnhancedLogger
+from angela.components.utils.enhanced_logging import EnhancedLogger
 
 # Dictionary to store enhanced logger instances
 _enhanced_loggers = {}

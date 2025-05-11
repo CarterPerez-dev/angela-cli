@@ -11,8 +11,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
-# Import through API layer
-from angela.api.safety import get_command_risk_classifier, get_command_impact_analyzer, get_adaptive_confirmation_handler, get_command_preview_generator, get_command_learning_handler
+# Import through API layer - fixed imports
+from angela.api.safety import get_command_risk_classifier, get_adaptive_confirmation
 from angela.api.execution import get_execution_engine
 from angela.api.context import get_history_manager, get_preferences_manager, get_session_manager
 from angela.utils.logging import get_logger
@@ -63,10 +63,8 @@ class AdaptiveExecutionEngine:
         
         # Analyze command risk and impact
         classifier = get_command_risk_classifier()
-        impact_analyzer = get_command_impact_analyzer()
-        
-        risk_level, risk_reason = classifier.classify_command_risk(command)
-        impact = impact_analyzer.analyze_command_impact(command)
+        risk_level, risk_reason = classifier.classify(command)
+        impact = classifier.analyze_impact(command)
         
         # Add to session context
         session_manager = get_session_manager()
@@ -75,15 +73,15 @@ class AdaptiveExecutionEngine:
         # Generate command preview if needed
         preferences_manager = get_preferences_manager()
         
+        preview = None
         if preferences_manager.preferences.ui.show_command_preview:
+            from angela.api.safety import get_command_preview_generator
             preview_generator = get_command_preview_generator()
             preview = await preview_generator.generate_preview(command)
-        else:
-            preview = None
         
         # Get adaptive confirmation based on risk level and user history
-        confirmation_handler = get_adaptive_confirmation_handler()
-        confirmed = await confirmation_handler.get_adaptive_confirmation(
+        confirmation_handler = get_adaptive_confirmation()
+        confirmed = await confirmation_handler(
             command=command,
             risk_level=risk_level,
             risk_reason=risk_reason,
@@ -128,8 +126,9 @@ class AdaptiveExecutionEngine:
         
         # Offer to learn from successful executions
         if result["success"] and risk_level > 0:
-            learning_handler = get_command_learning_handler()
-            await learning_handler.offer_command_learning(command)
+            from angela.api.safety import offer_command_learning
+            if offer_command_learning:
+                await offer_command_learning(command)
         
         return result
     

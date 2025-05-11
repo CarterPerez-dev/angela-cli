@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from pydantic import BaseModel
 
 from angela.utils.logging import get_logger
-from angela.api.ai import get_confidence_scorer
+from angela.components.ai.confidence import confidence_scorer
 from angela.api.context import get_history_manager
 
 logger = get_logger(__name__)

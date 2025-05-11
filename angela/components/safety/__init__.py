@@ -137,9 +137,10 @@ __all__ = [
     'requires_confirmation'
 ]
 
-# Register these functions to be accessible via the service registry
-# This avoids circular imports when other modules need these functions
-from angela.core.registry import registry
-registry.register("check_command_safety", check_command_safety)
-registry.register("validate_command_safety", validate_command_safety)
-registry.register("check_operation_safety", check_operation_safety)
+def register_safety_functions():
+    """Register safety functions to the registry to avoid circular imports."""
+    # Import inside function to avoid circular imports
+    from angela.core.registry import registry
+    registry.register("check_command_safety", check_command_safety)
+    registry.register("validate_command_safety", validate_command_safety)
+    registry.register("check_operation_safety", check_operation_safety)

@@ -14,13 +14,13 @@ import hashlib
 
 from pydantic import BaseModel, Field
 
-from angela.api.config import get_config_manager
+from angela.config import config_manager  # Changed from angela.api.config import get_config_manager
 from angela.utils.logging import get_logger
 from angela.api.workflows import get_workflow_manager, get_workflow_model_classes
 
 logger = get_logger(__name__)
 
-config_manager = get_config_manager()
+
 Workflow, _ = get_workflow_model_classes()
 
 # Constants
@@ -351,4 +351,4 @@ class WorkflowSharingManager:
             }
 
 # Global workflow sharing manager instance
-workflow_sharing_manager = WorkflowSharingManager(workflow_manager)
+workflow_sharing_manager = WorkflowSharingManager(get_workflow_manager)

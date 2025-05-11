@@ -1,3 +1,4 @@
+# angela/api/shell.py
 """
 Public API for shell components.
 

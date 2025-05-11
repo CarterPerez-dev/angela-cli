@@ -52,6 +52,11 @@ def get_complex_workflow_plan_class():
     from angela.components.intent.complex_workflow_planner import ComplexWorkflowPlan
     return ComplexWorkflowPlan
 
+def get_advanced_task_plan_class():
+    """Get the AdvancedTaskPlan class."""
+    from angela.components.intent.planner import AdvancedTaskPlan
+    return AdvancedTaskPlan
+
 # Plan Model Classes
 def get_plan_model_classes():
     """Get the plan model classes."""

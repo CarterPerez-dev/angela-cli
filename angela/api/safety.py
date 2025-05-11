@@ -37,6 +37,32 @@ def get_command_preview_generator():
     from angela.components.safety.preview import command_preview_generator
     return registry.get_or_create("command_preview_generator", lambda: command_preview_generator)
 
+# Additional functions needed by components
+def get_validate_command_safety_func():
+    """Get the validate_command_safety function."""
+    from angela.components.safety import validate_command_safety
+    return validate_command_safety
+
+def get_operation_safety_checker():
+    """Get the check_operation_safety function."""
+    from angela.components.safety import check_operation_safety
+    return check_operation_safety
+
+def get_command_learning_handler():
+    """Get the command learning handler function."""
+    from angela.components.safety.adaptive_confirmation import offer_command_learning
+    return offer_command_learning
+
+def get_command_impact_analyzer():
+    """Get the command impact analyzer."""
+    from angela.components.safety.classifier import analyze_command_impact
+    return analyze_command_impact
+
+def get_adaptive_confirmation_handler():
+    """Get the adaptive confirmation handler."""
+    from angela.components.safety.adaptive_confirmation import get_adaptive_confirmation
+    return get_adaptive_confirmation
+
 # Helper functions for direct validation
 def validate_command(command: str) -> Tuple[bool, Optional[str]]:
     """
