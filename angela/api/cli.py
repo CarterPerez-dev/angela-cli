@@ -4,6 +4,7 @@ Public API for CLI components.
 This module provides functions to access CLI components with lazy initialization.
 """
 from typing import Optional, Any, Dict
+import typer
 
 from angela.core.registry import registry
 
@@ -18,32 +19,27 @@ from angela.components.execution.rollback_commands import app as rollback_app
 # Main CLI App
 def get_main_app():
     """Get the main CLI app instance."""
-    return registry.get_or_create("main_app", lambda: main_app)
+    return registry.get_or_create("main_app", typer.Typer, factory=lambda: main_app)
 
-# Files CLI App
 def get_files_app():
     """Get the files CLI app instance."""
-    return registry.get_or_create("files_app", lambda: files_app)
+    return registry.get_or_create("files_app", typer.Typer, factory=lambda: files_app)
 
-# Workflows CLI App
 def get_workflows_app():
     """Get the workflows CLI app instance."""
-    return registry.get_or_create("workflows_app", lambda: workflows_app)
+    return registry.get_or_create("workflows_app", typer.Typer, factory=lambda: workflows_app)
 
-# Generation CLI App
 def get_generation_app():
     """Get the generation CLI app instance."""
-    return registry.get_or_create("generation_app", lambda: generation_app)
+    return registry.get_or_create("generation_app", typer.Typer, factory=lambda: generation_app)
 
-# Docker CLI App
 def get_docker_app():
     """Get the docker CLI app instance."""
-    return registry.get_or_create("docker_app", lambda: docker_app)
+    return registry.get_or_create("docker_app", typer.Typer, factory=lambda: docker_app)
 
-# Rollback Commands App (from execution)
 def get_rollback_app():
     """Get the rollback commands CLI app instance."""
-    return registry.get_or_create("rollback_app", lambda: rollback_app)
+    return registry.get_or_create("rollback_app", typer.Typer, factory=lambda: rollback_app)
 
 # Unified App Interface
 def get_app():
@@ -92,3 +88,6 @@ def _ensure_subcommands_registered(app):
     
     if "docker" not in registered_commands:
         app.add_typer(docker, name="docker", help="Docker and Docker Compose operations")
+        
+        
+app = get_app()        
