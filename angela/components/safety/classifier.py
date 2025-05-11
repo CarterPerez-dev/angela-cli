@@ -96,116 +96,87 @@ OVERRIDE_PATTERNS = {
     ],
 }
 
-def classify_command_risk(command: str) -> Tuple[int, str]:
-    """
-    Classify the risk level of a shell command.
-    
-    Args:
-        command: The shell command to classify.
-        
-    Returns:
-        A tuple of (risk_level, reason), where risk_level is an integer
-        from the RISK_LEVELS constants and reason is a string explaining
-        the classification.
-    """
-    if not command.strip():
-        return RISK_LEVELS["SAFE"], "Empty command"
-    
-    # First check override patterns that would force a specific risk level
-    for level_name, patterns in OVERRIDE_PATTERNS.items():
-        for pattern in patterns:
-            if re.search(pattern, command):
-                level = RISK_LEVELS[level_name]
-                return level, f"Matched override pattern for {level_name} risk"
-    
-    # Check standard risk patterns from highest to lowest risk
-    for level, patterns in sorted(RISK_PATTERNS.items(), key=lambda x: x[0], reverse=True):
-        for pattern, reason in patterns:
-            if re.search(pattern, command.strip()):
-                return level, reason
-    
-    # Default to medium risk if no pattern matches
-    # It's safer to require confirmation for unknown commands
-    return RISK_LEVELS["MEDIUM"], "Unrecognized command type"
 
 
-def analyze_command_impact(command: str) -> Dict[str, any]:
-    """
-    Analyze the potential impact of a command.
-    
-    Args:
-        command: The shell command to analyze.
+class CommandRiskClassifier: # New Class
+    def classify(self, command: str) -> Tuple[int, str]: # Renamed from classify_command_risk
+        """
+        Classify the risk level of a shell command.
+        """
+        if not command.strip():
+            return RISK_LEVELS["SAFE"], "Empty command"
+
+        for level_name, patterns in OVERRIDE_PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, command):
+                    level = RISK_LEVELS[level_name]
+                    return level, f"Matched override pattern for {level_name} risk"
+
+        for level, patterns in sorted(RISK_PATTERNS.items(), key=lambda x: x[0], reverse=True):
+            for pattern, reason in patterns:
+                if re.search(pattern, command.strip()):
+                    return level, reason
+
+        return RISK_LEVELS["MEDIUM"], "Unrecognized command type"
+
+    def analyze_impact(self, command: str) -> Dict[str, any]: # Renamed from analyze_command_impact
+        """
+        Analyze the potential impact of a command.
+        """
+        impact = {
+            "affected_files": set(),
+            "affected_dirs": set(),
+            "operations": [],
+            "destructive": False,
+            "creates_files": False,
+            "modifies_files": False,
+        }
+        try:
+            tokens = shlex.split(command)
+            if not tokens:
+                return impact
+            base_cmd = tokens[0]
+            args = tokens[1:]
+            for arg in args:
+                if arg.startswith('-'):
+                    continue
+                if arg in ['>', '>>', '<', '|']:
+                    continue
+                if '/' in arg or '.' in arg or not arg.startswith('-'):
+                    if base_cmd in ['rm', 'mv', 'rmdir']:
+                        impact["destructive"] = True
+                    if base_cmd in ['mkdir']:
+                        impact["affected_dirs"].add(arg)
+                        impact["creates_files"] = True
+                    else:
+                        impact["affected_files"].add(arg)
+                    if base_cmd in ['cp', 'mv', 'touch', 'mkdir', 'ln']:
+                        impact["creates_files"] = True
+                    if base_cmd in ['vim', 'nano', 'sed', 'cp', 'mv']:
+                        impact["modifies_files"] = True
+            if base_cmd in ['ls', 'find', 'grep', 'cat', 'less', 'more', 'tail', 'head']:
+                impact["operations"].append("read")
+            elif base_cmd in ['rm', 'rmdir']:
+                impact["operations"].append("delete")
+            elif base_cmd in ['mv']:
+                impact["operations"].append("move")
+            elif base_cmd in ['cp']:
+                impact["operations"].append("copy")
+            elif base_cmd in ['touch', 'mkdir']:
+                impact["operations"].append("create")
+            elif base_cmd in ['chmod', 'chown']:
+                impact["operations"].append("change_attributes")
+            else:
+                impact["operations"].append("unknown")
         
-    Returns:
-        A dictionary containing impact analysis information, such as
-        affected files, operations, etc.
-    """
-    impact = {
-        "affected_files": set(),
-        "affected_dirs": set(),
-        "operations": [],
-        "destructive": False,
-        "creates_files": False,
-        "modifies_files": False,
-    }
-    
-    try:
-        # Simple lexical analysis of the command
-        tokens = shlex.split(command)
-        if not tokens:
-            return impact
+        except Exception as e:
+            logger.exception(f"Error analyzing command impact for '{command}': {str(e)}")
         
-        base_cmd = tokens[0]
-        args = tokens[1:]
+        # Convert sets to lists for easier serialization
+        impact["affected_files"] = list(impact["affected_files"])
+        impact["affected_dirs"] = list(impact["affected_dirs"])
         
-        # Extract potentially affected files and directories
-        for arg in args:
-            # Skip arguments that start with a dash (options)
-            if arg.startswith('-'):
-                continue
-            
-            # Skip redirection operators
-            if arg in ['>', '>>', '<', '|']:
-                continue
-                
-            # Assume it might be a file or directory path
-            if '/' in arg or '.' in arg or not arg.startswith('-'):
-                if base_cmd in ['rm', 'mv', 'rmdir']:
-                    impact["destructive"] = True
-                
-                if base_cmd in ['mkdir']:
-                    impact["affected_dirs"].add(arg)
-                    impact["creates_files"] = True
-                else:
-                    impact["affected_files"].add(arg)
-                
-                if base_cmd in ['cp', 'mv', 'touch', 'mkdir', 'ln']:
-                    impact["creates_files"] = True
-                
-                if base_cmd in ['vim', 'nano', 'sed', 'cp', 'mv']:
-                    impact["modifies_files"] = True
+        return impact
         
-        # Record the type of operation
-        if base_cmd in ['ls', 'find', 'grep', 'cat', 'less', 'more', 'tail', 'head']:
-            impact["operations"].append("read")
-        elif base_cmd in ['rm', 'rmdir']:
-            impact["operations"].append("delete")
-        elif base_cmd in ['mv']:
-            impact["operations"].append("move")
-        elif base_cmd in ['cp']:
-            impact["operations"].append("copy")
-        elif base_cmd in ['touch', 'mkdir']:
-            impact["operations"].append("create")
-        elif base_cmd in ['chmod', 'chown']:
-            impact["operations"].append("change_attributes")
-        else:
-            impact["operations"].append("unknown")
-    
-    except Exception as e:
-        logger.exception(f"Error analyzing command impact for '{command}': {str(e)}")
-    
-    # Convert sets to lists for easier serialization
-    impact["affected_files"] = list(impact["affected_files"])
-    impact["affected_dirs"] = list(impact["affected_dirs"])
-    
-    return impact
+       
+command_risk_classifier = CommandRiskClassifier()

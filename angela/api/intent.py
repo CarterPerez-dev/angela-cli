@@ -57,6 +57,11 @@ def get_advanced_task_plan_class():
     from angela.components.intent.planner import AdvancedTaskPlan
     return AdvancedTaskPlan
 
+def get_plan_step_type_enum():
+    """Get the PlanStepType enum."""
+    from angela.components.intent.planner import PlanStepType
+    return PlanStepType
+    
 # Plan Model Classes
 def get_plan_model_classes():
     """Get the plan model classes."""

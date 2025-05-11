@@ -39,6 +39,7 @@ from angela.api.execution import get_execution_engine, get_adaptive_engine
 execution_engine = get_execution_engine()
 adaptive_engine = get_adaptive_engine()
 
+
 # Import other required components
 GeminiRequest = get_gemini_request_class()
 parse_ai_response = get_parse_ai_response_func()
@@ -66,9 +67,13 @@ gemini_client = get_gemini_client()
 enhanced_task_planner = get_enhanced_task_planner()
 
 # Get classification and confirmation from API
-classify_command_risk = get_command_risk_classifier().classify
-analyze_command_impact = get_command_risk_classifier().analyze_impact
-get_adaptive_confirmation = get_adaptive_confirmation()
+from angela.api.safety import (
+    classify_command_risk,  # Imports the helper function from api/safety.py
+    analyze_command_impact, # Imports the new helper function from api/safety.py
+    get_adaptive_confirmation # Imports the getter for the adaptive_confirmation instance
+)
+
+adaptive_confirmation_handler = get_adaptive_confirmation()
 
 # Get Docker integration
 docker_integration = get_docker_integration()

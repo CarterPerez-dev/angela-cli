@@ -13,6 +13,7 @@ def get_command_validator():
     from angela.components.safety.validator import command_validator
     return registry.get_or_create("command_validator", lambda: command_validator)
 
+
 # Command Risk Classifier API
 def get_command_risk_classifier():
     """Get the command risk classifier instance."""
@@ -77,18 +78,15 @@ def validate_command(command: str) -> Tuple[bool, Optional[str]]:
     validator = get_command_validator()
     return validator(command)
 
-def classify_command_risk(command: str) -> Dict[str, Any]:
-    """
-    Classify the risk level of a command.
-    
-    Args:
-        command: Command to classify
-        
-    Returns:
-        Dictionary with risk classification
-    """
-    classifier = get_command_risk_classifier()
-    return classifier.classify(command)
+def classify_command_risk(command: str) -> Tuple[int, str]:
+    """ API: Classify the risk level of a command. """
+    from angela.components.safety import classify_command_risk as classify_fn
+    return classify_fn(command)
+
+def analyze_command_impact(command: str) -> Dict[str, Any]:
+    """ API: Analyze the potential impact of a command. """
+    from angela.components.safety import analyze_command_impact as analyze_fn 
+    return analyze_fn(command)
 
 def generate_command_preview(command: str) -> Dict[str, Any]:
     """
