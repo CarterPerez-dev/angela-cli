@@ -339,3 +339,6 @@ async def offer_command_learning(command: str) -> None:
         if add_to_trusted:
             preferences_manager.add_trusted_command(command)
             console.print(f"Added [green]{base_command}[/green] to trusted commands.")
+
+
+adaptive_confirmation = get_adaptive_confirmation
