@@ -85,61 +85,6 @@ class InlineFeedback:
         if timeout > 0:
             asyncio.create_task(self._clear_message_after_timeout(message_id, timeout))
     
-    async def ask_question(
-        self, 
-        question: str,
-        options: List[str],
-        default_option: Optional[str] = None,
-        timeout: int = 30,
-        callback: Optional[Callable[[str], Awaitable[None]]] = None
-    ) -> str:
-        """
-        Ask a question inline and wait for response.
-        """
-        if not await self._ensure_loop() or not self.loop:
-            self._logger.error("Cannot ask question: Event loop not available.")
-            return default_option or "" # Fallback
-
-        prompt_id = self._get_next_prompt_id()
-        options_display = "/".join(options)
-        if default_option and default_option in options:
-            options_display = options_display.replace(default_option, f"[{default_option}]")
-        
-        formatted_question = f"\n\033[35m[Angela] {question} ({options_display})\033[0m "
-        
-        result_future = self.loop.create_future()
-        self._active_prompts[prompt_id] = {
-            "question": question,
-            "options": options,
-            "default": default_option,
-            "result": result_future,
-            "formatted_question": formatted_question
-        }
-        
-        thread = threading.Thread(
-            target=self._input_thread,
-            args=(prompt_id, formatted_question, options, default_option, timeout, result_future)
-        )
-        thread.daemon = True
-        thread.start()
-        self._active_threads[prompt_id] = thread
-        
-        try:
-            result = await asyncio.wait_for(result_future, timeout=timeout + 5) # Add buffer for thread ops
-            if callback and result is not None: # Ensure result is not None before callback
-                await callback(result)
-            return result if result is not None else default_option or ""
-        except asyncio.TimeoutError:
-            self._logger.warning(f"Question timed out: {question}")
-            if not result_future.done():
-                 self._set_future_result_threadsafe(result_future, default_option) # Ensure future is resolved
-            return default_option or ""
-        finally:
-            if prompt_id in self._active_prompts:
-                del self._active_prompts[prompt_id]
-            if prompt_id in self._active_threads:
-                del self._active_threads[prompt_id]
-    
     async def suggest_command(
         self, 
         command: str,
@@ -148,26 +93,68 @@ class InlineFeedback:
         execute_callback: Optional[Callable[[], Awaitable[None]]] = None
     ) -> bool:
         """
-        Suggest a command and offer to execute it.
+        Suggest a command and offer to execute it with enhanced visuals.
+        
+        Args:
+            command: The command to suggest
+            explanation: Explanation of what the command does
+            confidence: Confidence score for the suggestion
+            execute_callback: Callback to execute the command
+            
+        Returns:
+            True if command was executed, False otherwise
         """
         from angela.api.context import get_session_manager
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.syntax import Syntax
         
+        console = Console()
+        
+        # Calculate visual confidence representation
         confidence_stars = int(confidence * 5)
         confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
-        message = (
-            f"I suggest this command: \033[1m{command}\033[0m\n"
-            f"Confidence: {confidence_display} ({confidence:.2f})\n"
-            f"{explanation}\n"
-            f"Execute? (y/n/e - where 'e' will edit before executing)"
-        )
+        confidence_color = "green" if confidence > 0.8 else "yellow" if confidence > 0.6 else "red"
         
-        response = await self.ask_question(message, ["y", "n", "e"], default_option="n", timeout=30)
+        # Display command with rich formatting
+        console.print(Panel(
+            Syntax(command, "bash", theme="monokai", word_wrap=True),
+            title="Suggested Command",
+            border_style="blue",
+            expand=False
+        ))
         
-        if response == "y":
+        # Display confidence score
+        console.print(Panel(
+            f"[bold]Confidence Score:[/bold] [{confidence_color}]{confidence:.2f}[/{confidence_color}] {confidence_display}\n"
+            "[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]",
+            title="AI Confidence",
+            border_style=confidence_color,
+            expand=False
+        ))
+        
+        # Display explanation
+        console.print(Panel(
+            explanation,
+            title="Explanation",
+            border_style="blue",
+            expand=False
+        ))
+        
+        # Create execution options
+        console.print("[bold cyan]┌───────────────────────────────────────┐[/bold cyan]")
+        console.print("[bold cyan]│[/bold cyan] Execute? ([green]y[/green]/[red]n[/red]/[yellow]e[/yellow] - where 'e' will edit) [bold cyan]│[/bold cyan]")
+        console.print("[bold cyan]└───────────────────────────────────────┘[/bold cyan]")
+        console.print("[bold cyan]▶[/bold cyan] ", end="")
+        
+        # Get user's response
+        response = input().strip().lower()
+        
+        if response == "y" or response == "yes" or response == "":
             if execute_callback:
                 await execute_callback()
             return True
-        elif response == "e":
+        elif response == "e" or response == "edit":
             edited_command = await self._get_edited_command(command)
             if edited_command and execute_callback:
                 get_session_manager().add_entity("edited_command", "command", edited_command)
@@ -177,20 +164,42 @@ class InlineFeedback:
     
     async def _get_edited_command(self, original_command: str) -> Optional[str]:
         """
-        Allow the user to edit a command.
+        Allow the user to edit a command with enhanced visual presentation.
+        
+        Args:
+            original_command: The command to edit
+            
+        Returns:
+            The edited command or None if cancelled
         """
         if not await self._ensure_loop() or not self.loop:
             self._logger.error("Cannot edit command: Event loop not available.")
-            return None # Fallback
-
+            return None
+    
         input_future = self.loop.create_future()
-
+        
+        from rich.console import Console
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+        
+        console = Console()
+    
         try:
+            # Try to use prompt_toolkit for a better editing experience
             from prompt_toolkit import prompt
             from prompt_toolkit.history import InMemoryHistory
             from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
             from prompt_toolkit.formatted_text import HTML
             from prompt_toolkit.key_binding import KeyBindings
+            
+            # Show editing instructions
+            console.print(Panel(
+                "Edit the command below.\n"
+                "Press [bold]Enter[/bold] to confirm or [bold]Esc[/bold] to cancel.",
+                title="Command Editor",
+                border_style="cyan",
+                expand=False
+            ))
             
             def get_prompt_toolkit_input():
                 try:
@@ -214,19 +223,31 @@ class InlineFeedback:
                 except Exception as e_thread:
                     self._logger.error(f"Error in prompt_toolkit thread: {e_thread}")
                     self._set_future_result_threadsafe(input_future, None)
-
+    
             thread = threading.Thread(target=get_prompt_toolkit_input)
             thread.daemon = True
             thread.start()
             
         except ImportError:
+            # Fallback to basic input if prompt_toolkit is not available
             self._logger.warning("prompt_toolkit not available, using basic input for command edit.")
-            print(f"\n\033[36m[Angela] Edit the command (Ctrl+C to cancel):\033[0m", file=sys.stderr)
-            print(f"\033[36m> \033[1m{original_command}\033[0m", file=sys.stderr)
+            
+            # Display the original command
+            console.print(Panel(
+                Syntax(original_command, "bash", theme="monokai", word_wrap=True),
+                title="Original Command",
+                border_style="blue",
+                expand=False
+            ))
+            
+            console.print("[bold cyan]┌────────────────────────────────┐[/bold cyan]")
+            console.print("[bold cyan]│[/bold cyan] [bold]Edit command:[/bold] [dim](Ctrl+C to cancel)[/dim] [bold cyan]│[/bold cyan]")
+            console.print("[bold cyan]└────────────────────────────────┘[/bold cyan]")
+            console.print("[bold cyan]▶[/bold cyan] ", end="")
             
             def get_basic_input():
                 try:
-                    user_input = input("\033[36m> \033[0m")
+                    user_input = input()
                     self._set_future_result_threadsafe(input_future, user_input)
                 except (KeyboardInterrupt, EOFError):
                     self._set_future_result_threadsafe(input_future, None)
@@ -237,20 +258,31 @@ class InlineFeedback:
             thread = threading.Thread(target=get_basic_input)
             thread.daemon = True
             thread.start()
-
+    
         try:
-            return await asyncio.wait_for(input_future, timeout=60)
+            edited_command = await asyncio.wait_for(input_future, timeout=60)
+            
+            # Display the edited command for confirmation
+            if edited_command is not None and edited_command != original_command:
+                console.print(Panel(
+                    Syntax(edited_command, "bash", theme="monokai", word_wrap=True),
+                    title="Edited Command",
+                    border_style="green",
+                    expand=False
+                ))
+                
+            return edited_command
         except asyncio.TimeoutError:
-            print("\n\033[33m[Angela] Edit timed out\033[0m", file=sys.stderr)
+            console.print("\n[yellow]Edit timed out[/yellow]")
             if not input_future.done():
-                self._set_future_result_threadsafe(input_future, None) # Ensure future is resolved
+                self._set_future_result_threadsafe(input_future, None)
             return None
         except Exception as e:
             self._logger.error(f"Error in command editor: {str(e)}")
             if not input_future.done():
                 self._set_future_result_threadsafe(input_future, None)
             return None
-
+    
     def _input_thread(
         self, 
         prompt_id: int,
@@ -258,35 +290,49 @@ class InlineFeedback:
         options: List[str],
         default_option: Optional[str],
         timeout: int,
-        future: asyncio.Future # Pass the future directly
+        future: asyncio.Future
     ) -> None:
         """
         Thread function to handle user input for a prompt.
+        
+        Args:
+            prompt_id: ID of the prompt
+            formatted_question: Formatted question text
+            options: Valid options
+            default_option: Default option
+            timeout: Timeout in seconds
+            future: Future to set with the result
         """
-        print(formatted_question, end="", file=sys.stderr)
-        sys.stderr.flush()
-        
-        result = default_option
-        
         try:
             if os.name == "posix":
                 import select
                 i, _, _ = select.select([sys.stdin], [], [], timeout)
                 if i:
                     user_input = sys.stdin.readline().strip().lower()
-                    if user_input in options: result = user_input
-                    elif user_input == "" and default_option: result = default_option
-            else: # Fallback for non-Unix (e.g. Windows)
-                # Basic input() doesn't support timeout directly in a simple way here
-                # This part remains a challenge for non-POSIX without more complex threading
+                    if user_input in options: 
+                        result = user_input
+                    elif user_input == "" and default_option: 
+                        result = default_option
+                    else:
+                        result = default_option
+                else:
+                    # Timeout occurred
+                    result = default_option
+            else: 
+                # Fallback for non-Unix (e.g. Windows)
                 user_input = input().strip().lower()
-                if user_input in options: result = user_input
-                elif user_input == "" and default_option: result = default_option
+                if user_input in options: 
+                    result = user_input
+                elif user_input == "" and default_option: 
+                    result = default_option
+                else:
+                    result = default_option
         except (KeyboardInterrupt, EOFError):
             # User cancelled, result remains default_option or None if no default
-            pass
+            result = default_option
         except Exception as e:
             self._logger.error(f"Error in input thread: {str(e)}")
+            result = default_option
         
         self._set_future_result_threadsafe(future, result)
     

@@ -7,6 +7,7 @@ support for async operations and interactive elements.
 """
 import asyncio
 import sys
+import time
 from typing import Optional, List, Dict, Any, Callable, Awaitable, Tuple, Set
 from enum import Enum
 from pathlib import Path
@@ -20,12 +21,24 @@ from rich.live import Live
 from rich.text import Text
 from rich.layout import Layout
 from rich.tree import Tree
+from rich.spinner import Spinner
 from rich import box
-
 
 from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
 from angela.utils.logging import get_logger
+from angela.constants import RISK_LEVELS
 
+# Get risk level names mapping for display
+RISK_LEVEL_NAMES = {v: k for k, v in RISK_LEVELS.items()}
+
+# Risk level color mapping
+RISK_COLORS = {
+    RISK_LEVELS["SAFE"]: "green",
+    RISK_LEVELS["LOW"]: "blue", 
+    RISK_LEVELS["MEDIUM"]: "yellow",
+    RISK_LEVELS["HIGH"]: "bright_red",  
+    RISK_LEVELS["CRITICAL"]: "red",
+}
 
 AdvancedTaskPlan = get_advanced_task_plan_class()
 PlanStepType = get_plan_step_type_enum()
@@ -50,61 +63,70 @@ class TerminalFormatter:
     and interactive elements.
     """
 
-    # Add at the class level
-    FUN_LOADING_QUOTES = [
-        "Hacking the mainframe...",
-        "Bypassing firewalls...",
-        "Executing top secret code...",
-        "Calculating probabilities...",
-        "Compiling quantum algorithms...",
-        "Downloading more RAM...",
-        "Applying machine learning...",
-        "Consulting the digital oracle...",
-        "Brewing digital coffee...",
-        "Searching the matrix...",
-        "Finding the perfect command...",
-        "Optimizing the execution path...",
-        "Connecting neural networks...",
-        "Interrogating the kernel...",
-        "Running at ludicrous speed...",
-        "Decrypting user intent...",
-        "Breaking the code...",
-        "Summoning digital demons...",
-        "Consulting the AI overlords...",
-        "Calculating the meaning of life...",
-        "Converting coffee to code...",
-        "Thinking at the speed of light...",
-        "Dividing by zero...",
-        "Engaging warp drive...",
-        "Feeding the hamsters powering this server...",
-        "Translating human to computer...",
-        "Negotiating with the CPU...",
-        "Convincing RAM to cooperate...",
-        "Preparing witty responses...",
-        "Processing at ludicrous speed...",
-        "Navigating through cyberspace...",
-        "Parsing the digital realm...",
-        "Entering the matrix...",
-        "Reticulating splines...",
-        "Unleashing digital magic...",
-        "Assembling bits and bytes...",
-        "Bending the rules of computation...",
-        "Defragmenting the space-time continuum...",
-        "Channeling the spirit of Ada Lovelace...",
-        "Consulting with digital elders...",
-        "Solving impossible equations...",
-        "Exploring the depths of code...",
-        "Talking to the AI spirits...",
-        "Entering the digital wilderness...",
-        "Following the white rabbit...",
-        "Looking for the answer to everything...",
-        "Deleting system32... just kidding!",
-        "Mining digital gold...",
-        "Breaking the internet... gently...",
-        "Reversing the polarity..."
+    # Replace fun loading quotes with philosophical wisdom
+    PHILOSOPHY_QUOTES = [
+        # Aristotle quotes
+        "We are what we repeatedly do. Excellence, then, is not an act, but a habit. - Aristotle",
+        "The whole is greater than the sum of its parts. - Aristotle",
+        "Knowing yourself is the beginning of all wisdom. - Aristotle",
+        "It is the mark of an educated mind to be able to entertain a thought without accepting it. - Aristotle",
+        "Happiness depends upon ourselves. - Aristotle",
+        
+        # Socrates quotes
+        "The unexamined life is not worth living. - Socrates",
+        "I know that I am intelligent, because I know that I know nothing. - Socrates",
+        "The secret of change is to focus all of your energy not on fighting the old, but on building the new. - Socrates",
+        "Be kind, for everyone you meet is fighting a hard battle. - Socrates",
+        "Wonder is the beginning of wisdom. - Socrates",
+        
+        # Plato quotes
+        "At the touch of love everyone becomes a poet. - Plato",
+        "We can easily forgive a child who is afraid of the dark; the real tragedy of life is when men are afraid of the light. - Plato",
+        "Be kind, for everyone you meet is fighting a harder battle. - Plato",
+        "The measure of a man is what he does with power. - Plato",
+        "Wise men speak because they have something to say; fools because they have to say something. - Plato",
+        
+        # Sun Tzu quotes
+        "Appear weak when you are strong, and strong when you are weak. - Sun Tzu",
+        "The supreme art of war is to subdue the enemy without fighting. - Sun Tzu",
+        "Let your plans be dark and impenetrable as night, and when you move, fall like a thunderbolt. - Sun Tzu",
+        "If you know the enemy and know yourself, you need not fear the result of a hundred battles. - Sun Tzu",
+        "Victorious warriors win first and then go to war, while defeated warriors go to war first and then seek to win. - Sun Tzu",
+        
+        # Hypatia quotes
+        "Reserve your right to think, for even to think wrongly is better than not to think at all. - Hypatia",
+        "Life is an unfoldment, and the further we travel the more truth we can comprehend. - Hypatia",
+        "To teach superstitions as truth is a most terrible thing. - Hypatia",
+        "All formal dogmatic religions are fallacious and must never be accepted by self-respecting persons as final. - Hypatia",
+        
+        # Sextus Empiricus quotes
+        "For every argument, there is a counter-argument of equal weight. - Sextus Empiricus",
+        "The wise man suspends judgment; he recognizes that nothing is certain. - Sextus Empiricus",
+        "Appearances are our only guide in life. - Sextus Empiricus",
+        "The goal of the skeptic is tranquility of mind. - Sextus Empiricus",
+        
+        # Pythagoras quotes
+        "The highest form of pure thought is in mathematics. - Pythagoras",
+        "Number is the ruler of forms and ideas, and the cause of gods and demons. - Pythagoras",
+        "Concern should drive us into action and not into a depression. - Pythagoras",
+        "Above all things, reverence yourself. - Pythagoras",
+        
+        # Xenophanes quotes
+        "If cattle and horses had hands, they would draw the forms of gods like cattle and horses. - Xenophanes",
+        "There is one god, greatest among gods and men, similar to mortals neither in shape nor in thought. - Xenophanes",
+        "The gods did not reveal all things to men at the start; but as time goes on, by searching, they discover more. - Xenophanes",
+        "Men create the gods in their own image. - Xenophanes",
+        
+        # Additional philosophical quotes
+        "The only true wisdom is in knowing you know nothing. - Socrates",
+        "Man is the measure of all things. - Protagoras",
+        "I think, therefore I am. - René Descartes",
+        "He who has a why to live can bear almost any how. - Friedrich Nietzsche",
+        "One cannot step twice in the same river. - Heraclitus",
+        "The function of prayer is not to influence God, but rather to change the nature of the one who prays. - Søren Kierkegaard",
+        "What is rational is actual and what is actual is rational. - G.W.F. Hegel"
     ]
     
-        
     def __init__(self):
         """Initialize the terminal formatter."""
         self._console = Console()
@@ -216,6 +238,7 @@ class TerminalFormatter:
                     expand=False
                 ))
     
+
     async def stream_output(
         self,
         command: str,
@@ -245,14 +268,14 @@ class TerminalFormatter:
         return_code = None
         start_time = time.time()
         
-        # Choose a random fun quote
-        fun_quote = random.choice(self.FUN_LOADING_QUOTES)
+        # Choose a random philosophy quote
+        quote = random.choice(self.PHILOSOPHY_QUOTES)
         
         # Set up progress display if requested
         if show_spinner:
             progress = Progress(
                 SpinnerColumn(),
-                TextColumn(f"[bold blue]{fun_quote} [/bold blue]"),
+                TextColumn(f"[bold blue]{quote} [/bold blue]"),
                 TimeElapsedColumn(),
                 console=self._console
             )
@@ -328,7 +351,323 @@ class TerminalFormatter:
         
         # Return the collected output
         return "".join(stdout_chunks), "".join(stderr_chunks), return_code
-    
+ 
+
+
+
+   
+    async def display_pre_confirmation_info(
+        self,
+        command: str,
+        risk_level: int,
+        risk_reason: str,
+        impact: Dict[str, Any],
+        explanation: Optional[str] = None,
+        preview: Optional[str] = None,
+        confidence_score: Optional[float] = None,
+        execution_time: Optional[float] = None
+    ) -> None:
+        """
+        Display a comprehensive pre-confirmation information block.
+        
+        Args:
+            command: The command to be executed
+            risk_level: Risk level (0-4)
+            risk_reason: Reason for the risk assessment
+            impact: Impact analysis dictionary
+            explanation: Optional explanation of the command
+            preview: Optional preview of command execution
+            confidence_score: Optional AI confidence score (0-1)
+            execution_time: Optional execution time if this is post-execution
+        """
+        # Create a master panel to contain everything
+        self._console.print("\n")
+        
+        # Risk level styling
+        risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
+        risk_color = RISK_COLORS.get(risk_level, "yellow")
+        
+        # 1. Command panel with risk level in title
+        self._console.print(Panel(
+            Syntax(command, "bash", theme="monokai", word_wrap=True),
+            title=f"Execute [{risk_name} Risk]",
+            border_style=risk_color,
+            expand=False
+        ))
+        
+        # 2. Explanation panel if provided
+        if explanation:
+            self._console.print(Panel(
+                explanation,
+                title="Explanation",
+                border_style="blue",
+                expand=False
+            ))
+        
+        # 3. Confidence score if available
+        if confidence_score is not None:
+            confidence_color = "green" if confidence_score > 0.8 else "yellow" if confidence_score > 0.6 else "red"
+            confidence_stars = int(confidence_score * 5)
+            confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+            
+            self._console.print(Panel(
+                f"[bold]Confidence Score:[/bold] [{confidence_color}]{confidence_score:.2f}[/{confidence_color}] {confidence_display}\n"
+                "[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]",
+                title="AI Confidence",
+                border_style=confidence_color,
+                expand=False
+            ))
+        
+        # 4. Risk assessment panel
+        risk_info = f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}\n"
+        risk_info += f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}"
+        
+        self._console.print(Panel(
+            risk_info,
+            title="Risk Assessment",
+            border_style=risk_color,
+            expand=False
+        ))
+        
+        # 5. Impact analysis panel
+        try:
+            # Import the function directly to avoid circular imports
+            from angela.components.safety.confirmation import format_impact_analysis
+            impact_table = format_impact_analysis(impact)
+            
+            self._console.print(Panel(
+                impact_table,
+                title="Impact Analysis",
+                border_style="blue",
+                expand=False
+            ))
+        except ImportError:
+            # Fallback if we can't import the function
+            self._logger.warning("Could not import format_impact_analysis, using simplified impact display")
+            impact_str = "\n".join([f"• {k}: {v}" for k, v in impact.items() if isinstance(v, (str, int, bool))])
+            
+            if impact_str:
+                self._console.print(Panel(
+                    impact_str,
+                    title="Impact Analysis",
+                    border_style="blue",
+                    expand=False
+                ))
+        
+        # 6. Preview panel if available
+        if preview:
+            self._console.print(Panel(
+                preview,
+                title="Command Preview",
+                border_style="blue",
+                expand=False
+            ))
+        
+        # 7. Warning for critical operations
+        if risk_level >= 4:  # CRITICAL
+            self._console.print(Panel(
+                "⚠️  [bold red]This is a CRITICAL risk operation[/bold red] ⚠️\n"
+                "It may cause significant changes to your system or data loss.",
+                border_style="red",
+                expand=False
+            ))
+        
+        # 8. Execution time if provided (for post-execution display)
+        if execution_time is not None:
+            self._console.print(f"[bold green]Completed in {execution_time:.2f}s[/bold green]")
+
+    async def display_inline_confirmation(
+        self,
+        prompt_text: str = "Proceed with execution?"
+    ) -> bool:
+        """
+        Display an inline confirmation prompt and get user input.
+        
+        Args:
+            prompt_text: The confirmation prompt text
+            
+        Returns:
+            True if confirmed, False otherwise
+        """
+        # Create a fancy confirmation prompt
+        border_line = "─" * (len(prompt_text) + 10)
+        self._console.print(f"\n[cyan]{border_line}[/cyan]")
+        self._console.print(f"[cyan]┌{'─' * (len(prompt_text) + 8)}┐[/cyan]")
+        self._console.print(f"[cyan]│[/cyan]  [bold]{prompt_text}[/bold] [green](y/n)[/green]  [cyan]│[/cyan]")
+        self._console.print(f"[cyan]└{'─' * (len(prompt_text) + 8)}┘[/cyan]")
+        
+        # Get the user's response
+        self._console.print("[cyan]▶[/cyan] ", end="")
+        response = input().strip().lower()
+        
+        # Consider empty response as "yes"
+        if not response:
+            return True
+        
+        # Check if the response is affirmative
+        return response in ("y", "yes")
+
+    async def display_execution_timer(
+        self,
+        command: str,
+        with_philosophy: bool = True
+    ) -> Tuple[str, str, int, float]:
+        """
+        Display a command execution timer with philosophy quotes.
+        
+        Args:
+            command: The command being executed
+            with_philosophy: Whether to display philosophy quotes
+            
+        Returns:
+            Tuple of (stdout, stderr, return_code, execution_time)
+        """
+        import random
+        import time
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.columns import Columns
+        from rich.layout import Layout
+        from rich.spinner import Spinner
+        
+        start_time = time.time()
+        
+        # Choose a random philosophy quote
+        quote = random.choice(self.PHILOSOPHY_QUOTES) if with_philosophy else ""
+        
+        # Use asyncio.create_subprocess_shell to execute the command
+        process = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        # Collect output
+        stdout_chunks = []
+        stderr_chunks = []
+        
+        # Set up tasks to read output
+        async def read_stream(stream, is_stdout: bool):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
+                    
+                try:
+                    line_str = line.decode('utf-8', errors='replace')
+                    
+                    # Store the output
+                    if is_stdout:
+                        stdout_chunks.append(line_str)
+                    else:
+                        stderr_chunks.append(line_str)
+                        
+                except Exception as e:
+                    self._logger.error(f"Error processing output: {str(e)}")
+        
+        # Create tasks for stdout and stderr
+        stdout_task = asyncio.create_task(read_stream(process.stdout, True))
+        stderr_task = asyncio.create_task(read_stream(process.stderr, False))
+        
+        # Create a layout for live display
+        def get_layout():
+            elapsed = time.time() - start_time
+            layout = Layout()
+            
+            # Create a spinner
+            spinner = Spinner("dots", text="[bold blue]Executing command...[/bold blue]")
+            
+            # For very short operations, this might not show at all
+            if with_philosophy:
+                layout.split_column(
+                    Panel(f"[italic cyan]{quote}[/italic cyan]", title="Philosophical Insight", border_style="blue", expand=False),
+                    Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Execution Time", border_style="yellow", expand=False)
+                )
+            else:
+                layout.split(Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Execution Time", border_style="yellow", expand=False))
+                
+            return layout
+        
+        # Display progress with Live
+        with Live(get_layout(), refresh_per_second=10) as live:
+            # Wait for the command to complete while updating the display
+            return_code = await process.wait()
+            
+            # Wait for the streams to complete
+            await stdout_task
+            await stderr_task
+            
+            # Update once more when done
+            execution_time = time.time() - start_time
+            live.update(
+                Panel(
+                    f"[bold green]Completed in {execution_time:.2f}s[/bold green]",
+                    title="Execution Complete",
+                    border_style="green",
+                    expand=False
+                )
+            )
+        
+        # Return the results
+        return (
+            "".join(stdout_chunks),
+            "".join(stderr_chunks),
+            return_code,
+            execution_time
+        )
+        
+    async def display_loading_timer(
+        self,
+        message: str,
+        with_philosophy: bool = True
+    ) -> None:
+        """
+        Display a loading timer with optional philosophy quotes.
+        
+        Args:
+            message: The loading message to display
+            with_philosophy: Whether to display philosophy quotes
+        """
+        import random
+        import time
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.layout import Layout
+        from rich.spinner import Spinner
+        
+        # Choose a random philosophy quote
+        quote = random.choice(self.PHILOSOPHY_QUOTES) if with_philosophy else ""
+        
+        start_time = time.time()
+        
+        # Create a layout for live display
+        def get_layout():
+            elapsed = time.time() - start_time
+            layout = Layout()
+            
+            # Display spinner with message
+            spinner = Spinner("dots", text=f"[bold blue]{message}[/bold blue]")
+            
+            if with_philosophy:
+                layout.split_column(
+                    Panel(f"[italic cyan]{quote}[/italic cyan]", title="Philosophical Insight", border_style="blue", expand=False),
+                    Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Processing Time", border_style="yellow", expand=False)
+                )
+            else:
+                layout.split(Panel(f"{spinner} [bold]{elapsed:.2f}s[/bold]", title="Processing Time", border_style="yellow", expand=False))
+                
+            return layout
+        
+        # Use try-except with asyncio.sleep to make it cancellable
+        try:
+            with Live(get_layout(), refresh_per_second=10) as live:
+                while True:
+                    await asyncio.sleep(0.1)  # Small sleep to allow cancellation
+                    live.update(get_layout())
+        except asyncio.CancelledError:
+            # Handle cancellation gracefully
+            pass
+            
     def create_table(
         self, 
         title: str, 
@@ -401,7 +740,8 @@ class TerminalFormatter:
         self._console.print(Panel(
             "I've created a plan to accomplish your goal. Here are the steps I'll take:",
             title="Task Plan",
-            border_style="blue"
+            border_style="blue",
+            expand=False
         ))
         self._console.print(table)
         
@@ -409,6 +749,53 @@ class TerminalFormatter:
         has_dependencies = any(step.dependencies for step in plan.steps)
         if has_dependencies:
             await self._display_dependency_graph(plan)
+            
+
+
+    def print_suggestion(self, suggestion: Dict[str, Any], with_confidence: bool = True) -> None:
+        """
+        Print a command suggestion with rich formatting.
+        
+        Args:
+            suggestion: The command suggestion
+            with_confidence: Whether to show confidence score
+        """
+        self._console.print("\n")
+        
+        # Extract suggestion components
+        command = suggestion.get("command", "")
+        explanation = suggestion.get("explanation", "")
+        confidence = suggestion.get("confidence", 0.0)
+        
+        # Display the command
+        self.print_command(command)
+        
+        # Show confidence if requested
+        if with_confidence:
+            confidence_color = "green" if confidence > 0.8 else "yellow" if confidence > 0.6 else "red"
+            confidence_stars = int(confidence * 5)
+            confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+            self._console.print(f"[bold]Confidence:[/bold] [{confidence_color}]{confidence:.2f}[/{confidence_color}] {confidence_display}")
+        
+        # Show explanation
+        self._console.print("\n[bold]Explanation:[/bold]")
+        self._console.print(explanation)
+        
+    def print_proactive_suggestion(self, suggestion: str, source: str = "AI") -> None:
+        """
+        Print a proactive suggestion.
+        
+        Args:
+            suggestion: The suggestion text
+            source: The source of the suggestion
+        """
+        self._console.print("\n")
+        self._console.print(Panel(
+            suggestion,
+            title=f"Suggestion from {source}",
+            border_style="green",
+            expand=False
+        ))
     
     async def _display_dependency_graph(self, plan: Any) -> None:
         """
@@ -700,7 +1087,8 @@ class TerminalFormatter:
                 # Display explanation
                 if "explanation" in match:
                     self._console.print(f"[italic]{match['explanation']}[/italic]")
-    
+
+
     def print_suggestion(self, suggestion: Dict[str, Any], with_confidence: bool = True) -> None:
         """
         Print a command suggestion with rich formatting.
@@ -743,7 +1131,6 @@ class TerminalFormatter:
             border_style="green",
             expand=False
         ))
-
 
 
 # Global formatter instance

@@ -78,3 +78,92 @@ async def display_step_error(step_id: str, error: str, step_type: str, descripti
     """
     from angela.components.shell.advanced_formatter import display_step_error as _display_step_error
     await _display_step_error(step_id, error, step_type, description)
+    
+    
+    
+async def display_pre_confirmation_info(
+    command: str,
+    risk_level: int,
+    risk_reason: str,
+    impact: Dict[str, Any],
+    explanation: Optional[str] = None,
+    preview: Optional[str] = None,
+    confidence_score: Optional[float] = None,
+    execution_time: Optional[float] = None
+) -> None:
+    """
+    Display a comprehensive pre-confirmation information block.
+    
+    Args:
+        command: The command to be executed
+        risk_level: Risk level (0-4)
+        risk_reason: Reason for the risk assessment
+        impact: Impact analysis dictionary
+        explanation: Optional explanation of the command
+        preview: Optional preview of command execution
+        confidence_score: Optional AI confidence score (0-1)
+        execution_time: Optional execution time if this is post-execution
+    """
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_pre_confirmation_info(
+        command=command,
+        risk_level=risk_level,
+        risk_reason=risk_reason,
+        impact=impact,
+        explanation=explanation,
+        preview=preview,
+        confidence_score=confidence_score,
+        execution_time=execution_time
+    )
+
+
+async def display_inline_confirmation(
+    prompt_text: str = "Proceed with execution?"
+) -> bool:
+    """
+    Display an inline confirmation prompt and get user input.
+    
+    Args:
+        prompt_text: The confirmation prompt text
+        
+    Returns:
+        True if confirmed, False otherwise
+    """
+    from angela.components.shell.formatter import terminal_formatter
+    return await terminal_formatter.display_inline_confirmation(prompt_text)
+
+async def display_execution_timer(
+    command: str,
+    with_philosophy: bool = True
+) -> Tuple[str, str, int, float]:
+    """
+    Display a command execution timer with philosophy quotes.
+    
+    Args:
+        command: The command being executed
+        with_philosophy: Whether to display philosophy quotes
+        
+    Returns:
+        Tuple of (stdout, stderr, return_code, execution_time)
+    """
+    from angela.components.shell.formatter import terminal_formatter
+    return await terminal_formatter.display_execution_timer(command, with_philosophy)
+
+async def display_loading_timer(
+    message: str,
+    with_philosophy: bool = True
+) -> None:
+    """
+    Display a loading timer with optional philosophy quotes.
+    
+    Args:
+        message: The loading message to display
+        with_philosophy: Whether to display philosophy quotes
+    """
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_loading_timer(message, with_philosophy)
+
+def get_inline_feedback():
+    """Get the inline feedback instance."""
+    from angela.components.shell.inline_feedback import InlineFeedback, inline_feedback
+    return inline_feedback

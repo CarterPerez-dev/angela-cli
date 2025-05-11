@@ -1752,7 +1752,7 @@ class Orchestrator:
         dry_run: bool
     ) -> Dict[str, Any]:
         """
-        Process a single command request.
+        Process a single command request with enhanced flow and visualizations.
         
         Args:
             request: The user request
@@ -1763,87 +1763,206 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         """
-        # Analyze intent with enhanced NLU
-        intent_result = intent_analyzer.analyze_intent(request)
+        # Import components via API
+        from angela.api.shell import get_terminal_formatter, get_output_type_enum
+        from angela.api.safety import get_adaptive_confirmation_handler
         
-        # Check if we've seen a similar request before
-        similar_command = history_manager.search_similar_command(request)
+        terminal_formatter = get_terminal_formatter()
+        OutputType = get_output_type_enum()
+        adaptive_confirmation_handler = get_adaptive_confirmation_handler()
         
-        # Get command suggestion from AI
-        suggestion = await self._get_ai_suggestion(
-            request, 
-            context, 
-            similar_command, 
-            intent_result
+        # Start a loading timer for initial processing
+        loading_task = asyncio.create_task(
+            terminal_formatter.display_loading_timer("Processing your request...")
         )
         
-        # Score confidence in the suggestion
-        confidence = confidence_scorer.score_command_confidence(
-            request=request,
-            command=suggestion.command,
-            context=context
-        )
-        
-        # If confidence is low, offer clarification
-        if confidence < 0.6 and not dry_run and not context.get("session", {}).get("skip_clarification"):
-            # Interactive clarification
-            from prompt_toolkit.shortcuts import yes_no_dialog
-            should_proceed = yes_no_dialog(
-                title="Low Confidence Suggestion",
-                text=f"I'm not very confident this is what you meant:\n\n{suggestion.command}\n\nWould you like to proceed with this command?",
-            ).run()
+        try:
+            # Analyze intent with enhanced NLU
+            intent_result = intent_analyzer.analyze_intent(request)
             
-            if not should_proceed:
-                return {
-                    "request": request,
-                    "response": "Command cancelled due to low confidence.",
-                    "context": context,
-                }
-        
-        result = {
-            "request": request,
-            "suggestion": suggestion,
-            "confidence": confidence,
-            "intent": intent_result.intent_type if hasattr(intent_result, 'intent_type') else "unknown",
-            "context": context,
-            "type": "command"
-        }
-        
-        # Execute the command if requested
-        if execute or dry_run:
-            self._logger.info(f"{'Dry run' if dry_run else 'Executing'} suggested command: {suggestion.command}")
+            # Check if we've seen a similar request before
+            similar_command = history_manager.search_similar_command(request)
             
-            # Execute using the adaptive engine with rich feedback
-            execution_result = await adaptive_engine.execute_command(
-                command=suggestion.command,
-                natural_request=request,
-                explanation=suggestion.explanation,
-                dry_run=dry_run
+            # Get command suggestion from AI
+            suggestion = await self._get_ai_suggestion(
+                request, 
+                context, 
+                similar_command, 
+                intent_result
             )
             
-            result["execution"] = execution_result
+            # Score confidence in the suggestion
+            confidence = confidence_scorer.score_command_confidence(
+                request=request,
+                command=suggestion.command,
+                context=context
+            )
             
-            # If execution failed, analyze errors and provide suggestions
-            if not execution_result.get("success") and execution_result.get("stderr"):
-                error_analysis = error_analyzer.analyze_error(
-                    suggestion.command, 
-                    execution_result["stderr"]
-                )
-                result["error_analysis"] = error_analysis
+            # Cancel the loading display
+            loading_task.cancel()
+            
+            # Analyze command risk and impact
+            risk_level, risk_reason = classify_command_risk(suggestion.command)
+            impact = analyze_command_impact(suggestion.command)
+            
+            # Generate preview of what the command will do
+            from angela.api.safety import get_command_preview_generator
+            preview_generator = get_command_preview_generator()
+            preview = await preview_generator.generate_preview(suggestion.command)
+            
+            # Store results in a dictionary
+            result = {
+                "request": request,
+                "suggestion": suggestion,
+                "confidence": confidence,
+                "intent": intent_result.intent_type if hasattr(intent_result, 'intent_type') else "unknown",
+                "context": context,
+                "type": "command",
+                "risk_level": risk_level,
+                "risk_reason": risk_reason,
+                "impact": impact,
+                "preview": preview
+            }
+            
+            # If confidence is low, offer clarification
+            if confidence < 0.6 and not dry_run and not context.get("session", {}).get("skip_clarification"):
+                # Display command with low confidence warning
+                terminal_formatter.print_command(suggestion.command, title="Suggested Command")
                 
-                # Generate fix suggestions
-                fix_suggestions = error_analyzer.generate_fix_suggestions(
-                    suggestion.command, 
-                    execution_result["stderr"]
-                )
-                execution_result["fix_suggestions"] = fix_suggestions
+                # Display confidence score
+                confidence_color = "red"  # Low confidence
+                confidence_stars = int(confidence * 5)
+                confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
                 
-                # Start background monitoring
-                if not dry_run:
-                    self._start_background_monitoring(suggestion.command, error_analysis)
+                console.print(Panel(
+                    f"[bold]Confidence Score:[/bold] [{confidence_color}]{confidence:.2f}[/{confidence_color}] {confidence_display}\n"
+                    "[dim](I'm not very confident this is what you meant)[/dim]",
+                    title="Low Confidence Warning",
+                    border_style=confidence_color,
+                    expand=False
+                ))
+                
+                # Ask for confirmation using inline prompt
+                prompt_text = "Proceed with this command anyway?"
+                should_proceed = await terminal_formatter.display_inline_confirmation(prompt_text)
+                
+                if not should_proceed:
+                    result["cancelled"] = True
+                    return {
+                        "request": request,
+                        "response": "Command cancelled due to low confidence.",
+                        "context": context,
+                    }
+            
+            # Execute the command if requested
+            if execute or dry_run:
+                self._logger.info(f"{'Dry run' if dry_run else 'Executing'} suggested command: {suggestion.command}")
+                
+                # Get confirmation using adaptive confirmation system
+                confirmed = await adaptive_confirmation_handler(
+                    command=suggestion.command,
+                    risk_level=risk_level,
+                    risk_reason=risk_reason,
+                    impact=impact,
+                    preview=preview,
+                    explanation=suggestion.explanation,
+                    natural_request=request,
+                    dry_run=dry_run,
+                    confidence_score=confidence
+                )
+                
+                if not confirmed and not dry_run:
+                    self._logger.info(f"Command execution cancelled by user: {suggestion.command}")
+                    result["cancelled"] = True
+                    return result
+                
+                # Execute with timer and philosophical quotes
+                stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
+                    suggestion.command,
+                    with_philosophy=True
+                )
+                
+                # Store execution results
+                execution_result = {
+                    "command": suggestion.command,
+                    "success": return_code == 0,
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "return_code": return_code,
+                    "execution_time": execution_time,
+                    "dry_run": dry_run
+                }
+                
+                result["execution"] = execution_result
+                
+                # Display the execution results
+                if return_code == 0:
+                    if stdout.strip():
+                        terminal_formatter.print_output(
+                            stdout,
+                            OutputType.STDOUT,
+                            title="Output"
+                        )
+                    # No message about "Command executed successfully with no output"
+                else:
+                    if stderr.strip():
+                        terminal_formatter.print_output(
+                            stderr,
+                            OutputType.STDERR,
+                            title="Error"
+                        )
+                    
+                    # If execution failed, analyze error and suggest fixes
+                    if stderr:
+                        error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
+                        fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
+                        
+                        result["error_analysis"] = error_analysis
+                        result["fix_suggestions"] = fix_suggestions
+                        
+                        # Display error analysis
+                        terminal_formatter.print_error_analysis(error_analysis)
+                
+                # Add to history
+                history_manager.add_command(
+                    command=suggestion.command,
+                    natural_request=request,
+                    success=return_code == 0,
+                    output=stdout,
+                    error=stderr,
+                    risk_level=risk_level
+                )
+                
+                # For multi-step operations, offer to learn from successful executions
+                if return_code == 0 and risk_level > 0:
+                    from angela.api.safety import offer_command_learning
+                    await offer_command_learning(suggestion.command)
+            
+            return result
         
-        return result
-    
+        except asyncio.CancelledError:
+            # Handle the case where the loading task gets cancelled
+            return {
+                "request": request,
+                "context": context,
+                "error": "Operation was cancelled",
+                "success": False
+            }
+            
+        except Exception as e:
+            # Cancel the loading display if it's still running
+            if loading_task and not loading_task.done():
+                loading_task.cancel()
+                
+            self._logger.exception(f"Error processing command request: {str(e)}")
+            return {
+                "request": request,
+                "type": "command",
+                "context": context,
+                "error": str(e),
+                "success": False
+            }
+            
 
     async def _process_multi_step_request(
         self, 
@@ -1852,14 +1971,20 @@ class Orchestrator:
         execute: bool, 
         dry_run: bool
     ) -> Dict[str, Any]:
-        """Process a multi-step operation request with transaction-based rollback support."""
+        """Process a multi-step operation request with enhanced visualization and transactions."""
         self._logger.info(f"Processing multi-step request: {request}")
         
-        # Get error recovery manager if needed
-        error_recovery_manager = self._get_error_recovery_manager()
+        # Import components via API
+        from angela.api.shell import get_terminal_formatter
+        from angela.api.execution import get_rollback_manager
         
-        # Determine if we should use advanced planning
-        complexity = await task_planner._determine_complexity(request)
+        terminal_formatter = get_terminal_formatter()
+        rollback_manager = get_rollback_manager()
+        
+        # Start a loading timer for initial processing
+        loading_task = asyncio.create_task(
+            terminal_formatter.display_loading_timer("Planning multi-step operation...")
+        )
         
         # Start a transaction for this multi-step operation
         transaction_id = None
@@ -1867,6 +1992,12 @@ class Orchestrator:
             transaction_id = await rollback_manager.start_transaction(f"Multi-step plan: {request[:50]}...")
         
         try:
+            # Determine if we should use advanced planning
+            complexity = await task_planner._determine_complexity(request)
+            
+            # Cancel the loading display
+            loading_task.cancel()
+            
             if complexity == "advanced":
                 # Use the advanced planner for complex tasks
                 plan = await task_planner.plan_task(request, context, complexity)
@@ -1896,7 +2027,7 @@ class Orchestrator:
                                     "id": step_id,
                                     "type": step.type,
                                     "description": step.description,
-                                    "command": step.command,
+                                    "command": getattr(step, "command", None),
                                     "dependencies": step.dependencies,
                                     "risk": step.estimated_risk
                                 }
@@ -1910,25 +2041,43 @@ class Orchestrator:
                     # Execute the plan if requested
                     if execute or dry_run:
                         # Display the plan with rich formatting
-                        await display_advanced_plan(plan)
+                        await terminal_formatter.display_advanced_plan(plan)
                         
-                        # Get confirmation for plan execution
-                        confirmed = await self._confirm_advanced_plan_execution(plan, dry_run)
+                        # Get confirmation using inline confirmation
+                        prompt_text = f"Execute this {len(plan.steps)}-step plan?"
+                        confirmed = await terminal_formatter.display_inline_confirmation(prompt_text)
                         
                         if confirmed or dry_run:
-                            # Execute the plan with transaction support
-                            execution_results = await task_planner.execute_plan(
-                                plan, 
-                                dry_run=dry_run,
-                                transaction_id=transaction_id
+                            # Start progress tracking loading timer
+                            execution_timer = asyncio.create_task(
+                                terminal_formatter.display_loading_timer("Executing multi-step plan...")
                             )
-                            result["execution_results"] = execution_results
-                            result["success"] = execution_results.get("success", False)
                             
-                            # Update transaction status
-                            if transaction_id:
-                                status = "completed" if result["success"] else "failed"
-                                await rollback_manager.end_transaction(transaction_id, status)
+                            try:
+                                # Execute the plan with transaction support
+                                execution_results = await task_planner.execute_plan(
+                                    plan, 
+                                    dry_run=dry_run,
+                                    transaction_id=transaction_id
+                                )
+                                
+                                # Cancel the timer
+                                execution_timer.cancel()
+                                
+                                # Display execution results
+                                await terminal_formatter.display_execution_results(plan, execution_results)
+                                
+                                result["execution_results"] = execution_results
+                                result["success"] = execution_results.get("success", False)
+                                
+                                # Update transaction status
+                                if transaction_id:
+                                    status = "completed" if result["success"] else "failed"
+                                    await rollback_manager.end_transaction(transaction_id, status)
+                            finally:
+                                # Ensure timer is cancelled even on error
+                                if not execution_timer.done():
+                                    execution_timer.cancel()
                         else:
                             result["cancelled"] = True
                             result["success"] = False
@@ -1936,21 +2085,37 @@ class Orchestrator:
                             # End the transaction as cancelled
                             if transaction_id:
                                 await rollback_manager.end_transaction(transaction_id, "cancelled")
+                    else:
+                        # Basic plan (fallback)
+                        result = await self._handle_basic_plan_execution(plan, request, context, execute, dry_run, transaction_id)
                 else:
-                    # Basic plan (fallback)
+                    # Use the basic planner for simple tasks
+                    plan = await task_planner.plan_task(request, context)
                     result = await self._handle_basic_plan_execution(plan, request, context, execute, dry_run, transaction_id)
-            else:
-                # Use the basic planner for simple tasks
-                plan = await task_planner.plan_task(request, context)
-                result = await self._handle_basic_plan_execution(plan, request, context, execute, dry_run, transaction_id)
+                
+                return result
             
-            return result
-        
+        except asyncio.CancelledError:
+            # Handle the case where a task gets cancelled
+            if transaction_id:
+                await rollback_manager.end_transaction(transaction_id, "cancelled")
+                
+            return {
+                "request": request,
+                "context": context,
+                "error": "Operation was cancelled",
+                "success": False
+            }
+            
         except Exception as e:
             # Handle any exceptions and end the transaction
             if transaction_id:
                 await rollback_manager.end_transaction(transaction_id, "failed")
             
+            # Cancel the loading timer if still running
+            if loading_task and not loading_task.done():
+                loading_task.cancel()
+                
             self._logger.exception(f"Error processing multi-step request: {str(e)}")
             raise
         
@@ -2162,7 +2327,11 @@ class Orchestrator:
         dry_run: bool,
         transaction_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Handle execution of a basic plan."""
+        """Handle execution of a basic plan with enhanced visualization."""
+        # Import terminal formatter
+        from angela.api.shell import get_terminal_formatter
+        terminal_formatter = get_terminal_formatter()
+        
         # Create result with the plan
         result = {
             "request": request,
@@ -2188,39 +2357,57 @@ class Orchestrator:
             # Display the plan
             await terminal_formatter.display_task_plan(plan)
             
-            # Get confirmation for plan execution
-            from prompt_toolkit.shortcuts import yes_no_dialog
-            confirmed = dry_run or yes_no_dialog(
-                title="Confirm Plan Execution",
-                text=f"Do you want to execute this {len(plan.steps)}-step plan?",
-            ).run()
+            # Get confirmation for plan execution using inline confirmation
+            prompt_text = f"Execute this {len(plan.steps)}-step plan?"
+            confirmed = await terminal_formatter.display_inline_confirmation(prompt_text)
             
             if confirmed or dry_run:
-                # Execute the plan
-                execution_results = await enhanced_task_planner.execute_plan(
-                    plan, 
-                    dry_run=dry_run,
-                    transaction_id=transaction_id
+                # Start a loading timer for execution
+                execution_timer = asyncio.create_task(
+                    terminal_formatter.display_loading_timer("Executing multi-step plan...")
                 )
                 
-                result["execution_results"] = execution_results
-                result["success"] = all(r.get("success", False) for r in execution_results)
-                
-                # Update transaction status
-                if transaction_id:
-                    rollback_manager = self._get_rollback_manager()
-                    if rollback_manager:
+                try:
+                    # Execute the plan with transaction support
+                    execution_results = await task_planner.execute_plan(
+                        plan, 
+                        dry_run=dry_run,
+                        transaction_id=transaction_id
+                    )
+                    
+                    # Cancel the timer
+                    execution_timer.cancel()
+                    
+                    # Display multi-step execution results
+                    await terminal_formatter.display_multi_step_execution(plan, execution_results)
+                    
+                    result["execution_results"] = execution_results
+                    result["success"] = all(r.get("success", False) for r in execution_results)
+                    
+                    # Update transaction status
+                    if transaction_id:
                         status = "completed" if result["success"] else "failed"
                         await rollback_manager.end_transaction(transaction_id, status)
+                    
+                    # Handle errors with recovery if needed
+                    if not result["success"] and not dry_run:
+                        recovered_results = await self._handle_execution_errors(plan, execution_results)
+                        result["recovery_attempted"] = True
+                        result["recovered_results"] = recovered_results
+                        # Update success status if recovery was successful
+                        if all(r.get("success", False) for r in recovered_results):
+                            result["success"] = True
+                finally:
+                    # Ensure timer is cancelled even on error
+                    if not execution_timer.done():
+                        execution_timer.cancel()
             else:
                 result["cancelled"] = True
                 result["success"] = False
                 
                 # End the transaction as cancelled
                 if transaction_id:
-                    rollback_manager = self._get_rollback_manager()
-                    if rollback_manager:
-                        await rollback_manager.end_transaction(transaction_id, "cancelled")
+                    await rollback_manager.end_transaction(transaction_id, "cancelled")
         
         return result
     

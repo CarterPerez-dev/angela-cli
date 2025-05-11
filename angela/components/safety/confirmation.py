@@ -1,17 +1,11 @@
-# angela/safety/confirmation.py
-"""
-User confirmation interface for potentially risky operations.
+# angela/components/safety/confirmation.py
 
-This module handles presenting command previews and obtaining user confirmation
-based on the risk level of operations.
-"""
 import sys
 from typing import Dict, Any, Optional, List, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
-from rich.prompt import Confirm
 from rich.table import Table
 from rich.text import Text
 
@@ -63,7 +57,7 @@ def format_impact_analysis(impact: Dict[str, Any]) -> Table:
     Returns:
         A rich Table object with the formatted impact analysis.
     """
-    table = Table(title="Impact Analysis", expand=True)
+    table = Table(expand=True)
     
     table.add_column("Aspect", style="bold cyan")
     table.add_column("Details", style="white")
@@ -133,106 +127,44 @@ async def get_confirmation(
     if not requires_confirmation(risk_level) and not dry_run:
         return True
     
-    # Get the risk level name and color
-    risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    risk_color = RISK_COLORS.get(risk_level, "yellow")
-    
-    # Create panel title based on risk
-    if dry_run:
-        title = Text("DRY RUN", style=f"bold {risk_color}")
-    else:
-        title = Text(f"Execute [{risk_name} Risk]", style=f"bold {risk_color}")
-    
-    # Create a multi-panel display with all relevant information
-    panels = []
-    
-    # Command panel
-    panels.append(Panel(
-        Syntax(command, "bash", theme="monokai", word_wrap=True),
-        title="Command",
-        border_style=risk_color,
-        expand=False
-    ))
-    
-    # Explanation panel if provided
-    if explanation:
-        panels.append(Panel(
-            explanation,
-            title="Explanation",
-            border_style="blue",
-            expand=False
-        ))
-    
-    # Risk info
-    risk_info = f"[bold {risk_color}]Risk Level:[/bold {risk_color}] {risk_name}\n"
-    risk_info += f"[bold {risk_color}]Reason:[/bold {risk_color}] {risk_reason}"
-    
-    # Add confidence info if available
-    if confidence_score is not None:
-        confidence_color = "green" if confidence_score > 0.8 else "yellow" if confidence_score > 0.6 else "red"
-        confidence_stars = int(confidence_score * 5)
-        confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
-        
-        risk_info += f"\n\n[bold]Confidence:[/bold] [{confidence_color}]{confidence_score:.2f}[/{confidence_color}] {confidence_display}"
-        risk_info += "\n[dim](Confidence indicates how sure Angela is that this command matches your request)[/dim]"
-    
-    panels.append(Panel(
-        risk_info,
-        title="Risk Assessment",
-        border_style=risk_color,
-        expand=False
-    ))
-    
-    # Impact analysis panel
-    panels.append(Panel(
-        format_impact_analysis(impact),
-        title="Impact Analysis",
-        border_style="blue",
-        expand=False
-    ))
-    
-    # Preview panel if available
-    if preview:
-        panels.append(Panel(
-            preview,
-            title="Command Preview",
-            border_style=risk_color,
-            expand=False
-        ))
-    
-    # For critical operations, use a more prominent warning
-    if risk_level == RISK_LEVELS["CRITICAL"]:
-        panels.append(Panel(
-            "⚠️  [bold red]This is a CRITICAL risk operation[/bold red] ⚠️\n"
-            "It may cause significant changes to your system or data loss.",
-            border_style="red",
-            expand=False
-        ))
+    # Get the terminal formatter
+    from angela.api.shell import get_terminal_formatter
+    terminal_formatter = get_terminal_formatter()
     
     # For dry run, just show the information without asking for confirmation
     if dry_run:
-        panels.append(Panel(
+        await terminal_formatter.display_pre_confirmation_info(
+            command=command,
+            risk_level=risk_level,
+            risk_reason=risk_reason,
+            impact=impact,
+            explanation=explanation,
+            preview=preview,
+            confidence_score=confidence_score
+        )
+        
+        console.print(Panel(
             "[bold blue]This is a dry run.[/bold blue] No changes will be made.",
             border_style="blue",
             expand=False
         ))
         
-        # Display all panels
-        for panel in panels:
-            console.print(panel)
-        
         return False
     
-    # Display all panels
-    for panel in panels:
-        console.print(panel)
+    # Display all the information
+    await terminal_formatter.display_pre_confirmation_info(
+        command=command,
+        risk_level=risk_level,
+        risk_reason=risk_reason,
+        impact=impact,
+        explanation=explanation,
+        preview=preview,
+        confidence_score=confidence_score
+    )
     
-    # Ask for confirmation using prompt_toolkit for a better experience
-    from prompt_toolkit import prompt
-    from prompt_toolkit.formatted_text import HTML
-    
-    # Use a more stylish prompt
-    confirmation_prompt = HTML("<ansigreen>Proceed with execution? [y/N]: </ansigreen>")
-    response = prompt(confirmation_prompt).lower()
-    
-    return response in ("y", "yes")
+    # Ask for confirmation
+    prompt_text = "Proceed with execution?"
+    if risk_level >= RISK_LEVELS["HIGH"]:
+        prompt_text = f"Proceed with this {RISK_LEVEL_NAMES.get(risk_level, 'HIGH')} risk operation?"
+        
+    return await terminal_formatter.display_inline_confirmation(prompt_text)
