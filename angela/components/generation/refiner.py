@@ -38,9 +38,9 @@ class InteractiveRefiner:
     async def process_refinement_feedback(
         self, 
         feedback: str,
-        project: CodeProject,
+        project: "CodeProject",
         focus_files: Optional[List[str]] = None
-    ) -> Tuple[CodeProject, Dict[str, Any]]:
+    ) -> Tuple["CodeProject", Dict[str, Any]]:
         """
         Process feedback to refine a generated project.
         
@@ -301,7 +301,7 @@ Only include files that are directly relevant to the feedback.
         self, 
         feedback: str,
         file: CodeFile,
-        project: CodeProject
+        project: "CodeProject"
     ) -> Dict[str, Any]:
         """
         Process feedback for a specific file.
@@ -318,6 +318,7 @@ Only include files that are directly relevant to the feedback.
         file_context = self._build_file_context(file, project)
         
         # Use the feedback manager to process the feedback
+        feedback_manager = get_feedback_manager()
         result = await feedback_manager.process_feedback(
             feedback=feedback,
             original_code=file.content,

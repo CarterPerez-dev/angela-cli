@@ -1,4 +1,4 @@
-# angela/intent/semantic_task_planner.py
+# angela/components/intent/semantic_task_planner.py
 """
 Semantic task planning and intent decomposition for Angela CLI.
 
@@ -15,14 +15,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.ai.semantic_analyzer import semantic_analyzer
-from angela.context import context_manager
-from angela.context.project_state_analyzer import project_state_analyzer
-from angela.intent.enhanced_task_planner import EnhancedTaskPlanner, AdvancedTaskPlan, PlanStepType
+# Updated imports using the new architecture
+from angela.api.ai import get_gemini_client, get_gemini_request_class, get_semantic_analyzer
+from angela.api.context import get_context_manager, get_project_state_analyzer
+from angela.api.shell import get_inline_feedback
 from angela.utils.logging import get_logger
 from angela.core.registry import registry
-from angela.shell.inline_feedback import inline_feedback
+
+# Internal module imports that don't cause circular dependencies
+from angela.components.intent.enhanced_task_planner import EnhancedTaskPlanner, AdvancedTaskPlan, PlanStepType
 
 logger = get_logger(__name__)
 
@@ -229,8 +230,10 @@ Return your analysis as a JSON object with this structure:
 
 Use the highest standards for identifying ambiguities that would benefit from clarification. If anything is unclear, set "needs_clarification" to true and document the ambiguity.
 """
-        
-        # Call AI to analyze the intent
+    
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()    
+
         api_request = GeminiRequest(
             prompt=prompt,
             temperature=0.1,  # Lower temperature for more deterministic analysis
@@ -430,6 +433,9 @@ Use the highest standards for identifying ambiguities that would benefit from cl
         self._logger.info(f"Getting user clarification for: {clarification.ambiguity_type}")
         
         try:
+            # Get inline_feedback through API layer
+            inline_feedback = get_inline_feedback()
+            
             # Check if inline_feedback is available
             if inline_feedback:
                 question = clarification.clarification_question
@@ -558,7 +564,8 @@ Use the highest standards for identifying ambiguities that would benefit from cl
         # If not found, use a generic approach
         if not file_reference:
             # Use file_resolver to get possible matches
-            from angela.context.file_resolver import file_resolver
+            from angela.api.context import get_file_resolver
+            file_resolver = get_file_resolver()
             
             project_root = context.get("project_root")
             if project_root:
@@ -956,8 +963,10 @@ Return your decomposition as a JSON object with this structure:
 If the goals must be executed in a specific order, set "sequential" to true and ensure the sub_goals are in the correct execution order.
 If some goals can be executed in parallel, set "sequential" to false and use dependencies to indicate required ordering.
 """
-            
-            # Call AI to decompose the goal
+
+            gemini_client = get_gemini_client()
+            GeminiRequest = get_gemini_request_class()            
+
             api_request = GeminiRequest(
                 prompt=prompt,
                 temperature=0.2,
@@ -1128,6 +1137,10 @@ If some goals can be executed in parallel, set "sequential" to false and use dep
             return enhanced_context
         
         try:
+            # Get semantic analyzer and project state analyzer through API layer
+            semantic_analyzer = get_semantic_analyzer()
+            project_state_analyzer = get_project_state_analyzer()
+            
             # Add semantic code information
             semantic_info = {
                 "modules": [],

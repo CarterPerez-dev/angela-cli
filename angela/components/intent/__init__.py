@@ -1,4 +1,4 @@
-# angela/intent/__init__.py
+# angela/components/intent/__init__.py
 """
 Intent components for Angela CLI.
 
@@ -8,58 +8,23 @@ across multiple levels of abstraction.
 """
 
 # Export core intent models
-from .models import IntentType, Intent, ActionPlan
+from angela.components.intent.models import IntentType, Intent, ActionPlan
 
-# Export base planner components - these should be safe to import directly
-from .planner import (
+# Export base planner components
+from angela.components.intent.planner import (
     PlanStep, TaskPlan, PlanStepType, 
     AdvancedPlanStep, AdvancedTaskPlan,
     task_planner
 )
 
-# Try to import EnhancedTaskPlanner directly if available
-try:
-    from .planner import EnhancedTaskPlanner  # This will work after our fix
-except ImportError:
-    # If not available from planner, we'll try enhanced_task_planner module directly
-    try:
-        from .enhanced_task_planner import EnhancedTaskPlanner
-    except ImportError:
-        # Log that it's not available, but don't crash
-        import logging
-        logging.getLogger(__name__).warning(
-            "EnhancedTaskPlanner is not available. Advanced planning features will be limited."
-        )
-        EnhancedTaskPlanner = None
-
-# Define functions to lazily load components that might cause circular imports
-def get_enhanced_task_planner():
-    """Get the enhanced task planner lazily to avoid circular imports."""
-    try:
-        from .enhanced_task_planner import enhanced_task_planner
-        return enhanced_task_planner
-    except ImportError:
-        # Return basic task planner as fallback
-        return task_planner
-
-# Export semantic understanding components as lazy functions
-def get_semantic_task_planner():
-    """Get the semantic task planner lazily to avoid circular imports."""
-    from .semantic_task_planner import (
-        semantic_task_planner,
-        IntentClarification
-    )
-    return semantic_task_planner
-
-# Export complex workflow planning components as lazy functions
-def get_complex_workflow_planner():
-    """Get the complex workflow planner lazily to avoid circular imports."""
-    from .complex_workflow_planner import (
-        WorkflowStepType,
-        ComplexWorkflowPlan,
-        complex_workflow_planner
-    )
-    return complex_workflow_planner
+# Export enhanced planner components - now that we have the API layer, 
+# direct imports are safe since they'll be accessed through the API
+from angela.components.intent.enhanced_task_planner import EnhancedTaskPlanner, enhanced_task_planner
+from angela.components.intent.semantic_task_planner import SemanticTaskPlanner, semantic_task_planner, IntentClarification
+from angela.components.intent.complex_workflow_planner import (
+    ComplexWorkflowPlanner, complex_workflow_planner, 
+    WorkflowStepType, ComplexWorkflowPlan
+)
 
 # Define the public API
 __all__ = [
@@ -71,11 +36,9 @@ __all__ = [
     'AdvancedPlanStep', 'AdvancedTaskPlan',
     'task_planner',
     
-    # Enhanced Task Planner (if available)
-    'EnhancedTaskPlanner',
-    
-    # Lazy loading functions for components with potential circular deps
-    'get_enhanced_task_planner',
-    'get_semantic_task_planner',
-    'get_complex_workflow_planner',
+    # Enhanced planning components
+    'EnhancedTaskPlanner', 'enhanced_task_planner',
+    'SemanticTaskPlanner', 'semantic_task_planner', 'IntentClarification',
+    'ComplexWorkflowPlanner', 'complex_workflow_planner', 
+    'WorkflowStepType', 'ComplexWorkflowPlan',
 ]

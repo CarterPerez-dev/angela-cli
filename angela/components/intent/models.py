@@ -1,4 +1,4 @@
-# angela/intent/models.py
+# angela/components/intent/models.py
 from enum import Enum
 from typing import Dict, Any, Optional, List
 

@@ -1,4 +1,4 @@
-# angela/intent/planner.py
+# angela/components/intent/planner.py
 """
 Task planning and goal decomposition for Angela CLI.
 
@@ -20,9 +20,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from angela.intent.models import ActionPlan, Intent, IntentType
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
+# Updated imports to use relative imports or API layer
+from angela.components.intent.models import ActionPlan, Intent, IntentType
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_context_manager
+from angela.api.execution import get_execution_engine, get_rollback_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -198,6 +200,10 @@ class TaskPlanner:
         # Generate a plan using the AI
         prompt = self._build_planning_prompt(goal, context)
         
+        # Get required classes through API layer
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
+        
         # Call AI service
         api_request = GeminiRequest(
             prompt=prompt,
@@ -239,6 +245,7 @@ class TaskPlanner:
         # Add files in current directory for context
         if context.get("cwd"):
             try:
+                context_manager = get_context_manager()
                 dir_contents = context_manager.get_directory_contents(Path(context["cwd"]))
                 files_str = "\n".join([f"- {item['name']}" for item in dir_contents])
                 context_str += f"\nFiles in current directory:\n{files_str}\n"
@@ -406,8 +413,9 @@ Include error handling where appropriate.
         
         # Check for EnhancedTaskPlanner to delegate advanced plans
         if isinstance(plan, AdvancedTaskPlan):
-            # Import here to avoid circular imports
-            from angela.intent.enhanced_task_planner import enhanced_task_planner
+            # Using API layer to avoid circular imports
+            from angela.api.intent import get_enhanced_task_planner
+            enhanced_task_planner = get_enhanced_task_planner()
             return await enhanced_task_planner.execute_plan(plan, dry_run, transaction_id)
         else:
             return await self._execute_basic_plan(plan, dry_run, transaction_id)
@@ -429,9 +437,9 @@ Include error handling where appropriate.
         Returns:
             List of execution results for each step
         """
-        # Import necessary modules inside method to avoid circular imports
-        from angela.execution.engine import execution_engine
-        from angela.execution.rollback import rollback_manager
+        # Get necessary components through API layer
+        execution_engine = get_execution_engine()
+        rollback_manager = get_rollback_manager()
         
         results = []
         
@@ -515,25 +523,10 @@ Include error handling where appropriate.
         Returns:
             An AdvancedTaskPlan with steps to achieve the goal
         """
-        # Import here to avoid circular imports
-        from angela.intent.enhanced_task_planner import enhanced_task_planner
+        # Using API layer to avoid circular imports
+        from angela.api.intent import get_enhanced_task_planner
+        enhanced_task_planner = get_enhanced_task_planner()
         return await enhanced_task_planner.plan_advanced_task(goal, context)
-        # Build a planning prompt for advanced planning
-        prompt = self._build_advanced_planning_prompt(goal, context)
-        
-        # Call the AI service
-        api_request = GeminiRequest(
-            prompt=prompt,
-            max_tokens=4000
-        )
-        
-        self._logger.debug("Sending advanced planning request to AI service")
-        api_response = await gemini_client.generate_text(api_request)
-        
-        # Parse the plan from the response
-        plan = self._parse_advanced_plan_response(api_response.text, goal, context)
-        
-        return plan
     
     def _build_advanced_planning_prompt(
         self, 
@@ -563,6 +556,7 @@ Include error handling where appropriate.
         # Add files in current directory for context
         if context.get("cwd"):
             try:
+                context_manager = get_context_manager()
                 dir_contents = context_manager.get_directory_contents(Path(context["cwd"]))
                 files_str = "\n".join([f"- {item['name']}" for item in dir_contents])
                 context_str += f"\nFiles in current directory:\n{files_str}\n"
@@ -747,6 +741,9 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
         """
         self._logger.info(f"Executing advanced plan: {plan.goal}")
         
+        # Get execution engine through API layer
+        execution_engine = get_execution_engine()
+        
         # Initialize execution state
         results = {}
         completed_steps = set()
@@ -786,8 +783,8 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
                         
                         # Record command execution in the transaction if successful
                         if not dry_run and transaction_id and result[2] == 0:  # return_code == 0
-                            # Import here to avoid circular imports
-                            from angela.execution.rollback import rollback_manager
+                            # Get rollback manager through API layer
+                            rollback_manager = get_rollback_manager()
                             
                             await rollback_manager.record_command_execution(
                                 command=step.command,
@@ -913,8 +910,8 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
         Returns:
             Dictionary with step execution results
         """
-        # Import here to avoid circular imports
-        from angela.execution.engine import execution_engine
+        # Get execution engine through API layer
+        execution_engine = get_execution_engine()
         
         # Prepare base result
         result = {
@@ -1113,13 +1110,15 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
     
     async def _read_file(self, path: str) -> str:
         """Read content from a file."""
-        from angela.execution.filesystem import read_file
-        return await read_file(path)
+        from angela.api.execution import get_filesystem_functions
+        fs = get_filesystem_functions()
+        return await fs.read_file(path)
     
     async def _write_file(self, path: str, content: str) -> bool:
         """Write content to a file."""
-        from angela.execution.filesystem import write_file
-        return await write_file(path, content)
+        from angela.api.execution import get_filesystem_functions
+        fs = get_filesystem_functions()
+        return await fs.write_file(path, content)
     
     async def _execute_code(self, code: str) -> Dict[str, Any]:
         """
@@ -1185,11 +1184,3 @@ Ensure each step has a unique ID and clear dependencies. Entry points are the st
 
 
 task_planner = TaskPlanner()
-
-# Import EnhancedTaskPlanner for export (will be available when importing from this module)
-try:
-    from angela.intent.enhanced_task_planner import EnhancedTaskPlanner
-except ImportError:
-    # Log warning but don't fail - EnhancedTaskPlanner may be imported later
-    logger.warning("EnhancedTaskPlanner not available during module initialization. Some advanced features may be limited.")
-    EnhancedTaskPlanner = None

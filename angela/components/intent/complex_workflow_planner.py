@@ -1,4 +1,4 @@
-# angela/intent/complex_workflow_planner.py
+# angela/components/intent/complex_workflow_planner.py
 """
 Complex Workflow Orchestration for Angela CLI.
 
@@ -13,24 +13,29 @@ import re
 import shlex
 import uuid
 from datetime import datetime
-from enum import Enum
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple, Union, Callable
 from enum import Enum
 
 from pydantic import BaseModel, Field, validator
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
+# Updated imports using the new architecture
+from angela.api.ai import get_gemini_client, get_gemini_request_class, get_semantic_analyzer
+from angela.api.context import (
+    get_context_manager, get_project_state_analyzer, get_file_resolver
+)
+from angela.api.shell import get_inline_feedback
+from angela.api.execution import get_adaptive_engine
+from angela.api.toolchain import get_universal_cli_translator
 from angela.utils.logging import get_logger
 from angela.core.registry import registry
-from angela.intent.enhanced_task_planner import (
+
+# Import directly from local module to avoid circular deps
+from angela.components.intent.enhanced_task_planner import (
     EnhancedTaskPlanner, StepExecutionContext, 
     AdvancedTaskPlan, AdvancedPlanStep, PlanStepType,
     ExecutionResult
 )
-from angela.toolchain.universal_cli import universal_cli_translator
-from angela.execution.adaptive_engine import adaptive_engine
 
 logger = get_logger(__name__)
 

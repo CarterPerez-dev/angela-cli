@@ -21,23 +21,23 @@ import uuid
 import logging
 import aiohttp
 from enum import Enum
+import sys
 
 from pydantic import BaseModel, Field, ValidationError, validator
 
-from angela.intent.models import ActionPlan, Intent, IntentType
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
-from angela.context.file_resolver import file_resolver
-from angela.utils.logging import get_logger
-from angela.execution.engine import execution_engine
-from angela.safety.validator import validate_command_safety
-from angela.safety.classifier import classify_command_risk
+# Updated imports using the new architecture
+from angela.components.intent.models import ActionPlan, Intent, IntentType
+from angela.api.ai import get_gemini_client, get_gemini_request_class, get_parse_ai_response_func, get_build_prompt_func
+from angela.api.context import get_context_manager, get_file_resolver
+from angela.api.safety import get_validate_command_safety_func, get_command_risk_classifier
+from angela.api.execution import get_execution_engine, get_error_recovery_manager, get_rollback_manager
 from angela.core.registry import registry
+from angela.utils.logging import get_logger
 
-# Reuse existing models from angela/intent/planner.py
-from angela.intent.planner import (
+# Import these directly from the same module to avoid circular imports
+from angela.components.intent.planner import (
     PlanStep, TaskPlan, PlanStepType, AdvancedPlanStep, AdvancedTaskPlan,
-    TaskPlanner, task_planner
+    TaskPlanner
 )
 
 logger = get_logger(__name__)
@@ -129,9 +129,8 @@ class CoreEnhancedTaskPlanner:
     def _get_error_recovery_manager(self):
         """Get or initialize the error recovery manager."""
         if self._error_recovery_manager is None:
-            # Import inside the method
-            from angela.execution.error_recovery import ErrorRecoveryManager
-            self._error_recovery_manager = ErrorRecoveryManager()
+            # Use API layer to avoid circular imports
+            self._error_recovery_manager = get_error_recovery_manager()
         return self._error_recovery_manager
 
     
@@ -377,7 +376,9 @@ Create at most {max_steps} steps, but don't add unnecessary steps.
 Ensure the plan handles potential errors and provides clear decision branches for different scenarios.
 """
         
-        # Call AI service
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
+        
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=4000,
@@ -432,11 +433,17 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         self._logger.info(f"Creating fallback plan for: {request}")
         
         # Generate a simple command for the request
-        from angela.ai.parser import CommandSuggestion
-        from angela.ai.prompts import build_prompt
+        # Get necessary functions through API layer
+        parse_ai_response = get_parse_ai_response_func()
+        build_prompt = get_build_prompt_func()
+        command_risk_classifier = get_command_risk_classifier()
         
         # Build prompt for AI
         prompt = build_prompt(request, context)
+        
+        # Get AI client and request class through API layer
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
         
         # Call AI service
         api_request = GeminiRequest(
@@ -447,7 +454,6 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         response = await gemini_client.generate_text(api_request)
         
         # Parse the response to get a command suggestion
-        from angela.ai.parser import parse_ai_response
         suggestion = parse_ai_response(response.text)
         
         # Create a simple plan with one command step
@@ -455,7 +461,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         step_id = "step1"
         
         # Get risk level
-        risk_level, _ = classify_command_risk(suggestion.command)
+        risk_level, _ = command_risk_classifier(suggestion.command)
         
         # Create the step
         step = AdvancedPlanStep(
@@ -499,7 +505,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         Returns:
             Dictionary with execution results
         """
-        # Get error recovery manager
+        # Get error recovery manager through API layer
         error_recovery_manager = self._get_error_recovery_manager()
     
         self._logger.info(f"Executing advanced plan: {plan.goal} (ID: {plan.id})")
@@ -618,7 +624,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                         
                         # Attempt error recovery
                         if not dry_run and error_recovery_manager:
-                            recovery_result = await self._attempt_recovery(step, error_result, context)
+                            recovery_result = await self._attempt_recovery(step, result, context)
                             
                             if recovery_result.get("recovery_success", False):
                                 self._logger.info(f"Recovery succeeded for step {step_id}")
@@ -734,8 +740,8 @@ Ensure the plan handles potential errors and provides clear decision branches fo
             "execution_time": execution_time,
             "variables": {k: v.dict() for k, v in self._variables.items()}
         }
-
-
+    
+    
     async def _attempt_recovery(
         self, 
         step: Any, 
@@ -753,7 +759,7 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         Returns:
             Updated execution result with recovery information
         """
-        # Get error recovery manager
+        # Get error recovery manager through API layer
         error_recovery_manager = self._get_error_recovery_manager()
         
         if error_recovery_manager:
@@ -766,8 +772,8 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                 "recovery_success": False,
                 "error": "Error recovery manager not available"
             }
-
-
+    
+    
     
     async def _execute_advanced_step(
         self, 
@@ -1113,8 +1119,8 @@ Ensure the plan handles potential errors and provides clear decision branches fo
         # Validate command safety if not specified to skip
         skip_safety = getattr(step, "skip_safety_check", False)
         if not skip_safety:
-            # Get validate_command_safety function
-            validate_func = registry.get("validate_command_safety")
+            # Get validate_command_safety function through API layer
+            validate_func = get_validate_command_safety_func()
             if validate_func:
                 is_safe, error_message = validate_func(step.command)
                 if not is_safe:
@@ -1124,8 +1130,9 @@ Ensure the plan handles potential errors and provides clear decision branches fo
                         "command": step.command
                     }
         
-        # Execute the command
+        # Execute the command using the execution engine from API layer
         try:
+            execution_engine = get_execution_engine()
             stdout, stderr, return_code = await execution_engine.execute_command(
                 command=step.command,
                 check_safety=not skip_safety
@@ -1154,8 +1161,8 @@ Ensure the plan handles potential errors and provides clear decision branches fo
             
             # Record command execution in the transaction if successful
             if context.transaction_id and return_code == 0:
-                # Import here to avoid circular imports
-                rollback_manager = registry.get("rollback_manager")
+                # Get rollback manager through API layer
+                rollback_manager = get_rollback_manager()
                 if rollback_manager:
                     await rollback_manager.record_command_execution(
                         command=step.command,
@@ -1454,7 +1461,8 @@ with open("{temp_dir / 'output.json'}", "w") as output_file:
                 shutil.rmtree(temp_dir)
             except Exception as e:
                 self._logger.error(f"Error cleaning up temporary files: {str(e)}")
-    
+                
+                
     async def _execute_javascript_code(
         self, 
         code: str, 
@@ -1863,15 +1871,13 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
             # Determine the operation type
             operation = getattr(step, "operation", "read" if not step.file_content else "write")
             
-            # Get filesystem functions
-            from angela.execution.filesystem import (
-                read_file, write_file, create_directory, delete_file, delete_directory,
-                move_file, copy_file
-            )
+            # Get filesystem functions through API layer
+            from angela.api.execution import get_filesystem_functions
+            fs = get_filesystem_functions()
             
             if operation == "read":
                 # Read file content
-                content = await read_file(step.file_path)
+                content = await fs.read_file(step.file_path)
                 return {
                     "success": True,
                     "content": content,
@@ -1884,10 +1890,10 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
             elif operation == "write":
                 # Create parent directories if needed
                 file_path = Path(step.file_path)
-                await create_directory(file_path.parent, parents=True)
+                await fs.create_directory(file_path.parent, parents=True)
                 
                 # Write content to file
-                await write_file(step.file_path, step.file_content)
+                await fs.write_file(step.file_path, step.file_content)
                 return {
                     "success": True,
                     "message": f"Content written to {step.file_path}",
@@ -1900,10 +1906,10 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
             elif operation == "delete":
                 # Delete file or directory
                 if Path(step.file_path).is_dir():
-                    await delete_directory(step.file_path)
+                    await fs.delete_directory(step.file_path)
                     message = f"Directory {step.file_path} deleted"
                 else:
-                    await delete_file(step.file_path)
+                    await fs.delete_file(step.file_path)
                     message = f"File {step.file_path} deleted"
                     
                 return {
@@ -1925,7 +1931,7 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                     }
                 
                 # Copy file or directory
-                await copy_file(step.file_path, destination)
+                await fs.copy_file(step.file_path, destination)
                 return {
                     "success": True,
                     "message": f"Copied {step.file_path} to {destination}",
@@ -1947,7 +1953,7 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                     }
                 
                 # Move file or directory
-                await move_file(step.file_path, destination)
+                await fs.move_file(step.file_path, destination)
                 return {
                     "success": True,
                     "message": f"Moved {step.file_path} to {destination}",
@@ -2058,214 +2064,215 @@ fs.writeFileSync("{temp_dir / 'output.json'}", JSON.stringify(outputs, replacer,
                 "condition": step.condition
             }
     
-async def _evaluate_expression(
-    self, 
-    expression: str, 
-    context: StepExecutionContext
-) -> bool:
-    """
-    Evaluate a simple condition expression.
-    
-    Args:
-        expression: The condition expression
-        context: Execution context
+    async def _evaluate_expression(
+        self, 
+        expression: str, 
+        context: StepExecutionContext
+    ) -> bool:
+        """
+        Evaluate a simple condition expression.
         
-    Returns:
-        Boolean result of the condition
-    """
-    # Check for file existence condition
-    file_exists_match = re.search(r'file(?:\s+)exists(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-    if file_exists_match:
-        file_path = file_exists_match.group(1).strip()
-        # Resolve variables in the file path
-        file_path = await self._resolve_variables_in_string(file_path, context)
-        return Path(file_path).exists()
-    
-    # Check for command success condition
-    cmd_success_match = re.search(r'command(?:\s+)success(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-    if cmd_success_match:
-        step_id = cmd_success_match.group(1).strip()
-        return context.results.get(step_id, {}).get("success", False)
-    
-    # Check for output contains condition
-    output_contains_match = re.search(r'output(?:\s+)contains(?:[:=\s]+)(.+?)(?:[:=\s]+)in(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
-    if output_contains_match:
-        pattern = output_contains_match.group(1).strip()
-        step_id = output_contains_match.group(2).strip()
-        
-        # Resolve variables in the pattern
-        pattern = await self._resolve_variables_in_string(pattern, context)
-        
-        # Get output from the specified step
-        step_output = context.results.get(step_id, {}).get("stdout", "")
-        return pattern in step_output
-    
-    # Check for variable condition
-    var_match = re.search(r'variable(?:\s+)(.+?)(?:\s*)([=!<>]=|[<>])(?:\s*)(.+)', expression, re.IGNORECASE)
-    if var_match:
-        var_name = var_match.group(1).strip()
-        operator = var_match.group(2).strip()
-        value = var_match.group(3).strip()
-        
-        # Get variable value
-        var_value = self._get_variable_value(var_name, context)
-        if var_value is None:
-            return False
-        
-        # Evaluate comparison
-        try:
-            # Convert value to appropriate type
-            if value.lower() == "true":
-                compare_value = True
-            elif value.lower() == "false":
-                compare_value = False
-            elif value.isdigit():
-                compare_value = int(value)
-            elif re.match(r'^-?\d+(\.\d+)?$', value):  # Fixed regex pattern here
-                compare_value = float(value)
-            else:
-                # Try to resolve variables in the value
-                resolved_value = await self._resolve_variables_in_string(value, context)
-                if resolved_value != value:
-                    # Value contained variables, use the resolved value
-                    compare_value = resolved_value
-                else:
-                    # Treat as a string but strip quotes
-                    compare_value = value.strip('\'"')
+        Args:
+            expression: The condition expression
+            context: Execution context
             
-            # Compare based on operator
-            if operator == "==":
-                return var_value == compare_value
-            elif operator == "!=":
-                return var_value != compare_value
-            elif operator == "<":
-                return var_value < compare_value
-            elif operator == ">":
-                return var_value > compare_value
-            elif operator == "<=":
-                return var_value <= compare_value
-            elif operator == ">=":
-                return var_value >= compare_value
-            else:
+        Returns:
+            Boolean result of the condition
+        """
+        # Check for file existence condition
+        file_exists_match = re.search(r'file(?:\s+)exists(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+        if file_exists_match:
+            file_path = file_exists_match.group(1).strip()
+            # Resolve variables in the file path
+            file_path = await self._resolve_variables_in_string(file_path, context)
+            return Path(file_path).exists()
+        
+        # Check for command success condition
+        cmd_success_match = re.search(r'command(?:\s+)success(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+        if cmd_success_match:
+            step_id = cmd_success_match.group(1).strip()
+            return context.results.get(step_id, {}).get("success", False)
+        
+        # Check for output contains condition
+        output_contains_match = re.search(r'output(?:\s+)contains(?:[:=\s]+)(.+?)(?:[:=\s]+)in(?:[:=\s]+)(.+)', expression, re.IGNORECASE)
+        if output_contains_match:
+            pattern = output_contains_match.group(1).strip()
+            step_id = output_contains_match.group(2).strip()
+            
+            # Resolve variables in the pattern
+            pattern = await self._resolve_variables_in_string(pattern, context)
+            
+            # Get output from the specified step
+            step_output = context.results.get(step_id, {}).get("stdout", "")
+            return pattern in step_output
+        
+        # Check for variable condition
+        var_match = re.search(r'variable(?:\s+)(.+?)(?:\s*)([=!<>]=|[<>])(?:\s*)(.+)', expression, re.IGNORECASE)
+        if var_match:
+            var_name = var_match.group(1).strip()
+            operator = var_match.group(2).strip()
+            value = var_match.group(3).strip()
+            
+            # Get variable value
+            var_value = self._get_variable_value(var_name, context)
+            if var_value is None:
                 return False
-        except Exception as e:
-            self._logger.error(f"Error comparing variable {var_name} with value {value}: {str(e)}")
-            return False
-    
-    # Simple boolean evaluation for unknown conditions
-    return bool(expression and expression.lower() not in ['false', '0', 'no', 'n', ''])
-
-async def _resolve_variables_in_string(
-    self, 
-    text: str, 
-    context: StepExecutionContext
-) -> str:
-    """
-    Resolve variables in a string.
-    
-    Args:
-        text: The string with potential variable references
-        context: Execution context
+            
+            # Evaluate comparison
+            try:
+                # Convert value to appropriate type
+                if value.lower() == "true":
+                    compare_value = True
+                elif value.lower() == "false":
+                    compare_value = False
+                elif value.isdigit():
+                    compare_value = int(value)
+                elif re.match(r'^-?\d+(\.\d+)?$', value):  # Fixed regex pattern here
+                    compare_value = float(value)
+                else:
+                    # Try to resolve variables in the value
+                    resolved_value = await self._resolve_variables_in_string(value, context)
+                    if resolved_value != value:
+                        # Value contained variables, use the resolved value
+                        compare_value = resolved_value
+                    else:
+                        # Treat as a string but strip quotes
+                        compare_value = value.strip('\'"')
+                
+                # Compare based on operator
+                if operator == "==":
+                    return var_value == compare_value
+                elif operator == "!=":
+                    return var_value != compare_value
+                elif operator == "<":
+                    return var_value < compare_value
+                elif operator == ">":
+                    return var_value > compare_value
+                elif operator == "<=":
+                    return var_value <= compare_value
+                elif operator == ">=":
+                    return var_value >= compare_value
+                else:
+                    return False
+            except Exception as e:
+                self._logger.error(f"Error comparing variable {var_name} with value {value}: {str(e)}")
+                return False
         
-    Returns:
-        String with variables resolved
-    """
-    if not text or "${" not in text:
-        return text
+        # Simple boolean evaluation for unknown conditions
+        return bool(expression and expression.lower() not in ['false', '0', 'no', 'n', ''])
     
-    result = text
-    var_pattern = r'\${([^}]+)}'
-    matches = re.findall(var_pattern, text)
-    
-    for var_name in matches:
-        var_value = self._get_variable_value(var_name, context)
-        if var_value is not None:
-            # Replace the variable reference with its value
-            result = result.replace(f"${{{var_name}}}", str(var_value))
-    
-    return result
-
-async def _resolve_loop_items(
-    self, 
-    loop_items_expr: str, 
-    context: StepExecutionContext
-) -> List[Any]:
-    """
-    Resolve loop items from various sources.
-    
-    Args:
-        loop_items_expr: Expression for loop items
-        context: Execution context
+    async def _resolve_variables_in_string(
+        self, 
+        text: str, 
+        context: StepExecutionContext
+    ) -> str:
+        """
+        Resolve variables in a string.
         
-    Returns:
-        List of items to loop over
-    """
-    # Check if loop_items is a variable reference
-    var_match = re.match(r'\${([^}]+)}', loop_items_expr)
-    if var_match:
-        var_name = var_match.group(1)
-        var_value = self._get_variable_value(var_name, context)
+        Args:
+            text: The string with potential variable references
+            context: Execution context
+            
+        Returns:
+            String with variables resolved
+        """
+        if not text or "${" not in text:
+            return text
         
-        if var_value is not None:
-            if isinstance(var_value, list):
-                return var_value
-            elif isinstance(var_value, dict):
-                # For dictionaries, loop over items
-                return list(var_value.items())
-            elif isinstance(var_value, str):
-                # For strings, try to parse as JSON
-                try:
-                    parsed = json.loads(var_value)
-                    if isinstance(parsed, list):
-                        return parsed
-                except json.JSONDecodeError:
-                    # Not JSON, split by lines
-                    return var_value.splitlines()
-    
-    # Check for range expression: range(start, end, step)
-    range_match = re.match(r'range\((\d+)(?:,\s*(\d+))?(?:,\s*(\d+))?\)', loop_items_expr)
-    if range_match:
-        if range_match.group(2):
-            # range(start, end, [step])
-            start = int(range_match.group(1))
-            end = int(range_match.group(2))
-            step = int(range_match.group(3)) if range_match.group(3) else 1
-            return list(range(start, end, step))
-        else:
-            # range(end)
-            end = int(range_match.group(1))
-            return list(range(end))
-    
-    # Check for file list: files(pattern)
-    files_match = re.match(r'files\(([^)]+)\)', loop_items_expr)
-    if files_match:
-        pattern = files_match.group(1).strip('"\'')
+        result = text
+        var_pattern = r'\${([^}]+)}'
+        matches = re.findall(var_pattern, text)
         
-        # Resolve pattern if it contains variables
-        resolved_pattern = await self._resolve_variables_in_string(pattern, context)
+        for var_name in matches:
+            var_value = self._get_variable_value(var_name, context)
+            if var_value is not None:
+                # Replace the variable reference with its value
+                result = result.replace(f"${{{var_name}}}", str(var_value))
         
-        # Import here to avoid circular imports
-        from glob import glob
+        return result
+    
+    async def _resolve_loop_items(
+        self, 
+        loop_items_expr: str, 
+        context: StepExecutionContext
+    ) -> List[Any]:
+        """
+        Resolve loop items from various sources.
         
-        # Get list of files matching the pattern
-        file_list = glob(resolved_pattern)
-        return file_list
+        Args:
+            loop_items_expr: Expression for loop items
+            context: Execution context
+            
+        Returns:
+            List of items to loop over
+        """
+        # Check if loop_items is a variable reference
+        var_match = re.match(r'\${([^}]+)}', loop_items_expr)
+        if var_match:
+            var_name = var_match.group(1)
+            var_value = self._get_variable_value(var_name, context)
+            
+            if var_value is not None:
+                if isinstance(var_value, list):
+                    return var_value
+                elif isinstance(var_value, dict):
+                    # For dictionaries, loop over items
+                    return list(var_value.items())
+                elif isinstance(var_value, str):
+                    # For strings, try to parse as JSON
+                    try:
+                        parsed = json.loads(var_value)
+                        if isinstance(parsed, list):
+                            return parsed
+                    except json.JSONDecodeError:
+                        # Not JSON, split by lines
+                        return var_value.splitlines()
+        
+        # Check for range expression: range(start, end, step)
+        range_match = re.match(r'range\((\d+)(?:,\s*(\d+))?(?:,\s*(\d+))?\)', loop_items_expr)
+        if range_match:
+            if range_match.group(2):
+                # range(start, end, [step])
+                start = int(range_match.group(1))
+                end = int(range_match.group(2))
+                step = int(range_match.group(3)) if range_match.group(3) else 1
+                return list(range(start, end, step))
+            else:
+                # range(end)
+                end = int(range_match.group(1))
+                return list(range(end))
+        
+        # Check for file list: files(pattern)
+        files_match = re.match(r'files\(([^)]+)\)', loop_items_expr)
+        if files_match:
+            pattern = files_match.group(1).strip('"\'')
+            
+            # Resolve pattern if it contains variables
+            resolved_pattern = await self._resolve_variables_in_string(pattern, context)
+            
+            # Import here to avoid circular imports
+            from glob import glob
+            
+            # Get list of files matching the pattern
+            file_list = glob(resolved_pattern)
+            return file_list
+        
+        # Check for JSON array
+        if loop_items_expr.startswith('[') and loop_items_expr.endswith(']'):
+            try:
+                items = json.loads(loop_items_expr)
+                if isinstance(items, list):
+                    return items
+            except json.JSONDecodeError:
+                pass
+        
+        # Check for comma-separated list
+        if ',' in loop_items_expr:
+            return [item.strip() for item in loop_items_expr.split(',')]
+        
+        # Default: return as single item
+        return [loop_items_expr]
     
-    # Check for JSON array
-    if loop_items_expr.startswith('[') and loop_items_expr.endswith(']'):
-        try:
-            items = json.loads(loop_items_expr)
-            if isinstance(items, list):
-                return items
-        except json.JSONDecodeError:
-            pass
-    
-    # Check for comma-separated list
-    if ',' in loop_items_expr:
-        return [item.strip() for item in loop_items_expr.split(',')]
-    
-    # Default: return as single item
-    return [loop_items_expr]
 
 
 # Now define the EnhancedTaskPlanner class that uses the core implementation
@@ -2290,9 +2297,8 @@ class EnhancedTaskPlanner(TaskPlanner):
     def _get_error_recovery_manager(self):
         """Get or initialize the error recovery manager."""
         if self._error_recovery_manager is None:
-            # Import inside the method
-            from angela.execution.error_recovery import ErrorRecoveryManager
-            self._error_recovery_manager = ErrorRecoveryManager()
+            # Get error recovery manager through API layer
+            self._error_recovery_manager = get_error_recovery_manager()
         return self._error_recovery_manager
         
             
@@ -2361,6 +2367,3 @@ class EnhancedTaskPlanner(TaskPlanner):
 
 # Create an instance of the enhanced task planner
 enhanced_task_planner = EnhancedTaskPlanner()
-
-# Replace the global task_planner with the enhanced version
-task_planner = enhanced_task_planner

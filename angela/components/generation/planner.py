@@ -737,24 +737,24 @@ For microservices architecture, consider:
         return project
     
     async def _determine_project_dependencies(
-            self, 
-            project_type: str, 
-            framework: Optional[str],
-            description: str
-        ) -> Dict[str, List[str]]:
-            """
-            Determine project dependencies based on type and framework.
+        self, 
+        project_type: str, 
+        framework: Optional[str],
+        description: str
+    ) -> Dict[str, List[str]]:
+        """
+        Determine project dependencies based on type and framework.
+        
+        Args:
+            project_type: Type of project
+            framework: Optional framework
+            description: Project description
             
-            Args:
-                project_type: Type of project
-                framework: Optional framework
-                description: Project description
-                
-            Returns:
-                Dictionary with runtime and development dependencies
-            """
-            # Build prompt for dependency determination
-            prompt = f"""
+        Returns:
+            Dictionary with runtime and development dependencies
+        """
+        # Build prompt for dependency determination
+        prompt = f"""
     As an expert software developer, determine the necessary dependencies for a {project_type} project{f' using {framework}' if framework else ''} based on this description:
     
     "{description}"
@@ -768,87 +768,88 @@ For microservices architecture, consider:
     Include only the necessary dependencies for the core functionality described.
     Use the latest stable versions and follow best practices for {project_type} projects.
     """
-            # Call AI service
-            api_request = GeminiRequest(
-                prompt=prompt,
-                max_tokens=2000,
-                temperature=0.2
-            )
-            
-            self._logger.debug("Sending dependency determination request to AI service")
-            response = await gemini_client.generate_text(api_request)
-            
-            try:
-                # Extract JSON from response
-                json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+        # Call AI service
+        gemini_client = get_gemini_client()
+        api_request = GeminiRequest(
+            prompt=prompt,
+            max_tokens=2000,
+            temperature=0.2
+        )
+        
+        self._logger.debug("Sending dependency determination request to AI service")
+        response = await gemini_client.generate_text(api_request)
+        
+        try:
+            # Extract JSON from response
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', response.text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Try to find JSON without code blocks
+                json_match = re.search(r'({.*})', response.text, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(1)
                 else:
-                    # Try to find JSON without code blocks
-                    json_match = re.search(r'({.*})', response.text, re.DOTALL)
-                    if json_match:
-                        json_str = json_match.group(1)
-                    else:
-                        # Assume the entire response is JSON
-                        json_str = response.text
-                
-                # Parse JSON
-                dependencies = json.loads(json_str)
-                
-                # Ensure correct structure
-                if "runtime" not in dependencies:
-                    dependencies["runtime"] = []
-                if "development" not in dependencies:
-                    dependencies["development"] = []
-                
-                return dependencies
-                
-            except Exception as e:
-                self._logger.error(f"Error parsing dependencies: {str(e)}")
-                
-                # Return default dependencies based on project type and framework
-                if project_type == "python":
-                    if framework == "django":
-                        return {
-                            "runtime": ["django", "django-rest-framework", "psycopg2-binary"],
-                            "development": ["pytest", "pytest-django", "flake8", "black"]
-                        }
-                    elif framework == "flask":
-                        return {
-                            "runtime": ["flask", "flask-sqlalchemy", "flask-migrate", "flask-cors"],
-                            "development": ["pytest", "pytest-flask", "flake8", "black"]
-                        }
-                    elif framework == "fastapi":
-                        return {
-                            "runtime": ["fastapi", "uvicorn", "sqlalchemy", "pydantic"],
-                            "development": ["pytest", "black", "isort", "mypy"]
-                        }
-                    else:
-                        return {
-                            "runtime": ["requests", "pydantic"],
-                            "development": ["pytest", "black", "isort"]
-                        }
-                elif project_type == "node":
-                    if framework == "react":
-                        return {
-                            "runtime": ["react", "react-dom", "react-router-dom"],
-                            "development": ["@testing-library/react", "jest", "eslint", "prettier"]
-                        }
-                    elif framework == "express":
-                        return {
-                            "runtime": ["express", "cors", "mongoose", "dotenv"],
-                            "development": ["nodemon", "jest", "supertest", "eslint"]
-                        }
-                    else:
-                        return {
-                            "runtime": ["axios", "dotenv"],
-                            "development": ["jest", "eslint", "prettier"]
-                        }
+                    # Assume the entire response is JSON
+                    json_str = response.text
+            
+            # Parse JSON
+            dependencies = json.loads(json_str)
+            
+            # Ensure correct structure
+            if "runtime" not in dependencies:
+                dependencies["runtime"] = []
+            if "development" not in dependencies:
+                dependencies["development"] = []
+            
+            return dependencies
+            
+        except Exception as e:
+            self._logger.error(f"Error parsing dependencies: {str(e)}")
+            
+            # Return default dependencies based on project type and framework
+            if project_type == "python":
+                if framework == "django":
+                    return {
+                        "runtime": ["django", "django-rest-framework", "psycopg2-binary"],
+                        "development": ["pytest", "pytest-django", "flake8", "black"]
+                    }
+                elif framework == "flask":
+                    return {
+                        "runtime": ["flask", "flask-sqlalchemy", "flask-migrate", "flask-cors"],
+                        "development": ["pytest", "pytest-flask", "flake8", "black"]
+                    }
+                elif framework == "fastapi":
+                    return {
+                        "runtime": ["fastapi", "uvicorn", "sqlalchemy", "pydantic"],
+                        "development": ["pytest", "black", "isort", "mypy"]
+                    }
                 else:
                     return {
-                        "runtime": [],
-                        "development": []
+                        "runtime": ["requests", "pydantic"],
+                        "development": ["pytest", "black", "isort"]
                     }
+            elif project_type == "node":
+                if framework == "react":
+                    return {
+                        "runtime": ["react", "react-dom", "react-router-dom"],
+                        "development": ["@testing-library/react", "jest", "eslint", "prettier"]
+                    }
+                elif framework == "express":
+                    return {
+                        "runtime": ["express", "cors", "mongoose", "dotenv"],
+                        "development": ["nodemon", "jest", "supertest", "eslint"]
+                    }
+                else:
+                    return {
+                        "runtime": ["axios", "dotenv"],
+                        "development": ["jest", "eslint", "prettier"]
+                    }
+            else:
+                return {
+                    "runtime": [],
+                    "development": []
+                }
 
     async def _create_files_for_component(
         self, 
