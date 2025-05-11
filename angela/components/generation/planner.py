@@ -14,7 +14,7 @@ import re
 from pydantic import BaseModel, Field
 
 
-ffrom angela.api.generation import get_generation_context_manager, get_code_file_class, get_code_project_class
+from angela.api.generation import get_generation_context_manager, get_code_file_class, get_code_project_class
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger

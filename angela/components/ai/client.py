@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 import google.generativeai as genai
 from pydantic import BaseModel
 
-from angela.api.utils import get_config_manager
+from angela.constants import get_config_manager
 from angela.constants import GEMINI_MODEL, GEMINI_MAX_TOKENS, GEMINI_TEMPERATURE
 from angela.utils.logging import get_logger
 

@@ -28,7 +28,7 @@ from angela.utils.logging import get_logger
 
 
 AdvancedTaskPlan = get_advanced_task_plan_class()
-PlanStepType = get_plan_step_type_enum(
+PlanStepType = get_plan_step_type_enum()
 
 _console = Console(record=True, width=100)
 

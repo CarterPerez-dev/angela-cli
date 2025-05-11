@@ -144,6 +144,7 @@ class Orchestrator:
         # Enhance context with project information, dependencies, and recent activity
         try:
             # Get context enhancer from registry
+            from angela.core.registry import registry
             context_enhancer = registry.get("context_enhancer")
             
             if context_enhancer:
@@ -153,7 +154,9 @@ class Orchestrator:
                 # If not in registry, try direct import as fallback
                 self._logger.warning("context_enhancer not found in registry, attempting direct import")
                 try:
-                    from angela.context.enhancer import context_enhancer
+                    # Use API layer to access context_enhancer
+                    from angela.api.context import get_context_enhancer
+                    context_enhancer = get_context_enhancer()
                     if context_enhancer:
                         # Register for future use
                         registry.register("context_enhancer", context_enhancer)
@@ -161,8 +164,9 @@ class Orchestrator:
                     else:
                         self._logger.warning("context_enhancer is None after direct import, attempting to create instance")
                         try:
-                            from angela.context.enhancer import ContextEnhancer
-                            temp_enhancer = ContextEnhancer()
+                            # Import via API layer
+                            from angela.api.context import get_context_enhancer_class
+                            temp_enhancer = get_context_enhancer_class()()
                             registry.register("context_enhancer", temp_enhancer)
                             context = await temp_enhancer.enrich_context(context)
                             self._logger.info("Successfully created and used temporary context_enhancer")
@@ -609,8 +613,9 @@ class Orchestrator:
         """
         self._logger.info(f"Processing code generation request: {request}")
         
-        # Import here to avoid circular imports
-        from angela.generation.engine import code_generation_engine
+        # Import here to avoid circular imports - use API layer
+        from angela.api.generation import get_code_generation_engine
+        code_generation_engine = get_code_generation_engine()
         
         # Project details extraction
         project_details = await self._extract_project_details(request)
@@ -664,7 +669,9 @@ class Orchestrator:
                 
             # Add Git initialization if appropriate
             if not dry_run and project_details.get("git_init", True):
-                from angela.toolchain.git import git_integration
+                # Use API to get git_integration
+                from angela.api.toolchain import get_git_integration
+                git_integration = get_git_integration()
                 
                 with console.status("[bold green]Initializing Git repository...[/bold green]"):
                     git_result = await git_integration.init_repository(
@@ -702,8 +709,9 @@ class Orchestrator:
         """
         self._logger.info(f"Processing feature addition request: {request}")
         
-        # Import here to avoid circular imports
-        from angela.generation.engine import code_generation_engine
+        # Import here to avoid circular imports - use API layer
+        from angela.api.generation import get_code_generation_engine
+        code_generation_engine = get_code_generation_engine()
         
         # Extract feature details
         feature_details = await self._extract_feature_details(request, context)
@@ -735,7 +743,9 @@ class Orchestrator:
         
         # Create branch if specified and not in dry run mode
         if not dry_run and feature_details.get("branch"):
-            from angela.toolchain.git import git_integration
+            # Use API layer to get git_integration
+            from angela.api.toolchain import get_git_integration
+            git_integration = get_git_integration()
             
             branch_name = feature_details.get("branch")
             with console.status(f"[bold green]Creating branch: {branch_name}[/bold green]"):
@@ -828,6 +838,7 @@ class Orchestrator:
         self._logger.info(f"Processing Docker operation: {request}")
         
         # Get docker_integration from registry
+        from angela.core.registry import registry
         docker_integration = registry.get("docker_integration")
         if not docker_integration:
             return {
@@ -1226,8 +1237,9 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         """
-        # Import here to avoid circular imports
-        from angela.toolchain.ci_cd import ci_cd_integration
+        # Import here to avoid circular imports - use API layer
+        from angela.api.toolchain import get_ci_cd_integration
+        ci_cd_integration = get_ci_cd_integration()
         
         self._logger.info(f"Processing CI/CD operation: {operation_details.get('platform', 'unknown')}")
         
@@ -1278,8 +1290,9 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         """
-        # Import here to avoid circular imports
-        from angela.toolchain.package_managers import package_manager_integration
+        # Import here to avoid circular imports - use API layer
+        from angela.api.toolchain import get_package_manager_integration
+        package_manager_integration = get_package_manager_integration()
         
         self._logger.info(f"Processing package operation")
         
@@ -1338,8 +1351,9 @@ class Orchestrator:
         Returns:
             Dictionary with processing results
         """
-        # Import here to avoid circular imports
-        from angela.toolchain.git import git_integration
+        # Import here to avoid circular imports - use API layer
+        from angela.api.toolchain import get_git_integration
+        git_integration = get_git_integration()
         
         self._logger.info(f"Processing Git operation: {operation_details.get('git_action', 'unknown')}")
         
@@ -1389,7 +1403,9 @@ class Orchestrator:
     
     async def _process_git_init(self, operation_details, project_dir, dry_run):
         """Process git init operation."""
-        from angela.toolchain.git import git_integration
+        # Use API layer to get git_integration
+        from angela.api.toolchain import get_git_integration
+        git_integration = get_git_integration()
         
         if dry_run:
             return {
@@ -1417,7 +1433,9 @@ class Orchestrator:
     
     async def _process_git_commit(self, operation_details, project_dir, dry_run):
         """Process git commit operation."""
-        from angela.toolchain.git import git_integration
+        # Use API layer to get git_integration
+        from angela.api.toolchain import get_git_integration
+        git_integration = get_git_integration()
         
         if dry_run:
             return {
@@ -1448,7 +1466,9 @@ class Orchestrator:
     
     async def _process_git_branch(self, operation_details, project_dir, dry_run):
         """Process git branch operation."""
-        from angela.toolchain.git import git_integration
+        # Use API layer to get git_integration
+        from angela.api.toolchain import get_git_integration
+        git_integration = get_git_integration()
         
         if dry_run:
             return {
@@ -1482,7 +1502,9 @@ class Orchestrator:
     
     async def _process_git_status(self, operation_details, project_dir, dry_run):
         """Process git status operation."""
-        from angela.toolchain.git import git_integration
+        # Use API layer to get git_integration
+        from angela.api.toolchain import get_git_integration
+        git_integration = get_git_integration()
         
         # Get repository status
         result = await git_integration.get_repository_status(path=project_dir)
@@ -2415,17 +2437,23 @@ class Orchestrator:
     
     def _get_rollback_manager(self):
         """Get the rollback manager from the registry."""
-        from angela.core.registry import registry
-        return registry.get("rollback_manager")
+        from angela.api.execution import get_rollback_manager
+        return get_rollback_manager()
     
-    async def _record_plan_in_transaction(self, plan, transaction_id):
+    def _get_error_recovery_manager(self):
+        """Get the error recovery manager from the registry."""
+        # Use API layer to get error_recovery_manager
+        from angela.api.execution import get_error_recovery_manager
+        return get_error_recovery_manager()
+    
+    async def _record_plan_in_transaction(self, plan_id, goal, plan_data, transaction_id):
         """Record a plan in a transaction."""
         rollback_manager = self._get_rollback_manager()
         if rollback_manager:
             await rollback_manager.record_plan_execution(
-                plan_id=plan.id,
-                goal=plan.goal,
-                plan_data=plan.dict(),
+                plan_id=plan_id,
+                goal=goal,
+                plan_data=plan_data,
                 transaction_id=transaction_id
             )
 
@@ -3252,7 +3280,8 @@ Include only the JSON object with no additional text.
             plan: The task plan to display
         """
         # Use the terminal formatter to display the plan
-        from angela.shell.formatter import terminal_formatter
+        from angela.api.shell import get_terminal_formatter
+        terminal_formatter = get_terminal_formatter()
         await terminal_formatter.display_task_plan(plan)
     
     async def _confirm_plan_execution(self, plan: Any, dry_run: bool) -> bool:
@@ -3543,8 +3572,12 @@ Include only the JSON object with no additional text.
         Returns:
             A dictionary with the operation results.
         """
+        # Use API layer to access execution_engine
+        from angela.api.execution import get_execution_engine
+        execution_engine = get_execution_engine()
+        
         # Execute the file operation
-        return await execute_file_operation(operation, parameters, dry_run=dry_run)
+        return await execution_engine.execute_file_operation(operation, parameters, dry_run=dry_run)
 
 
 
@@ -3569,8 +3602,9 @@ Include only the JSON object with no additional text.
         """
         self._logger.info(f"Processing universal CLI request: {request}")
         
-        # Import here to avoid circular imports
-        from angela.toolchain.universal_cli import universal_cli_translator
+        # Import here to avoid circular imports - use API layer
+        from angela.api.toolchain import get_universal_cli_translator
+        universal_cli_translator = get_universal_cli_translator()
         
         # Translate the request into a command
         translation = await universal_cli_translator.translate_request(request, context)
@@ -3629,10 +3663,14 @@ Include only the JSON object with no additional text.
         """
         self._logger.info(f"Processing complex workflow: {request}")
         
-        # Use the enhanced task planner for complex workflows
-        from angela.intent.enhanced_task_planner import enhanced_task_planner
-        from angela.shell.formatter import terminal_formatter
-        from angela.execution.rollback import rollback_manager
+        # Use the enhanced task planner for complex workflows - using API layer
+        from angela.api.intent import get_enhanced_task_planner
+        from angela.api.shell import get_terminal_formatter
+        from angela.api.execution import get_rollback_manager
+        
+        enhanced_task_planner = get_enhanced_task_planner()
+        terminal_formatter = get_terminal_formatter()
+        rollback_manager = get_rollback_manager()
         
         # Generate a complex plan
         plan = await enhanced_task_planner.plan_advanced_task(request, context, max_steps=30)
@@ -3745,8 +3783,13 @@ Include only the JSON object with no additional text.
         session_manager.add_command(command)
         
         # Generate command preview if needed
-        from angela.safety.preview import generate_preview
-        preview = await generate_preview(command) if preferences_manager.preferences.ui.show_command_preview else None
+        from angela.api.safety import get_command_preview_generator
+        from angela.api.context import get_preferences_manager
+        
+        command_preview_generator = get_command_preview_generator()
+        preferences_manager = get_preferences_manager()
+        
+        preview = await command_preview_generator.generate_preview(command) if preferences_manager.preferences.ui.show_command_preview else None
         
         # Get adaptive confirmation based on risk level and user history
         confirmed = await get_adaptive_confirmation(
@@ -3795,8 +3838,9 @@ Include only the JSON object with no additional text.
         
         # Offer to learn from successful executions
         if result["success"] and risk_level > 0:
-            from angela.safety.adaptive_confirmation import offer_command_learning
-            await offer_command_learning(command)
+            from angela.api.safety import get_adaptive_confirmation
+            adaptive_confirmation = get_adaptive_confirmation()
+            await adaptive_confirmation.offer_command_learning(command)
         
         return result
 
@@ -3841,8 +3885,14 @@ Include only the JSON object with no additional text.
         """
         self._logger.info(f"Processing complex workflow request: {request}")
         
-        # Import here to avoid circular imports
-        from angela.intent.complex_workflow_planner import complex_workflow_planner
+        # Import here to avoid circular imports - use API layer
+        from angela.api.intent import get_complex_workflow_planner
+        from angela.api.shell import get_terminal_formatter
+        from angela.api.execution import get_rollback_manager
+        
+        complex_workflow_planner = get_complex_workflow_planner()
+        terminal_formatter = get_terminal_formatter()
+        rollback_manager = get_rollback_manager()
         
         # Start a transaction for this complex workflow
         transaction_id = None
@@ -4121,7 +4171,10 @@ Include only the JSON object with no additional text.
                 "dry_run": True
             }
         
-        # Use the execution engine to run the command
+        # Use the execution engine to run the command - using API layer
+        from angela.api.execution import get_execution_engine
+        execution_engine = get_execution_engine()
+        
         stdout, stderr, exit_code = await execution_engine.execute_command(
             command=command,
             check_safety=True
@@ -4189,7 +4242,10 @@ Include only the JSON object with no additional text.
         """
         self._logger.info("Detecting CI/CD pipeline opportunities")
         
-        ci_cd_integration = registry.get("ci_cd_integration")
+        # Get ci_cd_integration through API layer 
+        from angela.api.toolchain import get_ci_cd_integration
+        ci_cd_integration = get_ci_cd_integration()
+        
         if not ci_cd_integration:
             return {
                 "success": False,
@@ -4218,7 +4274,10 @@ Include only the JSON object with no additional text.
         """
         self._logger.info(f"Suggesting complex workflow for: {request}")
         
-        workflow_engine = registry.get("cross_tool_workflow_engine")
+        # Get workflow_engine through API layer
+        from angela.api.toolchain import get_cross_tool_workflow_engine
+        workflow_engine = get_cross_tool_workflow_engine()
+        
         if not workflow_engine:
             return {
                 "success": False,
@@ -4267,7 +4326,10 @@ Include only the JSON object with no additional text.
         """
         self._logger.info(f"Executing cross-tool workflow: {request}")
         
-        workflow_engine = registry.get("cross_tool_workflow_engine")
+        # Get workflow_engine through API layer
+        from angela.api.toolchain import get_cross_tool_workflow_engine
+        workflow_engine = get_cross_tool_workflow_engine()
+        
         if not workflow_engine:
             return {
                 "success": False,
@@ -4303,3 +4365,4 @@ orchestrator = Orchestrator()
 def process_request(request: str) -> Dict[str, Any]:
     """Synchronous wrapper for processing a request."""
     return asyncio.run(orchestrator.process_request(request))
+   

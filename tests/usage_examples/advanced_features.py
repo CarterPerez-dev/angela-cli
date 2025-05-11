@@ -9,7 +9,7 @@ def test_code_generation():
     
     ```python
     def factorial(n):
-        """
+        \"\"\"
         Calculate the factorial of a number.
         
         Args:
@@ -17,7 +17,7 @@ def test_code_generation():
             
         Returns:
             The factorial of n (n!)
-        """
+        \"\"\"
         if n < 0:
             raise ValueError("Factorial is not defined for negative numbers")
         if n == 0 or n == 1:
