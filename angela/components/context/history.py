@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 
 from angela.config import config_manager
 from angela.utils.logging import get_logger
-from angela.context.preferences import preferences_manager
+from angela.api.context import get_preferences_manager
 
 logger = get_logger(__name__)
 
@@ -113,6 +113,7 @@ class HistoryManager:
                 logger.debug(f"Loaded {len(self._history)} history items")
                 
                 # Trim history if needed
+                preferences_manager = get_preferences_manager()
                 max_items = preferences_manager.preferences.context.max_history_items
                 if len(self._history) > max_items:
                     self._history = self._history[-max_items:]
@@ -192,6 +193,7 @@ class HistoryManager:
         self._save_history()
         
         # Update patterns if enabled
+        preferences_manager = get_preferences_manager()
         if preferences_manager.preferences.context.auto_learn_patterns:
             self._update_patterns(record)
     

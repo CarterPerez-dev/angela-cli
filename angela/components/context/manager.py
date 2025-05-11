@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List, Set
 
 from angela.constants import PROJECT_MARKERS
 from angela.utils.logging import get_logger
-from angela.context.file_detector import detect_file_type, get_content_preview
+from angela.api.context import get_file_detector
 
 logger = get_logger(__name__)
 
@@ -137,7 +137,8 @@ class ContextManager:
         stat = file_path.stat()
         
         # Get detailed file type info
-        type_info = detect_file_type(file_path)
+        file_detector = get_file_detector()
+        type_info = file_detector.detect_file_type(file_path)
         
         # Create the result
         result = {
@@ -210,7 +211,8 @@ class ContextManager:
         if not file_path or not file_path.is_file():
             return None
         
-        return get_content_preview(file_path, max_lines=max_lines)
+        file_detector = get_file_detector()
+        return file_detector.get_content_preview(file_path, max_lines=max_lines)
     
     def find_files(
         self, 

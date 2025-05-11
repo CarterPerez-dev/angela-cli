@@ -13,6 +13,7 @@ from pathlib import Path
 # Non-circular imports can remain at the top level
 from angela.config import config_manager
 from angela.utils.logging import get_logger
+from angela.api.context import get_project_inference, get_file_activity_tracker, get_file_resolver
 
 logger = get_logger(__name__)
 
@@ -56,9 +57,13 @@ class ContextEnhancer:
             await self._add_file_reference_context(enriched)
             
             # Add enhanced file activity information 
-            from angela.context.file_activity import file_activity_tracker, ActivityType
+            file_activity_tracker = get_file_activity_tracker()
             
             try:
+                # Get ActivityType enum
+                from angela.api.context import get_activity_type
+                ActivityType = get_activity_type()
+                
                 # Get recent file activities by types
                 viewed_activities = file_activity_tracker.get_recent_activities(
                     limit=5, 
@@ -96,7 +101,7 @@ class ContextEnhancer:
             
             # Add file resolver information if available
             if "requested_file" in context:
-                from angela.context.file_resolver import file_resolver
+                file_resolver = get_file_resolver()
                 
                 try:
                     resolved_files = await file_resolver.resolve_file_references(
@@ -134,8 +139,8 @@ class ContextEnhancer:
             context: The context to enrich
             project_root: The path to the project root
         """
-        # Local import to avoid circular dependency
-        from angela.context.project_inference import project_inference
+        # Get project_inference from API
+        project_inference = get_project_inference()
         
         self._logger.debug(f"Adding project info for {project_root}")
         
@@ -264,8 +269,9 @@ class ContextEnhancer:
         Args:
             context: The context to enrich
         """
-        # Local import to avoid circular dependency
-        from angela.context.session import session_manager
+        # Get session_manager from API
+        from angela.api.context import get_session_manager
+        session_manager = get_session_manager()
         
         self._logger.debug("Adding recent file activity to context")
         

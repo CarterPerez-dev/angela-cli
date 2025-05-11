@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from enum import Enum
 
 from angela.utils.logging import get_logger
-from angela.context.file_activity import file_activity_tracker, ActivityType
-from angela.ai.semantic_analyzer import semantic_analyzer, Module, Function, Class
+from angela.api.context import get_file_activity_tracker, get_activity_type
+from angela.api.ai import get_semantic_analyzer, get_module_class, get_function_class, get_class_class
 
 logger = get_logger(__name__)
 
@@ -38,7 +38,7 @@ class EntityActivity:
     """Represents an activity on a specific code entity."""
     entity_name: str
     entity_type: EntityType
-    activity_type: ActivityType
+    activity_type: Any  # Will be initialized from get_activity_type()
     file_path: Path
     timestamp: float
     line_start: int
@@ -81,7 +81,7 @@ class EnhancedFileActivityTracker:
         self._file_snapshots: Dict[str, Dict[str, Any]] = {}
         
         # Keep track of the last analyzed version of each file
-        self._last_analyzed_modules: Dict[str, Module] = {}
+        self._last_analyzed_modules: Dict[str, Any] = {}
         
         # Regular expressions for quick entity detection
         self._function_pattern = re.compile(r'(?:async\s+)?(?:def|function)\s+(\w+)\s*\(')
@@ -92,7 +92,7 @@ class EnhancedFileActivityTracker:
         self, 
         file_path: Union[str, Path], 
         new_content: str = None,
-        activity_type: ActivityType = ActivityType.MODIFIED,
+        activity_type: Optional[Any] = None,
         details: Dict[str, Any] = None
     ) -> List[EntityActivity]:
         """
@@ -109,6 +109,13 @@ class EnhancedFileActivityTracker:
         """
         path_obj = Path(file_path)
         
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
+        # Use MODIFIED as default activity type if not provided
+        if activity_type is None:
+            activity_type = ActivityType.MODIFIED
+            
         # Skip if file doesn't exist (or is being created)
         if not path_obj.exists() and activity_type != ActivityType.CREATED:
             return []
@@ -183,7 +190,7 @@ class EnhancedFileActivityTracker:
         self,
         file_path: Path,
         content: str,
-        activity_type: ActivityType,
+        activity_type: Any,
         details: Dict[str, Any]
     ) -> List[EntityActivity]:
         """
@@ -200,6 +207,7 @@ class EnhancedFileActivityTracker:
         """
         # Use semantic analyzer to extract entities
         try:
+            semantic_analyzer = get_semantic_analyzer()
             module = await semantic_analyzer.analyze_file(file_path)
             
             if not module:
@@ -316,10 +324,15 @@ class EnhancedFileActivityTracker:
         Returns:
             List of entity activities
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         entity_activities = []
         
         # Use semantic analyzer to extract entities from both versions
         try:
+            semantic_analyzer = get_semantic_analyzer()
+            
             # Create a temporary file for the old content
             old_temp_path = file_path.with_suffix(f"{file_path.suffix}.old")
             with open(old_temp_path, 'w', encoding='utf-8') as f:
@@ -394,8 +407,8 @@ class EnhancedFileActivityTracker:
     def _compare_classes(
         self,
         file_path: Path,
-        old_module: Module,
-        new_module: Module,
+        old_module: Any,
+        new_module: Any,
         old_content: str,
         new_content: str,
         details: Dict[str, Any]
@@ -414,6 +427,9 @@ class EnhancedFileActivityTracker:
         Returns:
             List of entity activities
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         entity_activities = []
         
         # Check for added classes
@@ -573,8 +589,8 @@ class EnhancedFileActivityTracker:
     def _compare_functions(
         self,
         file_path: Path,
-        old_module: Module,
-        new_module: Module,
+        old_module: Any,
+        new_module: Any,
         old_content: str,
         new_content: str,
         details: Dict[str, Any]
@@ -593,6 +609,9 @@ class EnhancedFileActivityTracker:
         Returns:
             List of entity activities
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         entity_activities = []
         
         # Check for added functions
@@ -673,8 +692,8 @@ class EnhancedFileActivityTracker:
     def _compare_imports(
         self,
         file_path: Path,
-        old_module: Module,
-        new_module: Module,
+        old_module: Any,
+        new_module: Any,
         old_content: str,
         new_content: str,
         details: Dict[str, Any]
@@ -693,6 +712,9 @@ class EnhancedFileActivityTracker:
         Returns:
             List of entity activities
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         entity_activities = []
         
         # Check for added imports
@@ -787,6 +809,9 @@ class EnhancedFileActivityTracker:
         Returns:
             List of entity activities
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         if not old_content or not new_content:
             return []
         
@@ -890,6 +915,9 @@ class EnhancedFileActivityTracker:
         Returns:
             EntityActivity if identified, None otherwise
         """
+        # Get the ActivityType enum
+        ActivityType = get_activity_type()
+        
         # Get the surrounding context from old and new content
         old_context_start = max(1, old_start - 10)
         old_context_end = min(len(old_content.splitlines()), old_start + old_count + 10)
@@ -1193,6 +1221,9 @@ class EnhancedFileActivityTracker:
             self._entity_activities = self._entity_activities[-self._max_activities:]
         
         # Log to the basic file activity tracker
+        file_activity_tracker = get_file_activity_tracker()
+        ActivityType = get_activity_type()
+        
         for activity in entity_activities:
             entity_str = f"{activity.entity_type.value}:{activity.entity_name}"
             
@@ -1219,7 +1250,7 @@ class EnhancedFileActivityTracker:
         self,
         limit: int = 10,
         entity_types: Optional[List[EntityType]] = None,
-        activity_types: Optional[List[ActivityType]] = None
+        activity_types: Optional[List[Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Get recent entity activities.

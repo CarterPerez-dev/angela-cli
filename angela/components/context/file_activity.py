@@ -12,7 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Set, Union
 
-from angela.context.session import session_manager
+from angela.api.context import get_session_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -326,6 +326,8 @@ class FileActivityTracker:
             activity: The file activity to add to the session
         """
         try:
+            session_manager = get_session_manager()
+            
             # Add to session as an entity
             path_name = activity.path.name
             entity_name = f"file:{path_name}"

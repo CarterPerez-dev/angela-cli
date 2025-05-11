@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, List, Set
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, asdict
 
-from angela.context.preferences import preferences_manager
+from angela.api.context import get_preferences_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -152,6 +152,7 @@ class SessionManager:
     def refresh_session(self) -> None:
         """Refresh the current session or create a new one if expired."""
         # Check if session is enabled in preferences
+        preferences_manager = get_preferences_manager()
         if not preferences_manager.preferences.context.remember_session_context:
             self._current_session = SessionMemory()
             return

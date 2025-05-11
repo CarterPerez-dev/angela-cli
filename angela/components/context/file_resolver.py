@@ -1,19 +1,12 @@
 # angela/context/file_resolver.py
-"""
-File reference resolution for Angela CLI.
 
-This module provides functionality to resolve file references from natural
-language queries, using a combination of techniques such as exact matching,
-fuzzy matching, pattern matching, and context-aware resolution.
-"""
 import os
 import re
 import difflib
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union, Set
 
-from angela.context import context_manager
-from angela.context.session import session_manager
+from angela.api.context import get_context_manager, get_session_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -269,6 +262,7 @@ class FileResolver:
         
         # Last modified file (via session)
         if lowercase_ref in ["last file", "last modified", "previous file"]:
+            session_manager = get_session_manager()
             session = session_manager.get_context()
             entities = session.get("entities", {})
             
@@ -304,6 +298,7 @@ class FileResolver:
             Path object if found, None otherwise
         """
         # Get recent files from session
+        session_manager = get_session_manager()
         session = session_manager.get_context()
         entities = session.get("entities", {})
         
@@ -466,6 +461,7 @@ class FileResolver:
         """
         # Store in session for future reference
         try:
+            session_manager = get_session_manager()
             session_manager.add_entity(
                 name=f"file_ref:{reference}",
                 entity_type="file_reference",

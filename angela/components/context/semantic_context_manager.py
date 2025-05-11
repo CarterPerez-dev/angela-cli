@@ -14,10 +14,9 @@ from typing import Dict, Any, List, Optional, Set, Union
 from datetime import datetime
 
 from angela.utils.logging import get_logger
-from angela.context.manager import context_manager
-from angela.context.file_activity import file_activity_tracker
-from angela.context.project_state_analyzer import project_state_analyzer
-from angela.ai.semantic_analyzer import semantic_analyzer
+from angela.api.context import get_context_manager, get_file_activity_tracker
+from angela.api.context import get_project_state_analyzer 
+from angela.api.ai import get_semantic_analyzer
 from angela.core.registry import registry
 
 logger = get_logger(__name__)
