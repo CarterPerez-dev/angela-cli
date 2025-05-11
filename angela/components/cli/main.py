@@ -207,49 +207,122 @@ def init():
 def show_status():
     """Show the status of Angela CLI features and components."""
     from rich.table import Table
-    
-    # Get integration status
-    from angela.integrations import phase_integration
-    status = asyncio.run(phase_integration.status())
+    from angela import __version__
+    from angela.constants import APP_NAME, APP_DESCRIPTION
     
     # Display general status
     console.print(Panel(
-        f"Angela CLI - Phase {status['phase']}\n"
-        f"{status['description']}",
+        f"Angela CLI v{__version__}\n"
+        f"{APP_DESCRIPTION}",
         title="Status",
         expand=False
     ))
     
-    # Display enabled features
-    if status.get("enabled_features"):
-        console.print("\n[bold]Enabled Features:[/bold]")
-        for feature in status["enabled_features"]:
-            console.print(f"• {feature}")
+    # Display configuration status
+    config = config_manager.config
+    config_status = Table(title="Configuration Status")
+    config_status.add_column("Setting", style="cyan")
+    config_status.add_column("Status", style="green")
+    
+    # Check API key status
+    api_key_status = "[green]Configured[/green]" if config.api.gemini_api_key else "[red]Not configured[/red]"
+    config_status.add_row("API Key", api_key_status)
+    
+    # Check configuration directory
+    config_dir_status = "[green]Exists[/green]" if config_manager.CONFIG_DIR.exists() else "[red]Not found[/red]"
+    config_status.add_row("Config Directory", config_dir_status)
+    
+    # Check user preferences
+    confirm_actions = "Enabled" if config.user.confirm_all_actions else "Standard risk-based"
+    config_status.add_row("Confirmations", confirm_actions)
+    
+    # Check debug mode
+    debug_mode = "Enabled" if config.debug else "Disabled"
+    config_status.add_row("Debug Mode", debug_mode)
+    
+    console.print(config_status)
     
     # Display project information if available
-    if status.get("project"):
-        project = status["project"]
-        console.print("\n[bold]Project Information:[/bold]")
-        console.print(f"• Type: {project['type']}")
-        if project.get("frameworks"):
-            console.print(f"• Frameworks: {', '.join(project['frameworks'])}")
-        if "dependencies_count" in project:
-            console.print(f"• Dependencies: {project['dependencies_count']}")
+    project_type = context_manager.project_type
+    project_root = context_manager.project_root
     
-    # Display network monitoring status if available
-    if status.get("network_monitoring"):
-        network = status["network_monitoring"]
-        console.print("\n[bold]Network Monitoring:[/bold]")
-        console.print(f"• Status: {network['status']}")
-        console.print(f"• Services Monitored: {network['services_monitored']}")
-        console.print(f"• Dependency Updates: {network['dependency_updates']}")
+    if project_root:
+        # Project detected
+        project_info = Table(title="Project Information")
+        project_info.add_column("Property", style="cyan")
+        project_info.add_column("Value", style="green")
+        
+        project_info.add_row("Project Type", project_type or "Unknown")
+        project_info.add_row("Project Root", str(project_root))
+        
+        # Count files in project
+        try:
+            file_count = sum(1 for _ in Path(project_root).glob('**/*') if _.is_file())
+            project_info.add_row("Files", str(file_count))
+        except Exception:
+            project_info.add_row("Files", "Error counting")
+        
+        # Detect source directories
+        try:
+            source_dirs = []
+            common_src_dirs = ['src', 'lib', 'app', 'angela']
+            for dir_name in common_src_dirs:
+                if (Path(project_root) / dir_name).is_dir():
+                    source_dirs.append(dir_name)
+            
+            if source_dirs:
+                project_info.add_row("Source Directories", ", ".join(source_dirs))
+        except Exception:
+            pass
+        
+        console.print(project_info)
+    else:
+        # No project detected
+        console.print("[yellow]No project detected in the current directory.[/yellow]")
     
+    # Display available components and services
+    try:
+        from angela.core.registry import registry
+        
+        services = registry.list_services()
+        if services:
+            service_table = Table(title="Registered Services")
+            service_table.add_column("Service", style="cyan")
+            service_table.add_column("Type", style="green")
+            
+            # Get a subset of interesting services to display
+            interesting_services = {
+                k: v for k, v in services.items() 
+                if not k.startswith('_') and k not in ('app', 'registry')
+            }
+            
+            # Limit to at most 10 services to avoid cluttering the display
+            display_count = min(10, len(interesting_services))
+            
+            for i, (name, service_type) in enumerate(interesting_services.items()):
+                if i >= display_count:
+                    service_table.add_row(f"... and {len(interesting_services) - display_count} more", "")
+                    break
+                service_table.add_row(name, service_type.__name__)
+            
+            console.print(service_table)
+    except Exception as e:
+        if config.debug:
+            console.print(f"[red]Error getting service information: {str(e)}[/red]")
+    
+    # Display system information
     console.print("\n[bold]System Information:[/bold]")
     console.print(f"• Current Directory: {context_manager.cwd}")
-    if context_manager.project_root:
-        console.print(f"• Project Root: {context_manager.project_root}")
-
-
+    if project_root:
+        console.print(f"• Project Root: {project_root}")
+    
+    # Show Python version
+    import sys
+    console.print(f"• Python Version: {sys.version.split()[0]}")
+    
+    # Show platform
+    import platform
+    console.print(f"• Platform: {platform.system()} {platform.release()}")
 
 
 
