@@ -19,7 +19,7 @@ from rich.panel import Panel
 # Use API imports to avoid circular dependencies
 from angela.api.ai import get_gemini_client, get_gemini_request_class, get_parse_ai_response_func
 from angela.api.ai import get_build_prompt_func, get_error_analyzer, get_content_analyzer, get_intent_analyzer
-from angela.api.ai import get_confidence_scorer
+from angela.api.ai import get_confidence_scorer, get_command_suggestion_class
 from angela.api.context import get_context_manager, get_session_manager, get_history_manager, get_file_resolver
 from angela.api.context import get_file_activity_tracker, get_activity_type, get_context_enhancer
 from angela.api.execution import get_execution_engine, get_adaptive_engine, get_rollback_manager, get_execution_hooks
@@ -65,6 +65,7 @@ content_analyzer = get_content_analyzer()
 context_enhancer = get_context_enhancer()
 gemini_client = get_gemini_client()
 enhanced_task_planner = get_enhanced_task_planner()
+CommandSuggestion = get_command_suggestion_class()
 
 # Get classification and confirmation from API
 from angela.api.safety import (
@@ -79,7 +80,12 @@ adaptive_confirmation_handler = get_adaptive_confirmation()
 docker_integration = get_docker_integration()
 
 # Get necessary plan model classes
-PlanStepType, AdvancedTaskPlan, TaskPlan = get_plan_model_classes()[3:5]
+plan_models = get_plan_model_classes()
+PlanStep = plan_models[0]
+TaskPlan = plan_models[1]
+PlanStepType = plan_models[2]
+AdvancedPlanStep = plan_models[3] 
+AdvancedTaskPlan = plan_models[4]
 
 logger = get_logger(__name__)
 

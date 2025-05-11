@@ -1,3 +1,4 @@
+# angela/api/workflows.py
 """
 Public API for the workflow components.
 
@@ -11,14 +12,14 @@ from angela.core.registry import registry
 # Workflow Manager API
 def get_workflow_manager():
     """Get the workflow manager instance."""
-    from angela.components.workflows.manager import workflow_manager
-    return registry.get_or_create("workflow_manager", lambda: workflow_manager)
+    from angela.components.workflows.manager import WorkflowManager, workflow_manager 
+    return registry.get_or_create("workflow_manager", WorkflowManager, factory=lambda: workflow_manager)
 
 # Workflow Sharing API
 def get_workflow_sharing_manager():
     """Get the workflow sharing manager instance."""
-    from angela.components.workflows.sharing import workflow_sharing_manager
-    return registry.get_or_create("workflow_sharing_manager", lambda: workflow_sharing_manager)
+    from angela.components.workflows.sharing import WorkflowSharingManager, workflow_sharing_manager 
+    return registry.get_or_create("workflow_sharing_manager", WorkflowSharingManager, factory=lambda: workflow_sharing_manager)
 
 # Models
 def get_workflow_model_classes():

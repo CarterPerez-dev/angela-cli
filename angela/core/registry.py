@@ -107,14 +107,16 @@ class ServiceRegistry:
         
         return None
     
-    def get_or_create(self, name: str, cls: Type[T], *args, **kwargs) -> T:
+    def get_or_create(self, name: str, cls: Type[T], factory: Optional[Callable[[], T]] = None, *args, **kwargs) -> T:
         """
         Get a service or create it if it doesn't exist.
         
         Args:
             name: Service name
-            cls: Class to instantiate if service doesn't exist
-            *args, **kwargs: Arguments to pass to the class constructor
+            cls: Class for type checking and default instantiation
+            factory: Optional factory function to create the instance.
+                     If provided, cls is used for type checking only.
+            *args, **kwargs: Arguments to pass to the class constructor if factory is None.
             
         Returns:
             The existing or newly created service
@@ -122,30 +124,38 @@ class ServiceRegistry:
         Raises:
             Exception: If service creation fails
         """
-        # Return existing service if available
-        service = self.get(name)
+        service = self.get(name) 
         if service is not None:
-            # Validate the service type matches the expected class
-            if not isinstance(service, cls):
+            if not isinstance(service, cls): 
                 self._logger.warning(
                     f"Type mismatch for service '{name}': expected {cls.__name__}, "
-                    f"got {type(service).__name__}"
+                    f"got {type(service).__name__}. Service was likely created by a different factory/method."
                 )
             return service
         
-        # Create new service instance
         try:
             with self._lock:
-                # Check again inside lock in case another thread created it
                 if name in self._services:
                     return self._services[name]
                 
-                self._logger.debug(f"Creating service: {name} ({cls.__name__})")
-                service = cls(*args, **kwargs)
-                return self.register(name, service)
+                self._logger.debug(f"Creating service: {name} (Type hint: {cls.__name__})")
+                if factory:
+                    self._logger.debug(f"Using provided factory for {name}")
+                    service_instance = factory()
+                else:
+                    self._logger.debug(f"Using direct instantiation for {name} with class {cls.__name__}")
+                    service_instance = cls(*args, **kwargs)
+                
+                if not isinstance(service_instance, cls):
+                    self._logger.error(
+                        f"Factory for '{name}' produced an instance of type {type(service_instance).__name__}, "
+                        f"but type {cls.__name__} was expected for type checking."
+                    )
+                    raise TypeError(f"Factory for {name} did not produce an instance of {cls.__name__}")
+
+                return self.register(name, service_instance)
         except Exception as e:
             self._logger.error(f"Error creating service '{name}': {e}", exc_info=True)
-            # Raise to make errors obvious
             raise
     
     def clear(self) -> None:

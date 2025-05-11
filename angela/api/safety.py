@@ -10,8 +10,8 @@ from angela.core.registry import registry
 # Command Validator API
 def get_command_validator():
     """Get the command validator instance."""
-    from angela.components.safety.validator import command_validator
-    return registry.get_or_create("command_validator", lambda: command_validator)
+    from angela.components.safety.validator import CommandValidator, command_validator
+    return registry.get_or_create("command_validator", CommandValidator, factory=lambda: command_validator)
 
 
 # Command Risk Classifier API
@@ -23,14 +23,16 @@ def get_command_risk_classifier():
 # Confirmation Helper API
 def get_confirmation_helper():
     """Get the confirmation helper instance."""
-    from angela.components.safety.confirmation import confirmation_helper
-    return registry.get_or_create("confirmation_helper", lambda: confirmation_helper)
+    from angela.components.safety.confirmation import ConfirmationHelper, confirmation_helper
+    return registry.get_or_create("confirmation_helper", ConfirmationHelper, factory=lambda: confirmation_helper)
 
 # Adaptive Confirmation API
 def get_adaptive_confirmation():
     """Get the adaptive confirmation instance."""
-    from angela.components.safety.adaptive_confirmation import adaptive_confirmation
-    return registry.get_or_create("adaptive_confirmation", lambda: adaptive_confirmation)
+    # Import the Class and the instance from the component module
+    from angela.components.safety.adaptive_confirmation import AdaptiveConfirmationHandler, adaptive_confirmation
+    # Pass the Class as the second argument, and the instance via the factory
+    return registry.get_or_create("adaptive_confirmation", AdaptiveConfirmationHandler, factory=lambda: adaptive_confirmation)
 
 # Command Preview API
 def get_command_preview_generator():

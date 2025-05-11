@@ -1,3 +1,4 @@
+# angela/api/intent.py
 """
 Public API for the intent components.
 
@@ -16,20 +17,20 @@ def get_intent_model_classes():
 # Task Planner API
 def get_task_planner():
     """Get the task planner instance."""
-    from angela.components.intent.planner import task_planner
-    return registry.get_or_create("task_planner", lambda: task_planner)
+    from angela.components.intent.planner import TaskPlanner, task_planner 
+    return registry.get_or_create("task_planner", TaskPlanner, factory=lambda: task_planner)
 
 # Enhanced Task Planner API
 def get_enhanced_task_planner():
     """Get the enhanced task planner instance."""
-    from angela.components.intent.enhanced_task_planner import enhanced_task_planner
-    return registry.get_or_create("enhanced_task_planner", lambda: enhanced_task_planner)
+    from angela.components.intent.enhanced_task_planner import EnhancedTaskPlanner, enhanced_task_planner 
+    return registry.get_or_create("enhanced_task_planner", EnhancedTaskPlanner, factory=lambda: enhanced_task_planner)
 
 # Semantic Task Planner API
 def get_semantic_task_planner():
     """Get the semantic task planner instance."""
-    from angela.components.intent.semantic_task_planner import semantic_task_planner
-    return registry.get_or_create("semantic_task_planner", lambda: semantic_task_planner)
+    from angela.components.intent.semantic_task_planner import SemanticTaskPlanner, semantic_task_planner 
+    return registry.get_or_create("semantic_task_planner", SemanticTaskPlanner, factory=lambda: semantic_task_planner)
 
 def get_intent_clarification_class():
     """Get the IntentClarification class."""
@@ -39,8 +40,8 @@ def get_intent_clarification_class():
 # Complex Workflow Planner API
 def get_complex_workflow_planner():
     """Get the complex workflow planner instance."""
-    from angela.components.intent.complex_workflow_planner import complex_workflow_planner
-    return registry.get_or_create("complex_workflow_planner", lambda: complex_workflow_planner)
+    from angela.components.intent.complex_workflow_planner import ComplexWorkflowPlanner, complex_workflow_planner 
+    return registry.get_or_create("complex_workflow_planner", ComplexWorkflowPlanner, factory=lambda: complex_workflow_planner)
 
 def get_workflow_step_type_enum():
     """Get the WorkflowStepType enum."""
@@ -52,17 +53,19 @@ def get_complex_workflow_plan_class():
     from angela.components.intent.complex_workflow_planner import ComplexWorkflowPlan
     return ComplexWorkflowPlan
 
+
 def get_advanced_task_plan_class():
     """Get the AdvancedTaskPlan class."""
     from angela.components.intent.planner import AdvancedTaskPlan
     return AdvancedTaskPlan
 
+
 def get_plan_step_type_enum():
     """Get the PlanStepType enum."""
     from angela.components.intent.planner import PlanStepType
     return PlanStepType
-    
-# Plan Model Classes
+
+
 def get_plan_model_classes():
     """Get the plan model classes."""
     from angela.components.intent.planner import (
@@ -70,7 +73,7 @@ def get_plan_model_classes():
     )
     return PlanStep, TaskPlan, PlanStepType, AdvancedPlanStep, AdvancedTaskPlan
 
-# Helper function to create an action plan
+
 def create_action_plan(task_plan: Any) -> Any:
     """
     Create an action plan from a task plan.
@@ -81,5 +84,6 @@ def create_action_plan(task_plan: Any) -> Any:
     Returns:
         An ActionPlan ready for execution
     """
-    from angela.components.intent.planner import task_planner
-    return task_planner.create_action_plan(task_plan)
+
+    from angela.components.intent.planner import task_planner as base_task_planner
+    return base_task_planner.create_action_plan(task_plan)

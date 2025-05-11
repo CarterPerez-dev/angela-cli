@@ -11,8 +11,8 @@ from angela.core.registry import registry
 # Terminal Formatter API
 def get_terminal_formatter():
     """Get the terminal formatter instance."""
-    from angela.components.shell.formatter import terminal_formatter
-    return registry.get_or_create("terminal_formatter", lambda: terminal_formatter)
+    from angela.components.shell.formatter import TerminalFormatter, terminal_formatter # Import Class and instance
+    return registry.get_or_create("terminal_formatter", TerminalFormatter, factory=lambda: terminal_formatter)
 
 # Output Type Enum
 def get_output_type_enum():
@@ -23,14 +23,14 @@ def get_output_type_enum():
 # Inline Feedback API
 def get_inline_feedback():
     """Get the inline feedback instance."""
-    from angela.components.shell.inline_feedback import inline_feedback
-    return registry.get_or_create("inline_feedback", lambda: inline_feedback)
+    from angela.components.shell.inline_feedback import InlineFeedback, inline_feedback # Import Class and instance
+    return registry.get_or_create("inline_feedback", InlineFeedback, factory=lambda: inline_feedback)
 
 # Completion Handler API
 def get_completion_handler():
     """Get the completion handler instance."""
-    from angela.components.shell.completion import completion_handler
-    return registry.get_or_create("completion_handler", lambda: completion_handler)
+    from angela.components.shell.completion import CompletionHandler, completion_handler # Import Class and instance
+    return registry.get_or_create("completion_handler", CompletionHandler, factory=lambda: completion_handler)
 
 # Advanced Formatter API Functions
 async def display_advanced_plan(plan: Any) -> None:

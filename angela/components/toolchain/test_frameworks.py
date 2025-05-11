@@ -1116,4 +1116,4 @@ func Benchmark{functions[0]}(b *testing.B) {{
             "file_count": len(generated_files)
         }
 
-
+test_framework_integration = TestFrameworkIntegration()

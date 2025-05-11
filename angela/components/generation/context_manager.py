@@ -5,6 +5,7 @@ Multi-file context management for code generation.
 This module provides tools for managing context across multiple files during code generation,
 ensuring coherence and proper dependency management.
 """
+from __future__ import annotations
 import asyncio
 from typing import Dict, Any, List, Optional, Set, Union, Tuple
 from pathlib import Path
@@ -16,6 +17,7 @@ from collections import defaultdict
 from angela.utils.logging import get_logger
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.context import get_file_detector
+
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
