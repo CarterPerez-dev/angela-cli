@@ -133,6 +133,215 @@ class TerminalFormatter:
         self._console = Console()
         self._logger = logger
         self._active_displays = set()
+
+    def _get_quantum_vortex_spinner(self, elapsed: float) -> Text:
+        """Create a mesmerizing quantum vortex spinner animation."""
+        import math
+        spinner_text = Text()
+        
+        # Outer vortex ring with color cycling
+        outer_symbols = ["◜", "◠", "◝", "◞", "◡", "◟"]
+        outer_idx = int(elapsed * 6) % len(outer_symbols)
+        outer_char = outer_symbols[outer_idx]
+        
+        # Color cycle through spectrum
+        hue = int(elapsed * 36) % 360
+        # Create RGB colors that cycle
+        r = int(abs(math.sin(hue/60)) * 255)
+        g = int(abs(math.sin((hue+120)/60)) * 255)
+        b = int(abs(math.sin((hue+240)/60)) * 255)
+        color_hex = f"#{r:02x}{g:02x}{b:02x}"
+        
+        # Inner particle with opposite rotation
+        inner_symbols = ["•", "◦", "●", "○", "◎", "◉"]
+        inner_idx = int(elapsed * 8) % len(inner_symbols)
+        inner_idx_reverse = (len(inner_symbols) - 1 - inner_idx)  # Reverse direction
+        inner_char = inner_symbols[inner_idx_reverse]
+        
+        # Pulsing effect for center particle
+        pulse_size = 1 + 0.5 * math.sin(elapsed * 3)
+        if pulse_size > 1.25:
+            center_style = "bold bright_white"
+        else:
+            center_style = "dim white"
+        
+        # Assemble the spinner components
+        spinner_text.append(f"[{color_hex}]{outer_char}[/{color_hex}]")
+        spinner_text.append(f"[{center_style}]{inner_char}[/{center_style}]")
+        
+        # Quantum particle trails
+        particle_pos = int(elapsed * 5) % 3
+        trail = " " * particle_pos + "∴" + " " * (2 - particle_pos)
+        spinner_text.append(f"[bright_cyan]{trail}[/bright_cyan]")
+        
+        return spinner_text
+    
+    def _get_elemental_cascade_spinner(self, elapsed: float) -> Text:
+        """Create a spinner that cycles through elemental themes."""
+        import math
+        spinner_text = Text()
+        
+        # Determine current element based on time
+        element_cycle = int(elapsed * 2) % 4  # Changes every 0.5 seconds
+        
+        # Element-specific animations
+        if element_cycle == 0:  # Fire
+            fire_symbols = ["🔥", "🔥", "🔥", "🔥", "💥", "✨", "🔥", "🔥"]
+            fire_idx = int(elapsed * 12) % len(fire_symbols)
+            
+            # Flame intensity changes
+            flame_chars = ["═", "╪", "╫", "╬", "╬", "╫", "╪"]
+            flame_idx = int(elapsed * 14) % len(flame_chars)
+            
+            spinner_text.append(f"{fire_symbols[fire_idx]}")
+            spinner_text.append(f"[bright_red]{flame_chars[flame_idx]}[/bright_red]")
+            spinner_text.append("[yellow]~[/yellow]")
+            
+        elif element_cycle == 1:  # Water
+            water_symbols = ["≈", "≋", "≈", "∽", "∿", "≈"]
+            water_idx = int(elapsed * 12) % len(water_symbols)
+            
+            # Wave effect
+            wave_level = int(2 + 2 * math.sin(elapsed * 6))
+            waves = "~" * wave_level
+            
+            spinner_text.append(f"[bright_blue]{water_symbols[water_idx]}[/bright_blue]")
+            spinner_text.append(f"[cyan]{waves}[/cyan]")
+            spinner_text.append("[blue]○[/blue]")
+            
+        elif element_cycle == 2:  # Earth
+            earth_symbols = ["◦", "•", "●", "◎", "◉", "⦿", "◉", "◎", "●", "•"]
+            earth_idx = int(elapsed * 10) % len(earth_symbols)
+            
+            # Growth effect
+            growth = [".", "․", "‥", "…", "⁘", "⁙"]
+            growth_idx = int(elapsed * 6) % len(growth)
+            
+            spinner_text.append(f"[green]{earth_symbols[earth_idx]}[/green]")
+            spinner_text.append(f"[dark_green]{growth[growth_idx]}[/dark_green]")
+            spinner_text.append("[bright_green]⏣[/bright_green]")
+            
+        else:  # Air
+            air_symbols = ["≋", "≈", "≋", "≈", "≋", "≈"]
+            air_idx = int(elapsed * 8) % len(air_symbols)
+            
+            # Wind effect
+            wind_dir = int(elapsed * 4) % 2
+            if wind_dir == 0:
+                wind = "»»»"
+            else:
+                wind = "«««"
+                
+            spinner_text.append(f"[white]{air_symbols[air_idx]}[/white]")
+            spinner_text.append(f"[bright_white]{wind}[/bright_white]")
+            spinner_text.append("[bright_cyan]◌[/bright_cyan]")
+        
+        return spinner_text
+    
+    def _get_interstellar_warp_spinner(self, elapsed: float) -> Text:
+        """Create a mind-blowing warp drive animation effect."""
+        import math
+        spinner_text = Text()
+        
+        # Warp ship core with pulsing energy
+        energy_level = int(3 + 3 * math.sin(elapsed * 8))
+        core_symbols = ["▮", "▰", "█", "▰", "▮", "▯", "▮", "▰", "█"]
+        core_idx = int(elapsed * 12) % len(core_symbols)
+        core_char = core_symbols[core_idx]
+        
+        # Warp field effect with varying lengths based on warp speed
+        warp_factor = 1 + int(elapsed * 10) % 9  # Warp factors 1-9
+        warp_speed = min(4, int(1 + warp_factor/2))  # Max length of 4
+        
+        # Center of animation
+        spinner_text.append("[bright_blue]=[/bright_blue]")
+        spinner_text.append(f"[bright_yellow]{core_char * energy_level}[/bright_yellow]")
+        spinner_text.append("[bright_blue]=[/bright_blue]")
+        
+        # Starfield effect - stars zooming past at different speeds
+        star_positions = []
+        for i in range(5):  # Generate 5 stars
+            # Each star moves at different speeds
+            pos = (elapsed * (5 + i)) % 15
+            intensity = min(1.0, 15 - pos) / 1.0  # Fade based on position
+            
+            if intensity > 0.7:
+                style = "bright_white"
+            elif intensity > 0.4:
+                style = "white"
+            else:
+                style = "dim white"
+                
+            # Convert position to integer for display
+            pos_int = int(pos)
+            
+            # Star character depends on position (moving away = smaller)
+            if pos_int < 3:
+                star = "*"
+            elif pos_int < 7:
+                star = "·"
+            else:
+                star = "."
+                
+            # Add to positions list
+            star_positions.append((pos_int, star, style))
+        
+        # Sort stars by position for layering
+        star_positions.sort()
+        
+        # Create starfield
+        starfield = [""] * 15  # Initialize empty spaces
+        for pos, star, style in star_positions:
+            if 0 <= pos < 15:  # Ensure within bounds
+                starfield[pos] = f"[{style}]{star}[/{style}]"
+        
+        # Add leading stars
+        for i in range(warp_speed):
+            starfield_segment = "".join(starfield[i*3:(i+1)*3])
+            if starfield_segment.strip():  # Only add if there's visible content
+                spinner_text.append(starfield_segment)
+        
+        # Add warp drive energy fluctuation
+        fluctuation = int(elapsed * 20) % 3
+        if fluctuation == 0:
+            spinner_text.append("[bright_cyan]⚡[/bright_cyan]")
+        elif fluctuation == 1:
+            spinner_text.append("[bright_magenta]⚡[/bright_magenta]")
+        else:
+            spinner_text.append("[bright_yellow]⚡[/bright_yellow]")
+        
+        return spinner_text
+    
+    def _get_random_spinner(self, elapsed: float) -> Text:
+        """Get a random spinner based on object ID determinism."""
+        # Use a hash of the current time's integer part to select a spinner
+        # This ensures the same spinner is used throughout a single load operation
+        import random
+        import hashlib
+        
+        # We'll use the hash of the elapsed time's integer part to select a spinner,
+        # but only hash it once at the beginning of a loading session
+        if not hasattr(self, '_current_spinner_choice'):
+            # Initialize a random spinner for this loading session
+            self._current_spinner_choice = random.randint(1, 3)
+            self._logger.debug(f"Selected spinner animation: {self._current_spinner_choice}")
+        
+        # Use the selected spinner
+        if self._current_spinner_choice == 1:
+            return self._get_quantum_vortex_spinner(elapsed)
+        elif self._current_spinner_choice == 2:
+            return self._get_elemental_cascade_spinner(elapsed)
+        else:
+            return self._get_interstellar_warp_spinner(elapsed)
+
+
+
+
+
+
+
+
+
     
     def print_command(self, command: str, title: Optional[str] = None) -> None:
         """
@@ -540,12 +749,20 @@ class TerminalFormatter:
         """
         import random
         import time
+        import math  # For advanced effects
+        import asyncio
         from rich.live import Live
         from rich.panel import Panel
         from rich.text import Text
         from rich.console import Group
-        from rich.spinner import Spinner
         from rich import box
+        
+        # Ensure no active live displays
+        self._ensure_no_active_live()
+        
+        # Reset spinner choice for new execution session
+        if hasattr(self, '_current_spinner_choice'):
+            delattr(self, '_current_spinner_choice')
         
         start_time = time.time()
         
@@ -556,34 +773,31 @@ class TerminalFormatter:
         def get_layout():
             elapsed = time.time() - start_time
             
+            # Get a random but consistent spinner for this execution session
+            spinner = self._get_random_spinner(elapsed)
+            
+            # Add execution message
+            spinner_with_text = Text()
+            spinner_with_text.append_text(spinner)
+            spinner_with_text.append(f" [bold]{elapsed:.2f}s[/bold]")
+            spinner_with_text.append(" - Executing command...")
+            
             if with_philosophy:
-                # Use actual Text objects with direct styling
+                # For the philosophy quote
                 quote_text = Text(quote, style="italic cyan")
                 
                 # Add an empty line for spacing
                 spacer = Text("")
                 
-                # Create spinner with proper formatting
-                spinner_text = Text()
-                spinner_text.append(Spinner("dots"))
-                spinner_text.append(f" {elapsed:.2f}s", style="bold")
-                spinner_text.append(" - Executing command...")
-                
                 # Group them together with proper spacing
-                content = Group(quote_text, spacer, spinner_text)
+                content = Group(quote_text, spacer, spinner_with_text)
             else:
-                # Create spinner with proper formatting
-                spinner_text = Text()
-                spinner_text.append(Spinner("dots"))
-                spinner_text.append(f" {elapsed:.2f}s", style="bold")
-                spinner_text.append(" - Executing command...")
-                
-                content = spinner_text
+                content = spinner_with_text
             
             panel = Panel(
                 content,
                 title="Command Execution",
-                border_style="magenta",  # New color
+                border_style="magenta",
                 box=box.ROUNDED,
                 padding=(1, 2)
             )
@@ -624,13 +838,9 @@ class TerminalFormatter:
         stdout_task = asyncio.create_task(read_stream(process.stdout, True))
         stderr_task = asyncio.create_task(read_stream(process.stderr, False))
         
-        # Reset any existing console state
-        if hasattr(self._console, "_live") and self._console._live:
-            self._console._live = None
-            
-        # Create a live display to show progress
+        # Display the live progress
         try:
-            with Live(get_layout(), refresh_per_second=10, console=self._console) as live:
+            with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
                 # Wait for the command to complete while updating the display
                 return_code = await process.wait()
                 
@@ -688,52 +898,55 @@ class TerminalFormatter:
         """
         import random
         import time
+        import math  
+        import asyncio
         from rich.live import Live
         from rich.panel import Panel
-        from rich.layout import Layout
-        from rich.spinner import Spinner
-        from rich.console import Group
         from rich.text import Text
+        from rich.console import Group
         from rich import box
+        
+        # Ensure no active live displays
+        self._ensure_no_active_live()
+        
+        # Reset spinner choice for new loading session
+        if hasattr(self, '_current_spinner_choice'):
+            delattr(self, '_current_spinner_choice')
         
         start_time = time.time()
         
         # Choose a random philosophy quote
         quote = random.choice(self.PHILOSOPHY_QUOTES) if with_philosophy else ""
         
-        # Create a layout function for a single compact panel
+        # Create a layout function that properly handles the spinner
         def get_layout():
             elapsed = time.time() - start_time
             
-            # Create content with proper rich formatting
+            # Get a random but consistent spinner for this loading session
+            spinner = self._get_random_spinner(elapsed)
+            
+            # Add timer and message to the spinner
+            spinner_with_text = Text()
+            spinner_with_text.append_text(spinner)
+            spinner_with_text.append(f" [bold]{elapsed:.2f}s[/bold]")
+            spinner_with_text.append(f" - {message}")
+            
             if with_philosophy:
-                # Important: Use actual Text objects with direct styling
+                # For the philosophy quote
                 quote_text = Text(quote, style="italic cyan")
                 
                 # Add an empty line for spacing
                 spacer = Text("")
                 
-                # Create spinner with proper formatting
-                spinner_text = Text()
-                spinner_text.append(Spinner("dots"))
-                spinner_text.append(f" {elapsed:.2f}s", style="bold")
-                spinner_text.append(f" - {message}")
-                
                 # Group them together with proper spacing
-                content = Group(quote_text, spacer, spinner_text)
+                content = Group(quote_text, spacer, spinner_with_text)
             else:
-                # Create spinner with proper formatting
-                spinner_text = Text()
-                spinner_text.append(Spinner("dots"))
-                spinner_text.append(f" {elapsed:.2f}s", style="bold")
-                spinner_text.append(f" - {message}")
-                
-                content = spinner_text
+                content = spinner_with_text
             
             panel = Panel(
                 content,
                 title="Angela is thinking...",
-                border_style="magenta",  # New color
+                border_style="magenta",
                 box=box.ROUNDED,
                 padding=(1, 2)
             )
@@ -742,14 +955,10 @@ class TerminalFormatter:
         
         # Use try-except with asyncio.sleep to make it cancellable
         try:
-            # Reset any existing console state
-            if hasattr(self._console, "_live") and self._console._live:
-                self._console._live = None
-            
-            with Live(get_layout(), refresh_per_second=10, console=self._console) as live:
+            with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
                 try:
                     while True:
-                        await asyncio.sleep(0.1)  # Small sleep to allow cancellation
+                        await asyncio.sleep(0.03)  # Smaller sleep for smoother animation
                         live.update(get_layout())
                 except asyncio.CancelledError:
                     # Handle cancellation gracefully
@@ -760,6 +969,7 @@ class TerminalFormatter:
             pass
         except Exception as e:
             self._logger.error(f"Error displaying loading timer: {str(e)}")
+
     
     def _ensure_no_active_live(self):
         """Ensure no active Live displays by checking and resetting console state."""
@@ -768,6 +978,12 @@ class TerminalFormatter:
             self._logger.warning("Detected active Live display. Attempting cleanup.")
             # Try to gracefully close any existing live display
             try:
+                try:
+                    # First try to stop it properly
+                    self._console._live.stop()
+                except Exception:
+                    # If that fails, just set it to None
+                    pass
                 self._console._live = None
                 # Reset other potentially problematic console state
                 if hasattr(self._console, "_buffer"):
