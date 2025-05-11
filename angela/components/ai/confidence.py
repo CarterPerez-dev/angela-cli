@@ -3,7 +3,7 @@
 import re
 from typing import Dict, Any, List, Tuple, Optional
 
-from angela.context.history import history_manager
+from angela.api.context import get_history_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -81,6 +81,7 @@ class ConfidenceScorer:
         base_command = command.split()[0] if command else ""
         
         # Get frequency of this base command
+        history_manager = get_history_manager()
         frequency = history_manager.get_command_frequency(base_command)
         
         # Get success rate

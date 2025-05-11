@@ -18,10 +18,11 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from angela.toolchain.docker import docker_integration
-from angela.context import context_manager
+from angela.api.toolchain import get_docker_integration
+from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
-from angela.execution.engine import execution_engine
+from angela.api.execution import get_execution_engine
+
 
 logger = get_logger(__name__)
 console = Console()
@@ -41,6 +42,7 @@ async def docker_status():
         task = progress.add_task("Checking", total=1)
         
         # Check Docker availability
+        docker_integration = get_docker_integration()
         docker_available = await docker_integration.is_docker_available()
         
         # Check Docker Compose availability

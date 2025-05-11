@@ -16,8 +16,8 @@ from typing import Dict, Any, List, Tuple, Optional, Set, Union, NamedTuple
 from collections import defaultdict
 
 from angela.utils.logging import get_logger
-from angela.context.file_detector import detect_file_type
-from angela.ai.client import gemini_client, GeminiRequest
+from angela.api.context import get_file_detector_func
+from angela.api.ai import get_gemini_client, get_gemini_request_class
 
 logger = get_logger(__name__)
 
@@ -941,6 +941,7 @@ class SemanticAnalyzer:
                 content = content[:20000] + "\n... [truncated]"
             
             # Detect language
+            detect_file_type = get_file_detector_func()
             file_info = detect_file_type(file_path)
             language = file_info.get("language", "unknown")
             
@@ -988,15 +989,17 @@ Please return a JSON response with the following structure:
 
 Ensure your JSON is valid. Don't include any comments or explanations outside the JSON.
 """
-            # Call AI service
+            GeminiRequest = get_gemini_request_class()
             api_request = GeminiRequest(
                 prompt=prompt,
                 max_tokens=4000,
                 temperature=0.1  # Low temperature for more deterministic output
             )
             
+            gemini_client = get_gemini_client()
             response = await gemini_client.generate_text(api_request)
             
+
             # Parse the response
             try:
                 # Try to extract JSON from the response

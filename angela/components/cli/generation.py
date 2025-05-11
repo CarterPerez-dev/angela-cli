@@ -17,19 +17,24 @@ from rich.markdown import Markdown
 
 
 from angela.utils.logging import get_logger
-from angela.generation.engine import code_generation_engine
-from angela.toolchain.git import git_integration
-from angela.toolchain.package_managers import package_manager_integration
-from angela.toolchain.test_frameworks import test_framework_integration
-from angela.toolchain.ci_cd import ci_cd_integration
-from angela.review.diff_manager import diff_manager
-from angela.review.feedback import feedback_manager
-from angela.context import context_manager
-from angela.context.enhancer import context_enhancer
-from angela.generation.refiner import interactive_refiner
-from angela.generation.context_manager import generation_context_manager
-from angela.generation.engine import CodeFile
-from angela.context.file_detector import detect_file_type
+from angela.api.generation import (
+    get_code_generation_engine,
+    get_interactive_refiner,
+    get_generation_context_manager,
+    get_code_file_class
+)
+from angela.api.toolchain import (
+    get_git_integration,
+    get_package_manager_integration,
+    get_test_framework_integration,
+    get_ci_cd_integration
+)
+from angela.api.review import get_diff_manager, get_feedback_manager
+from angela.api.context import (
+    get_context_manager,
+    get_context_enhancer,
+    get_file_detector_func
+)
 
 app = typer.Typer(help="Code generation commands")
 console = Console()

@@ -20,11 +20,20 @@ from rich.text import Text
 from rich.prompt import Prompt, Confirm
 from rich.filesize import decimal as format_size
 
-from angela.context import context_manager
-from angela.execution.filesystem import (
-    create_directory, delete_directory, create_file, read_file,
-    write_file, delete_file, copy_file, move_file, FileSystemError
+from angela.api.context import get_context_manager
+from angela.api.execution import (
+    get_filesystem_error_class,
+    get_create_directory_func,
+    get_delete_directory_func,
+    get_create_file_func,
+    get_read_file_func,
+    get_write_file_func,
+    get_delete_file_func,
+    get_copy_file_func,
+    get_move_file_func,
+    get_rollback_manager
 )
+
 from angela.execution.rollback import rollback_manager
 from angela.utils.logging import get_logger
 
@@ -49,6 +58,7 @@ def list_directory(
 ):
     """List directory contents with enhanced formatting."""
     try:
+        context_manager = get_context_manager()
         dir_path = Path(path) if path else context_manager.cwd
         
         if not dir_path.exists():
@@ -129,7 +139,8 @@ def make_directory(
     """Create a directory."""
     try:
         # Run the operation
-        success = asyncio.run(create_directory(path, parents=parents, dry_run=dry_run))
+        create_directory_func = get_create_directory_func()
+        success = asyncio.run(create_directory_func(path, parents=parents, dry_run=dry_run))
         
         if success:
             if dry_run:
@@ -140,11 +151,10 @@ def make_directory(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error creating directory: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
-
 
 @app.command("rmdir")
 def remove_directory(

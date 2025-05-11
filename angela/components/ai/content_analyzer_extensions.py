@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import json
 
-from angela.ai.content_analyzer import ContentAnalyzer, content_analyzer
+from angela.components.ai.content_analyzer import ContentAnalyzer, content_analyzer
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -299,10 +299,13 @@ class EnhancedContentAnalyzer(ContentAnalyzer):
     
     async def _get_ai_analysis(self, prompt):
         """Get analysis from the AI service."""
-        api_request = GeminiRequest(
+        from angela.api.ai import get_gemini_client, get_gemini_request_class
+        
+        api_request = get_gemini_request_class()(
             prompt=prompt,
             max_tokens=4000
         )
         
-        response = await gemini_client.generate_text(api_request)
+        client = get_gemini_client()
+        response = await client.generate_text(api_request)
         return response.text

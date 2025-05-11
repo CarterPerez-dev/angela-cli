@@ -1,4 +1,4 @@
-# angela/ai/__init__.py
+# angela/components/ai/__init__.py
 """
 AI components for Angela CLI.
 

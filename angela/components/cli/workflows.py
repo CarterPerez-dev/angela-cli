@@ -16,9 +16,9 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.prompt import Prompt, Confirm
 
-from angela.workflows.manager import workflow_manager
-from angela.context import context_manager
-from angela.shell.formatter import terminal_formatter
+from angela.api.workflows import get_workflow_manager
+from angela.api.context import get_context_manager
+from angela.api.shell import get_terminal_formatter
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,6 +56,7 @@ def list_workflows(
     """List available workflows."""
     try:
         # Get workflows
+        workflow_manager = get_workflow_manager()
         workflows = workflow_manager.list_workflows(tag)
         
         if not workflows:
@@ -115,9 +116,10 @@ def export_workflow(
     """Export a workflow to a shareable package."""
     try:
         # Get the workflow sharing manager
-        from angela.workflows.sharing import workflow_sharing_manager
+        from angela.api.workflows import get_workflow_sharing_manager
         
         # Export the workflow using run_async instead of asyncio.run()
+        workflow_sharing_manager = get_workflow_sharing_manager()
         result = run_async(workflow_sharing_manager.export_workflow(
             workflow_name=name,
             output_path=output
@@ -134,7 +136,6 @@ def export_workflow(
         logger.exception(f"Error exporting workflow: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
-
 
 @app.command("import")
 def import_workflow(

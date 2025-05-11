@@ -15,8 +15,14 @@ from rich.table import Table
 from rich.text import Text
 from rich import print as rich_print
 
-from angela.context.enhancer import context_enhancer
-from angela.context import context_manager, file_resolver, file_activity_tracker, ActivityType
+from angela.api.context import (
+    get_context_enhancer,
+    get_context_manager,
+    get_file_resolver,
+    get_file_activity_tracker,
+    get_activity_type_enum
+)
+
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -36,6 +42,7 @@ def resolve_file(
 ):
     """Resolve a file reference to an actual file path."""
     # Get the current context
+    context_manager = get_context_manager()
     context = context_manager.get_context_dict()
     
     # Convert scope
@@ -47,6 +54,7 @@ def resolve_file(
     
     # Run the resolver
     try:
+        file_resolver = get_file_resolver()
         path = asyncio.run(file_resolver.resolve_reference(
             reference,
             context,
@@ -62,6 +70,7 @@ def resolve_file(
             ))
             
             # Track as viewed file
+            file_activity_tracker = get_file_activity_tracker()
             file_activity_tracker.track_file_viewing(path, None, {
                 "reference": reference,
                 "resolved_via": "cli"

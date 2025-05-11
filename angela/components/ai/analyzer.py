@@ -7,8 +7,8 @@ import shlex
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union
 
-from angela.context.history import history_manager
 from angela.utils.logging import get_logger
+from angela.api.context import get_history_manager
 
 logger = get_logger(__name__)
 
@@ -73,7 +73,7 @@ class ErrorAnalyzer:
         pattern_match = self._match_error_pattern(error)
         
         # Check command history for similar errors and their fixes
-        historical_fixes = history_manager.find_error_patterns(error_short)
+        historical_fixes = get_history_manager().find_error_patterns(error_short)
         
         # Analyze command structure for potential issues
         command_issues = self._analyze_command_structure(command)

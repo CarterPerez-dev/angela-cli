@@ -11,10 +11,9 @@ import difflib
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Union
 
-from angela.review.diff_manager import diff_manager
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.context import context_manager
-from angela.context.file_detector import detect_file_type
+from angela.api.review import get_diff_manager
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_context_manager, get_file_detector_func
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -56,6 +55,7 @@ class ContentAnalyzer:
             return {"error": f"File not found: {path_obj}"}
         
         # Get file info to determine type and appropriate analysis
+        detect_file_type = get_file_detector_func()
         file_info = detect_file_type(path_obj)
         
         # Read file content
@@ -70,11 +70,13 @@ class ContentAnalyzer:
         prompt = self._build_analysis_prompt(content, file_info, request)
         
         # Call AI service
+        GeminiRequest = get_gemini_request_class()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=4000
         )
         
+        gemini_client = get_gemini_client()
         response = await gemini_client.generate_text(api_request)
         
         # Structure the analysis results
@@ -176,6 +178,7 @@ Summary:
             return {"error": f"File not found: {path_obj}"}
         
         # Get file info
+        detect_file_type = get_file_detector_func()
         file_info = detect_file_type(path_obj)
         
         # Check if this is a text file that can be manipulated
@@ -194,17 +197,20 @@ Summary:
         prompt = self._build_manipulation_prompt(original_content, file_info, instruction)
         
         # Call AI service
+        GeminiRequest = get_gemini_request_class()
         api_request = GeminiRequest(
             prompt=prompt,
             max_tokens=20000  # Large token limit for returning the full modified content
         )
         
+        gemini_client = get_gemini_client()
         response = await gemini_client.generate_text(api_request)
         
         # Extract the modified content from the response
         modified_content = self._extract_modified_content(response.text, original_content)
         
         # Generate diff
+        diff_manager = get_diff_manager()
         diff = diff_manager.generate_diff(original_content, modified_content)
         
         # Return the results

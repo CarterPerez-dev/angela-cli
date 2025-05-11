@@ -10,9 +10,16 @@ import shlex
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 
-from angela.execution.filesystem import (
-    create_directory, delete_directory, create_file, read_file,
-    write_file, delete_file, copy_file, move_file, FileSystemError
+from angela.api.execution import (
+    get_filesystem_error_class,
+    get_create_directory_func,
+    get_delete_directory_func,
+    get_create_file_func,
+    get_read_file_func,
+    get_write_file_func,
+    get_delete_file_func,
+    get_copy_file_func,
+    get_move_file_func
 )
 from angela.utils.logging import get_logger
 
@@ -323,7 +330,8 @@ async def execute_file_operation(
             path = parameters.get("path")
             parents = parameters.get("parents", True)
             
-            success = await create_directory(path, parents=parents, dry_run=dry_run)
+            create_directory_func = get_create_directory_func()
+            success = await create_directory_func(path, parents=parents, dry_run=dry_run)
             result["success"] = success
             
         elif operation_type == "delete_directory":
@@ -331,7 +339,8 @@ async def execute_file_operation(
             recursive = parameters.get("recursive", False)
             force = parameters.get("force", False)
             
-            success = await delete_directory(
+            delete_directory_func = get_delete_directory_func()
+            success = await delete_directory_func(
                 path, recursive=recursive, force=force, dry_run=dry_run
             )
             result["success"] = success
@@ -340,14 +349,16 @@ async def execute_file_operation(
             path = parameters.get("path")
             content = parameters.get("content")
             
-            success = await create_file(path, content=content, dry_run=dry_run)
+            create_file_func = get_create_file_func()
+            success = await create_file_func(path, content=content, dry_run=dry_run)
             result["success"] = success
             
         elif operation_type == "read_file":
             path = parameters.get("path")
             binary = parameters.get("binary", False)
             
-            content = await read_file(path, binary=binary)
+            read_file_func = get_read_file_func()
+            content = await read_file_func(path, binary=binary)
             result["content"] = content
             result["success"] = True
             
@@ -356,7 +367,8 @@ async def execute_file_operation(
             content = parameters.get("content", "")
             append = parameters.get("append", False)
             
-            success = await write_file(
+            write_file_func = get_write_file_func()
+            success = await write_file_func(
                 path, content, append=append, dry_run=dry_run
             )
             result["success"] = success
@@ -365,7 +377,8 @@ async def execute_file_operation(
             path = parameters.get("path")
             force = parameters.get("force", False)
             
-            success = await delete_file(path, force=force, dry_run=dry_run)
+            delete_file_func = get_delete_file_func()
+            success = await delete_file_func(path, force=force, dry_run=dry_run)
             result["success"] = success
             
         elif operation_type == "copy_file":
@@ -373,7 +386,8 @@ async def execute_file_operation(
             destination = parameters.get("destination")
             overwrite = parameters.get("overwrite", False)
             
-            success = await copy_file(
+            copy_file_func = get_copy_file_func()
+            success = await copy_file_func(
                 source, destination, overwrite=overwrite, dry_run=dry_run
             )
             result["success"] = success
@@ -383,7 +397,8 @@ async def execute_file_operation(
             destination = parameters.get("destination")
             overwrite = parameters.get("overwrite", False)
             
-            success = await move_file(
+            move_file_func = get_move_file_func()
+            success = await move_file_func(
                 source, destination, overwrite=overwrite, dry_run=dry_run
             )
             result["success"] = success
@@ -394,7 +409,7 @@ async def execute_file_operation(
         
         return result
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error executing file operation: {str(e)}")
         return {
             "operation": operation_type,
