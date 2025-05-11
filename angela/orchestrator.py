@@ -1773,7 +1773,7 @@ class Orchestrator:
         
         # Start a loading timer for initial processing
         loading_task = asyncio.create_task(
-            terminal_formatter.display_loading_timer("Angela is initializing satellite uplink....")
+            terminal_formatter.display_loading_timer("Angela’s decrypting the payload....")
         )
         
         try:

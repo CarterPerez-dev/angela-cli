@@ -166,13 +166,13 @@ class TerminalFormatter:
             center_style = "dim white"
         
         # Assemble the spinner components
-        spinner_text.append(f"[{color_hex}]{outer_char}[/{color_hex}]")
-        spinner_text.append(f"[{center_style}]{inner_char}[/{center_style}]")
+        spinner_text.append(outer_char, style=color_hex)
+        spinner_text.append(inner_char, style=center_style)
         
         # Quantum particle trails
         particle_pos = int(elapsed * 5) % 3
         trail = " " * particle_pos + "∴" + " " * (2 - particle_pos)
-        spinner_text.append(f"[bright_cyan]{trail}[/bright_cyan]")
+        spinner_text.append(trail, style="bright_cyan")
         
         return spinner_text
     
@@ -193,9 +193,9 @@ class TerminalFormatter:
             flame_chars = ["═", "╪", "╫", "╬", "╬", "╫", "╪"]
             flame_idx = int(elapsed * 14) % len(flame_chars)
             
-            spinner_text.append(f"{fire_symbols[fire_idx]}")
-            spinner_text.append(f"[bright_red]{flame_chars[flame_idx]}[/bright_red]")
-            spinner_text.append("[yellow]~[/yellow]")
+            spinner_text.append(fire_symbols[fire_idx]) # Appending a plain character
+            spinner_text.append(flame_chars[flame_idx], style="bright_red")
+            spinner_text.append("~", style="yellow")
             
         elif element_cycle == 1:  # Water
             water_symbols = ["≈", "≋", "≈", "∽", "∿", "≈"]
@@ -205,9 +205,9 @@ class TerminalFormatter:
             wave_level = int(2 + 2 * math.sin(elapsed * 6))
             waves = "~" * wave_level
             
-            spinner_text.append(f"[bright_blue]{water_symbols[water_idx]}[/bright_blue]")
-            spinner_text.append(f"[cyan]{waves}[/cyan]")
-            spinner_text.append("[blue]○[/blue]")
+            spinner_text.append(water_symbols[water_idx], style="bright_blue")
+            spinner_text.append(waves, style="cyan")
+            spinner_text.append("○", style="blue")
             
         elif element_cycle == 2:  # Earth
             earth_symbols = ["◦", "•", "●", "◎", "◉", "⦿", "◉", "◎", "●", "•"]
@@ -217,9 +217,9 @@ class TerminalFormatter:
             growth = [".", "․", "‥", "…", "⁘", "⁙"]
             growth_idx = int(elapsed * 6) % len(growth)
             
-            spinner_text.append(f"[green]{earth_symbols[earth_idx]}[/green]")
-            spinner_text.append(f"[dark_green]{growth[growth_idx]}[/dark_green]")
-            spinner_text.append("[bright_green]⏣[/bright_green]")
+            spinner_text.append(earth_symbols[earth_idx], style="green")
+            spinner_text.append(growth[growth_idx], style="dark_green")
+            spinner_text.append("⏣", style="bright_green")
             
         else:  # Air
             air_symbols = ["≋", "≈", "≋", "≈", "≋", "≈"]
@@ -232,9 +232,9 @@ class TerminalFormatter:
             else:
                 wind = "«««"
                 
-            spinner_text.append(f"[white]{air_symbols[air_idx]}[/white]")
-            spinner_text.append(f"[bright_white]{wind}[/bright_white]")
-            spinner_text.append("[bright_cyan]◌[/bright_cyan]")
+            spinner_text.append(air_symbols[air_idx], style="white")
+            spinner_text.append(wind, style="bright_white")
+            spinner_text.append("◌", style="bright_cyan")
         
         return spinner_text
     
@@ -254,9 +254,9 @@ class TerminalFormatter:
         warp_speed = min(4, int(1 + warp_factor/2))  # Max length of 4
         
         # Center of animation
-        spinner_text.append("[bright_blue]=[/bright_blue]")
-        spinner_text.append(f"[bright_yellow]{core_char * energy_level}[/bright_yellow]")
-        spinner_text.append("[bright_blue]=[/bright_blue]")
+        spinner_text.append("=", style="bright_blue")
+        spinner_text.append(core_char * energy_level, style="bright_yellow")
+        spinner_text.append("=", style="bright_blue")
         
         # Starfield effect - stars zooming past at different speeds
         star_positions = []
@@ -290,25 +290,28 @@ class TerminalFormatter:
         star_positions.sort()
         
         # Create starfield
-        starfield = [""] * 15  # Initialize empty spaces
+        starfield_markup_list = [""] * 15  # Initialize empty spaces with placeholder
         for pos, star, style in star_positions:
             if 0 <= pos < 15:  # Ensure within bounds
-                starfield[pos] = f"[{style}]{star}[/{style}]"
+                # Store as markup string in the list
+                starfield_markup_list[pos] = f"[{style}]{star}[/{style}]"
         
         # Add leading stars
         for i in range(warp_speed):
-            starfield_segment = "".join(starfield[i*3:(i+1)*3])
-            if starfield_segment.strip():  # Only add if there's visible content
-                spinner_text.append(starfield_segment)
+            # Join the markup strings from the list for the current segment
+            starfield_segment_markup = "".join(starfield_markup_list[i*3:(i+1)*3])
+            if starfield_segment_markup.strip():  # Only add if there's visible content
+                # Append the composed markup string, ensuring it's parsed by Text.from_markup
+                spinner_text.append(Text.from_markup(starfield_segment_markup))
         
         # Add warp drive energy fluctuation
         fluctuation = int(elapsed * 20) % 3
         if fluctuation == 0:
-            spinner_text.append("[bright_cyan]⚡[/bright_cyan]")
+            spinner_text.append("⚡", style="bright_cyan")
         elif fluctuation == 1:
-            spinner_text.append("[bright_magenta]⚡[/bright_magenta]")
+            spinner_text.append("⚡", style="bright_magenta")
         else:
-            spinner_text.append("[bright_yellow]⚡[/bright_yellow]")
+            spinner_text.append("⚡", style="bright_yellow")
         
         return spinner_text
     
@@ -317,7 +320,7 @@ class TerminalFormatter:
         # Use a hash of the current time's integer part to select a spinner
         # This ensures the same spinner is used throughout a single load operation
         import random
-        import hashlib
+        # No need to import hashlib here as it's not used in the provided logic
         
         # We'll use the hash of the elapsed time's integer part to select a spinner,
         # but only hash it once at the beginning of a loading session
@@ -333,14 +336,6 @@ class TerminalFormatter:
             return self._get_elemental_cascade_spinner(elapsed)
         else:
             return self._get_interstellar_warp_spinner(elapsed)
-
-
-
-
-
-
-
-
 
     
     def print_command(self, command: str, title: Optional[str] = None) -> None:
@@ -778,8 +773,9 @@ class TerminalFormatter:
             
             # Add execution message
             spinner_with_text = Text()
-            spinner_with_text.append_text(spinner)
-            spinner_with_text.append(f" [bold]{elapsed:.2f}s[/bold]")
+            spinner_with_text.append(spinner)
+            spinner_with_text.append(" ")
+            spinner_with_text.append(f"{elapsed:.2f}s", style="bold")
             spinner_with_text.append(" - Executing command...")
             
             if with_philosophy:
@@ -848,12 +844,12 @@ class TerminalFormatter:
                 await stdout_task
                 await stderr_task
                 
-                # Update once more when done
-                execution_time = time.time() - start_time
+                execution_time = time.time() - start_time # This is the correct variable
                 live.update(
                     Panel(
-                        Text(f"Completed in {execution_time:.2f}s", style="bold green"),
-                        title="Process Complete",
+                        # Use execution_time here
+                        Text(f"Clocked in {execution_time:.6f}s", style="bold green"), 
+                        title="Angela Initialized", # Or "Process Complete" if that's more accurate
                         border_style="green",
                         box=box.ROUNDED,
                         expand=False
@@ -865,24 +861,57 @@ class TerminalFormatter:
         except Exception as e:
             self._logger.error(f"Error in execution timer: {str(e)}")
             # Ensure we still wait for the process
-            if process.returncode is None:
-                return_code = await process.wait()
-            else:
+            if process.returncode is None: # Check if process might still be running
+                try:
+                    # Wait for process with a timeout to avoid hanging indefinitely
+                    await asyncio.wait_for(process.wait(), timeout=5.0) 
+                    return_code = process.returncode if process.returncode is not None else -1
+                except asyncio.TimeoutError:
+                    self._logger.error("Timeout waiting for process to complete after error.")
+                    if process.returncode is None: # if still none after timeout, try to kill
+                        try:
+                            process.kill()
+                            await process.wait() # ensure it's reaped
+                        except ProcessLookupError:
+                            pass # process might have already exited
+                        except Exception as kill_e:
+                            self._logger.error(f"Error trying to kill process: {kill_e}")
+                    return_code = -1 
+                except Exception as proc_e:
+                    self._logger.error(f"Further error waiting for process: {proc_e}")
+                    return_code = -1
+            elif process.returncode is not None: # Process already finished, just get its code
                 return_code = process.returncode
+            else: # Fallback if process object is in an unexpected state
+                return_code = -1
+
+            # Wait for the streams to complete, even in error cases
+            # Use try-except for each to ensure one doesn't prevent the other
+            try:
+                await asyncio.wait_for(stdout_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                self._logger.error("Timeout waiting for stdout_task to complete after error.")
+            except Exception as stream_e:
+                self._logger.error(f"Error waiting for stdout_task: {stream_e}")
             
-            # Wait for the streams to complete
-            await stdout_task
-            await stderr_task
+            try:
+                await asyncio.wait_for(stderr_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                self._logger.error("Timeout waiting for stderr_task to complete after error.")
+            except Exception as stream_e:
+                self._logger.error(f"Error waiting for stderr_task: {stream_e}")
             
+            # Recalculate execution_time up to the point of error handling completion
             execution_time = time.time() - start_time
         
         # Return the results
         return (
             "".join(stdout_chunks),
             "".join(stderr_chunks),
-            return_code,
+            return_code if isinstance(return_code, int) else -1, # Ensure return_code is an int
             execution_time
         )
+
         
     async def display_loading_timer(
         self,
@@ -927,8 +956,9 @@ class TerminalFormatter:
             
             # Add timer and message to the spinner
             spinner_with_text = Text()
-            spinner_with_text.append_text(spinner)
-            spinner_with_text.append(f" [bold]{elapsed:.2f}s[/bold]")
+            spinner_with_text.append(spinner)
+            spinner_with_text.append(" ")
+            spinner_with_text.append(f"{elapsed:.2f}s", style="bold")
             spinner_with_text.append(f" - {message}")
             
             if with_philosophy:
@@ -945,7 +975,7 @@ class TerminalFormatter:
             
             panel = Panel(
                 content,
-                title="Angela is thinking...",
+                title="Angela initializing...",
                 border_style="magenta",
                 box=box.ROUNDED,
                 padding=(1, 2)
@@ -955,7 +985,7 @@ class TerminalFormatter:
         
         # Use try-except with asyncio.sleep to make it cancellable
         try:
-            with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
+            with Live(get_layout(), refresh_per_second=20, console=self._console, transient=True) as live:
                 try:
                     while True:
                         await asyncio.sleep(0.03)  # Smaller sleep for smoother animation
