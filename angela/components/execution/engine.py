@@ -85,11 +85,36 @@ class ExecutionEngine:
             args = shlex.split(command)
             
             # Execute the command and capture output
-            process = await asyncio.create_subprocess_exec(
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
+            if command.startswith('cd ') and ' && ' in command:
+                # Extract working directory and actual command
+                cd_part, actual_command = command.split(' && ', 1)
+                working_dir = cd_part[3:].strip()  # Remove the 'cd ' prefix
+                
+                # Execute the actual command with the correct working directory
+                process = await asyncio.create_subprocess_exec(
+                    *shlex.split(actual_command),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=working_dir  # Set the working directory instead of using cd
+                )
+            else:
+                # For regular commands without cd
+                use_shell = '&&' in command or '|' in command or '>' in command or '<' in command
+                
+                if use_shell:
+                    # Use shell mode for complex shell commands
+                    process = await asyncio.create_subprocess_shell(
+                        command,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                else:
+                    # For simple commands, use exec
+                    process = await asyncio.create_subprocess_exec(
+                        *shlex.split(command),
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
             
             # Wait for the command to complete
             stdout_bytes, stderr_bytes = await process.communicate()
