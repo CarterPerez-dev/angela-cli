@@ -19,6 +19,7 @@ from angela.api import safety
 from angela.api import shell
 from angela.api import toolchain
 from angela.api import workflows
+from angela.api import interfaces
 
 # Define the public API
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     'execution',
     'generation',
     'intent',
+    'interfaces',
     'monitoring',
     'review',
     'safety',

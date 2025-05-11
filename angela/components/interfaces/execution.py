@@ -1,4 +1,4 @@
-# angela/interfaces/execution.py
+# angela/components/interfaces/execution.py
 """Interfaces for execution components."""
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Tuple

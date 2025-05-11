@@ -1,4 +1,4 @@
-# angela/interfaces/__init__.py
+# angela/components/interfaces/__init__.py
 """Interfaces for Angela CLI components.
 
 This package provides abstract base classes that define standardized interfaces
@@ -7,8 +7,8 @@ and supporting dependency inversion.
 """
 
 # Export core interfaces
-from angela.interfaces.execution import CommandExecutor, AdaptiveExecutor
-from angela.interfaces.safety import SafetyValidator
+from angela.components.interfaces.execution import CommandExecutor, AdaptiveExecutor
+from angela.components.interfaces.safety import SafetyValidator
 from angela.core import registry
 
 __all__ = [
