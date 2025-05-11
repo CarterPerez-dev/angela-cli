@@ -205,16 +205,7 @@ class Orchestrator:
             request_type = await self._determine_request_type(request, context)
             self._logger.info(f"Determined request type: {request_type.value}")
             
-            # Process the request based on its type
-            if request_type == RequestType.COMMAND:
-                # Handle single command request
-                return await self._process_command_request(request, context, execute, dry_run)
-        
-        try:
-            # Analyze the request to determine its type
-            request_type = await self._determine_request_type(request, context)
-            self._logger.info(f"Determined request type: {request_type.value}")
-            
+   
             # Process the request based on its type
             if request_type == RequestType.COMMAND:
                 # Handle single command request
