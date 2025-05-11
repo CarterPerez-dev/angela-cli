@@ -16,8 +16,8 @@ from typing import Dict, Any, List, Optional, Tuple, Set, Union
 from datetime import datetime
 
 from angela.utils.logging import get_logger
-from angela.context.project_inference import project_inference
-from angela.execution.engine import execution_engine
+from angela.api.context import get_project_inference
+from angela.api.execution import get_execution_engine
 
 logger = get_logger(__name__)
 
@@ -68,6 +68,7 @@ class ProjectStateAnalyzer:
         
         # First, get basic project information
         try:
+            project_inference = get_project_inference()
             basic_info = await project_inference.infer_project_info(path_obj)
         except Exception as e:
             self._logger.error(f"Error getting basic project info: {str(e)}")
@@ -153,6 +154,8 @@ class ProjectStateAnalyzer:
         result["is_git_repo"] = True
         
         try:
+            execution_engine = get_execution_engine()
+            
             # Get current branch
             stdout, stderr, return_code = await execution_engine.execute_command(
                 command=f"cd {project_root} && git branch --show-current",
@@ -592,6 +595,7 @@ class ProjectStateAnalyzer:
                 manage_py = project_root / "manage.py"
                 if manage_py.exists():
                     try:
+                        execution_engine = get_execution_engine()
                         stdout, stderr, return_code = await execution_engine.execute_command(
                             command=f"cd {project_root} && python manage.py showmigrations",
                             check_safety=False
@@ -646,6 +650,7 @@ class ProjectStateAnalyzer:
                         
                         # Try to detect pending migrations
                         try:
+                            execution_engine = get_execution_engine()
                             stdout, stderr, return_code = await execution_engine.execute_command(
                                 command=f"cd {project_root} && alembic current",
                                 check_safety=False
@@ -706,6 +711,7 @@ class ProjectStateAnalyzer:
                 
                 # Try to detect pending migrations
                 try:
+                    execution_engine = get_execution_engine()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         command=f"cd {project_root} && rake db:migrate:status",
                         check_safety=False
@@ -771,6 +777,7 @@ class ProjectStateAnalyzer:
                 
                 # Try to find outdated packages
                 try:
+                    execution_engine = get_execution_engine()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         command=f"cd {project_root} && pip list --outdated --format=json",
                         check_safety=False
@@ -876,6 +883,7 @@ class ProjectStateAnalyzer:
                 # Try to find outdated packages
                 npm_cmd = "npm" if result["package_manager"] == "npm" else "yarn"
                 try:
+                    execution_engine = get_execution_engine()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         command=f"cd {project_root} && {npm_cmd} outdated --json",
                         check_safety=False
@@ -978,6 +986,7 @@ class ProjectStateAnalyzer:
                 
                 # Try to run flake8 to get issue count
                 try:
+                    execution_engine = get_execution_engine()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         command=f"cd {project_root} && flake8 --max-line-length=120 --count",
                         check_safety=False
@@ -1026,6 +1035,7 @@ class ProjectStateAnalyzer:
                 
                 # Try to run eslint to get issue count
                 try:
+                    execution_engine = get_execution_engine()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         command=f"cd {project_root} && npx eslint . --max-warnings=9999 -f json",
                         check_safety=False
@@ -1220,6 +1230,8 @@ class ProjectStateAnalyzer:
         result = dict(git_state)
         
         try:
+            execution_engine = get_execution_engine()
+            
             # Get the git log graph
             stdout, stderr, return_code = await execution_engine.execute_command(
                 command=f"cd {path_obj} && git log --graph --oneline --decorate -n 10",

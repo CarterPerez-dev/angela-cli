@@ -7,10 +7,9 @@ import shlex
 import subprocess
 from typing import Dict, Any, List, Tuple, Optional, TYPE_CHECKING
 
-
-from angela.utils.logging import get_logger
-from angela.core.registry import registry
-
+# Import through API layer
+from angela.api.utils import get_logger
+from angela.api.core import get_registry
 
 if TYPE_CHECKING:
     from angela.intent.models import ActionPlan
@@ -46,15 +45,15 @@ class ExecutionEngine:
         # If safety checks are requested, perform them
         if check_safety:
             # Get check_command_safety function from registry to avoid circular import
-            # (Assuming 'check_command_safety' is a key for a function in the registry)
-            check_command_safety_func = registry.get("check_command_safety") # Renamed for clarity
+            registry = get_registry()
+            check_command_safety_func = registry.get("check_command_safety")
 
             if not check_command_safety_func:
                 self._logger.error("Safety check function 'check_command_safety' not found in registry.")
                 return "", "Safety check function not configured", 1 # Or raise an error
 
             # Check if the command is safe to execute
-            is_safe = await check_command_safety_func(command, dry_run) # Use the retrieved function
+            is_safe = await check_command_safety_func(command, dry_run)
             if not is_safe:
                 self._logger.warning(f"Command execution cancelled due to safety concerns: {command}")
                 return "", "Command execution cancelled due to safety concerns", 1

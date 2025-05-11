@@ -12,8 +12,9 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List, Tuple, Union, BinaryIO, TextIO
 
-from angela.utils.logging import get_logger
-from angela.safety import check_operation_safety
+# Import through API layer
+from angela.api.utils import get_logger
+from angela.api.safety import get_operation_safety_checker
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,8 @@ async def create_directory(
     
     try:
         # Check if the operation is safe
-        if not await check_operation_safety('create_directory', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('create_directory', operation_params, dry_run):
             return False
         
         # If this is a dry run, stop here
@@ -117,7 +119,8 @@ async def delete_directory(
             raise FileSystemError(f"Path is not a directory: {path_obj}")
         
         # Check if the operation is safe
-        if not await check_operation_safety('delete_directory', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('delete_directory', operation_params, dry_run):
             return False
         
         # Create a backup for rollback if needed
@@ -168,7 +171,8 @@ async def create_file(
     
     try:
         # Check if the operation is safe
-        if not await check_operation_safety('create_file', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('create_file', operation_params, dry_run):
             return False
         
         # If this is a dry run, stop here
@@ -233,7 +237,8 @@ async def read_file(
             raise FileSystemError(f"Path is not a file: {path_obj}")
         
         # Check if the operation is safe
-        if not await check_operation_safety('read_file', operation_params, False):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('read_file', operation_params, False):
             raise FileSystemError("Operation not permitted due to safety constraints")
         
         # Read the file
@@ -280,7 +285,8 @@ async def write_file(
     
     try:
         # Check if the operation is safe
-        if not await check_operation_safety('write_file', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('write_file', operation_params, dry_run):
             return False
         
         # If this is a dry run, stop here
@@ -347,7 +353,8 @@ async def delete_file(
             raise FileSystemError(f"Path is not a file: {path_obj}")
         
         # Check if the operation is safe
-        if not await check_operation_safety('delete_file', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('delete_file', operation_params, dry_run):
             return False
         
         # Create a backup for rollback if needed
@@ -415,7 +422,8 @@ async def copy_file(
                 await _backup_file(dest_obj)
         
         # Check if the operation is safe
-        if not await check_operation_safety('copy_file', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('copy_file', operation_params, dry_run):
             return False
         
         # If this is a dry run, stop here
@@ -483,7 +491,8 @@ async def move_file(
                 await _backup_file(dest_obj)
         
         # Check if the operation is safe
-        if not await check_operation_safety('move_file', operation_params, dry_run):
+        safety_checker = get_operation_safety_checker()
+        if not await safety_checker.check_operation_safety('move_file', operation_params, dry_run):
             return False
         
         # Create a backup of the source file

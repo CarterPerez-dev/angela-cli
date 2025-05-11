@@ -9,11 +9,11 @@ from typing import Dict, Any, List, Optional, Tuple, Set, Union
 from enum import Enum
 from datetime import datetime
 
-from angela.ai.client import gemini_client, GeminiRequest
-from angela.ai.analyzer import error_analyzer
-from angela.context import context_manager
-from angela.utils.logging import get_logger
-
+# Import through API layer
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.ai import get_error_analyzer
+from angela.api.context import get_context_manager
+from angela.api.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -309,6 +309,8 @@ class ErrorRecoveryManager:
             Error analysis result
         """
         # Use the error analyzer to analyze the error
+        error_analyzer = get_error_analyzer()
+        
         analysis = error_analyzer.analyze_error(command, error)
         
         # Generate fix suggestions
@@ -544,6 +546,9 @@ Valid strategy types:
 """
         
         # Call the AI service
+        gemini_client = get_gemini_client()
+        GeminiRequest = get_gemini_request_class()
+        
         api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
         api_response = await gemini_client.generate_text(api_request)
         
@@ -630,8 +635,9 @@ Valid strategy types:
         """
         self._logger.info(f"Executing recovery strategy: {strategy.get('type')}")
         
-        # Import here to avoid circular imports
-        from angela.execution.engine import execution_engine
+        # Import through API layer
+        from angela.api.execution import get_execution_engine
+        execution_engine = get_execution_engine()
         
         result = {
             "strategy": strategy,
@@ -815,12 +821,16 @@ Valid strategy types:
         """
         Guide the user through recovery options.
         """
+        # Import through API layer
+        from angela.api.shell import get_terminal_formatter, get_output_type
 
-        from angela.shell.formatter import terminal_formatter, OutputType
-        
         if not strategies:
             return None
 
+        # Get terminal formatter from API layer
+        terminal_formatter = get_terminal_formatter()
+        OutputType = get_output_type()
+        
         # Display recovery options
         terminal_formatter.print_output(
             "Command execution failed. The following recovery options are available:",

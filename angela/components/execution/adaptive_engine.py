@@ -11,14 +11,11 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 
-from angela.safety.classifier import classify_command_risk, analyze_command_impact
-from angela.safety.adaptive_confirmation import get_adaptive_confirmation
-from angela.execution.engine import execution_engine
-from angela.context.history import history_manager
-from angela.context.preferences import preferences_manager
-from angela.context.session import session_manager
-
-from angela.utils.logging import get_logger
+# Import through API layer
+from angela.api.safety import get_command_risk_classifier, get_command_impact_analyzer, get_adaptive_confirmation_handler, get_command_preview_generator, get_command_learning_handler
+from angela.api.execution import get_execution_engine
+from angela.api.context import get_history_manager, get_preferences_manager, get_session_manager
+from angela.api.utils import get_logger
 
 logger = get_logger(__name__)
 console = Console()
@@ -35,11 +32,12 @@ class AdaptiveExecutionEngine:
         """Initialize the adaptive execution engine."""
         self._logger = logger
         self._error_analyzer = None # Initialize to None
-        
+    
     def _get_error_analyzer(self): # New helper method
         if self._error_analyzer is None:
-            from angela.ai.analyzer import error_analyzer # Import here
-            self._error_analyzer = error_analyzer
+            # Import through API layer
+            from angela.api.ai import get_error_analyzer
+            self._error_analyzer = get_error_analyzer()
         return self._error_analyzer
     
     async def execute_command(
@@ -64,18 +62,28 @@ class AdaptiveExecutionEngine:
         self._logger.info(f"Preparing to execute command: {command}")
         
         # Analyze command risk and impact
-        risk_level, risk_reason = classify_command_risk(command)
-        impact = analyze_command_impact(command)
+        classifier = get_command_risk_classifier()
+        impact_analyzer = get_command_impact_analyzer()
+        
+        risk_level, risk_reason = classifier.classify_command_risk(command)
+        impact = impact_analyzer.analyze_command_impact(command)
         
         # Add to session context
+        session_manager = get_session_manager()
         session_manager.add_command(command)
         
         # Generate command preview if needed
-        from angela.safety.preview import generate_preview
-        preview = await generate_preview(command) if preferences_manager.preferences.ui.show_command_preview else None
+        preferences_manager = get_preferences_manager()
+        
+        if preferences_manager.preferences.ui.show_command_preview:
+            preview_generator = get_command_preview_generator()
+            preview = await preview_generator.generate_preview(command)
+        else:
+            preview = None
         
         # Get adaptive confirmation based on risk level and user history
-        confirmed = await get_adaptive_confirmation(
+        confirmation_handler = get_adaptive_confirmation_handler()
+        confirmed = await confirmation_handler.get_adaptive_confirmation(
             command=command,
             risk_level=risk_level,
             risk_reason=risk_reason,
@@ -102,6 +110,7 @@ class AdaptiveExecutionEngine:
         result = await self._execute_with_feedback(command, dry_run)
         
         # Add to history
+        history_manager = get_history_manager()
         history_manager.add_command(
             command=command,
             natural_request=natural_request,
@@ -113,15 +122,14 @@ class AdaptiveExecutionEngine:
         
         # If execution failed, analyze error and suggest fixes
         if not result["success"] and result.get("stderr"):
-            error_analyzer_instance = self._get_error_analyzer() 
-            result["error_analysis"] = error_analyzer_instance.analyze_error(command, result["stderr"])
-            result["fix_suggestions"] = error_analyzer_instance.generate_fix_suggestions(command, result["stderr"])
-
+            error_analyzer = self._get_error_analyzer()
+            result["error_analysis"] = error_analyzer.analyze_error(command, result["stderr"])
+            result["fix_suggestions"] = error_analyzer.generate_fix_suggestions(command, result["stderr"])
         
         # Offer to learn from successful executions
         if result["success"] and risk_level > 0:
-            from angela.safety.adaptive_confirmation import offer_command_learning
-            await offer_command_learning(command)
+            learning_handler = get_command_learning_handler()
+            await learning_handler.offer_command_learning(command)
         
         return result
     
@@ -136,10 +144,14 @@ class AdaptiveExecutionEngine:
         Returns:
             Dictionary with execution results
         """
+        preferences_manager = get_preferences_manager()
         use_spinners = preferences_manager.preferences.ui.use_spinners
         
         # For dry runs, return the preview directly
         if dry_run:
+            # Get execution engine through API
+            execution_engine = get_execution_engine()
+            
             # Execute in dry-run mode
             stdout, stderr, return_code = await execution_engine.dry_run_command(command)
             
@@ -151,6 +163,9 @@ class AdaptiveExecutionEngine:
                 "return_code": return_code,
                 "dry_run": True
             }
+        
+        # Get execution engine through API
+        execution_engine = get_execution_engine()
         
         # Show execution spinner if enabled
         if use_spinners:
@@ -179,6 +194,7 @@ class AdaptiveExecutionEngine:
             )
         
         # Store result in session for reference
+        session_manager = get_session_manager()
         if stdout.strip():
             session_manager.add_result(stdout.strip())
         

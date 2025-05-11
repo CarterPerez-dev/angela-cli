@@ -10,8 +10,9 @@ import re
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union
 
-from angela.context.file_activity import file_activity_tracker, ActivityType
-from angela.utils.logging import get_logger
+# Import through API layer
+from angela.api.context import get_file_activity_tracker, get_activity_type
+from angela.api.utils import get_logger
 
 logger = get_logger(__name__)
 
@@ -176,6 +177,10 @@ class ExecutionHooks:
         if not result.get("success", False):
             return
         
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        ActivityType = get_activity_type()
+        
         # Track file activity based on operation type
         if operation_type == "create_file":
             file_path = parameters.get("path")
@@ -254,6 +259,9 @@ class ExecutionHooks:
             command: The command to analyze
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         # Split command into tokens
         tokens = command.split()
         
@@ -304,6 +312,9 @@ class ExecutionHooks:
             output: The command output
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         # Check for file paths in output
         paths = set()
         
@@ -347,6 +358,9 @@ class ExecutionHooks:
             command: The executed command
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         tokens = command.split()
         
         if len(tokens) < 2:
@@ -386,6 +400,9 @@ class ExecutionHooks:
             command: The executed command
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         tokens = command.split()
         
         if len(tokens) < 2:
@@ -427,6 +444,8 @@ class ExecutionHooks:
                 if not path.is_absolute():
                     path = Path(context.get("cwd", ".")) / file_path
                 
+                # Get ActivityType via API
+                ActivityType = get_activity_type()
                 operation = ActivityType.CREATED
                 if tokens[redirect_idx] == '>>':
                     operation = ActivityType.MODIFIED
@@ -457,6 +476,9 @@ class ExecutionHooks:
             command: The executed command
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         tokens = command.split()
         
         if len(tokens) < 2:
@@ -492,6 +514,9 @@ class ExecutionHooks:
             command: The executed command
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         tokens = command.split()
         
         if len(tokens) < 3:
@@ -570,6 +595,9 @@ class ExecutionHooks:
             command: The executed command
             context: Context information
         """
+        # Get file activity tracker via API
+        file_activity_tracker = get_file_activity_tracker()
+        
         tokens = command.split()
         
         if len(tokens) < 2:
