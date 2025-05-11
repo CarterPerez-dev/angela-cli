@@ -85,6 +85,7 @@ async def list_containers(
     ) as progress:
         task = progress.add_task("Listing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.list_containers(all_containers)
         
         progress.update(task, completed=1)
@@ -164,6 +165,7 @@ async def show_container_logs(
     ) as progress:
         task = progress.add_task("Getting logs", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.get_container_logs(
             container_id_or_name=container,
             tail=tail,
@@ -192,7 +194,6 @@ async def show_container_logs(
     else:
         console.print(f"[red]Error getting container logs: {result.get('error', 'Unknown error')}[/red]")
 
-
 @app.command("start")
 async def start_container(container: str = typer.Argument(..., help="Container ID or name")):
     """Start a Docker container."""
@@ -203,6 +204,7 @@ async def start_container(container: str = typer.Argument(..., help="Container I
     ) as progress:
         task = progress.add_task("Starting", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.start_container(container)
         
         progress.update(task, completed=1)
@@ -226,6 +228,7 @@ async def stop_container(
     ) as progress:
         task = progress.add_task("Stopping", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.stop_container(container, timeout)
         
         progress.update(task, completed=1)
@@ -249,6 +252,7 @@ async def restart_container(
     ) as progress:
         task = progress.add_task("Restarting", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.restart_container(container, timeout)
         
         progress.update(task, completed=1)
@@ -273,6 +277,7 @@ async def remove_container(
     ) as progress:
         task = progress.add_task("Removing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.remove_container(container, force, volumes)
         
         progress.update(task, completed=1)
@@ -296,6 +301,7 @@ async def list_images(
     ) as progress:
         task = progress.add_task("Listing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.list_images(all_images)
         
         progress.update(task, completed=1)
@@ -354,6 +360,7 @@ async def remove_image(
     ) as progress:
         task = progress.add_task("Removing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.remove_image(image, force)
         
         progress.update(task, completed=1)
@@ -362,8 +369,8 @@ async def remove_image(
         console.print(f"[green]Image {image} removed successfully.[/green]")
     else:
         console.print(f"[red]Error removing image: {result.get('error', 'Unknown error')}[/red]")
-
-
+        
+        
 @app.command("pull")
 async def pull_image(image: str = typer.Argument(..., help="Image name to pull")):
     """Pull a Docker image."""
@@ -374,6 +381,7 @@ async def pull_image(image: str = typer.Argument(..., help="Image name to pull")
     ) as progress:
         task = progress.add_task("Pulling", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.pull_image(image)
         
         progress.update(task, completed=1)
@@ -405,6 +413,7 @@ async def build_image(
     ) as progress:
         task = progress.add_task("Building", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.build_image(
             context_path=path,
             tag=tag,
@@ -453,6 +462,7 @@ async def run_container(
     ) as progress:
         task = progress.add_task("Running", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.run_container(
             image=image,
             command=command,
@@ -495,6 +505,7 @@ async def exec_in_container(
     ) as progress:
         task = progress.add_task("Executing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.exec_in_container(
             container_id_or_name=container,
             command=command,
@@ -517,9 +528,6 @@ async def exec_in_container(
     else:
         console.print(f"[red]Error executing command: {result.get('error', 'Unknown error')}[/red]")
 
-
-# Docker Compose commands
-
 @app.command("compose-up")
 async def compose_up(
     compose_file: Optional[str] = typer.Option(None, "--file", "-f", help="Path to docker-compose.yml"),
@@ -535,6 +543,7 @@ async def compose_up(
     if directory:
         dir_path = Path(directory).absolute()
     else:
+        context_manager = get_context_manager()
         dir_path = context_manager.cwd
     
     if not dir_path.exists() or not dir_path.is_dir():
@@ -548,6 +557,7 @@ async def compose_up(
     ) as progress:
         task = progress.add_task("Starting", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.compose_up(
             compose_file=compose_file,
             project_directory=dir_path,
@@ -584,6 +594,7 @@ async def compose_down(
     if directory:
         dir_path = Path(directory).absolute()
     else:
+        context_manager = get_context_manager()
         dir_path = context_manager.cwd
     
     if not dir_path.exists() or not dir_path.is_dir():
@@ -597,6 +608,7 @@ async def compose_down(
     ) as progress:
         task = progress.add_task("Stopping", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.compose_down(
             compose_file=compose_file,
             project_directory=dir_path,
@@ -625,6 +637,7 @@ async def compose_ps(
     if directory:
         dir_path = Path(directory).absolute()
     else:
+        context_manager = get_context_manager()
         dir_path = context_manager.cwd
     
     if not dir_path.exists() or not dir_path.is_dir():
@@ -638,6 +651,7 @@ async def compose_ps(
     ) as progress:
         task = progress.add_task("Listing", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.compose_ps(
             compose_file=compose_file,
             project_directory=dir_path,
@@ -672,6 +686,7 @@ async def compose_logs(
     if directory:
         dir_path = Path(directory).absolute()
     else:
+        context_manager = get_context_manager()
         dir_path = context_manager.cwd
     
     if not dir_path.exists() or not dir_path.is_dir():
@@ -685,6 +700,7 @@ async def compose_logs(
     ) as progress:
         task = progress.add_task("Getting logs", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.compose_logs(
             compose_file=compose_file,
             project_directory=dir_path,
@@ -716,8 +732,6 @@ async def compose_logs(
         console.print(f"[red]Error getting Docker Compose logs: {result.get('error', 'Unknown error')}[/red]")
 
 
-# Dockerfile and docker-compose.yml generation commands
-
 @app.command("generate-dockerfile")
 async def generate_dockerfile(
     directory: str = typer.Argument(".", help="Project directory"),
@@ -738,6 +752,7 @@ async def generate_dockerfile(
     ) as progress:
         task = progress.add_task("Generating", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.generate_dockerfile(
             project_directory=dir_path,
             output_file=output,
@@ -788,6 +803,7 @@ async def generate_docker_compose(
     ) as progress:
         task = progress.add_task("Generating", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.generate_docker_compose(
             project_directory=dir_path,
             output_file=output,
@@ -840,6 +856,7 @@ async def generate_dockerignore(
     ) as progress:
         task = progress.add_task("Generating", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.generate_dockerignore(
             project_directory=dir_path,
             output_file=output,
@@ -893,6 +910,7 @@ async def setup_docker_project(
     ) as progress:
         task = progress.add_task("Setting up", total=1)
         
+        docker_integration = get_docker_integration()
         result = await docker_integration.setup_docker_project(
             project_directory=dir_path,
             generate_dockerfile=dockerfile,
@@ -943,12 +961,14 @@ async def info():
         task = progress.add_task("Getting info", total=1)
         
         # Check Docker and Docker Compose availability
+        docker_integration = get_docker_integration()
         docker_available = await docker_integration.is_docker_available()
         compose_available = await docker_integration.is_docker_compose_available()
         
         # Execute docker info command if available
         docker_info_output = ""
         if docker_available:
+            execution_engine = get_execution_engine()
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 "docker info",
                 check_safety=True

@@ -62,7 +62,11 @@ def create_project(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
+        
+        # Get code generation engine
+        code_generation_engine = get_code_generation_engine()
         
         # Generate project plan
         project_plan = asyncio.run(code_generation_engine.generate_project(
@@ -102,6 +106,7 @@ def create_project(
                 console.print("\n[bold]Initializing Git repository...[/bold]")
                 
                 with console.status("[bold green]Initializing Git...[/bold green]"):
+                    git_integration = get_git_integration()
                     git_result = asyncio.run(git_integration.init_repository(
                         path=output_dir,
                         initial_branch="main",
@@ -118,6 +123,7 @@ def create_project(
                 console.print("\n[bold]Installing dependencies...[/bold]")
                 
                 with console.status("[bold green]Installing dependencies...[/bold green]"):
+                    package_manager_integration = get_package_manager_integration()
                     deps_result = asyncio.run(package_manager_integration.install_dependencies(
                         path=output_dir,
                         dependencies=project_plan.dependencies.get("runtime", []),
@@ -135,6 +141,7 @@ def create_project(
                 console.print("\n[bold]Generating test files...[/bold]")
                 
                 with console.status("[bold green]Generating tests...[/bold green]"):
+                    test_framework_integration = get_test_framework_integration()
                     test_result = asyncio.run(test_framework_integration.generate_test_files(
                         src_files=project_plan.files,
                         project_type=project_plan.project_type,
@@ -150,7 +157,8 @@ def create_project(
             if ci_platform:
                 console.print("\n[bold]Generating CI/CD configuration...[/bold]")
                 
-                with console.status(f"[bold green]Generating {ci_platform} configuration...[/bold green]"):
+                with console.status("[bold green]Generating {ci_platform} configuration...[/bold green]"):
+                    ci_cd_integration = get_ci_cd_integration()
                     ci_result = asyncio.run(ci_cd_integration.generate_ci_configuration(
                         path=output_dir,
                         platform=ci_platform,
@@ -167,6 +175,7 @@ def create_project(
                 console.print("\n[bold]Creating initial commit...[/bold]")
                 
                 with console.status("[bold green]Creating commit...[/bold green]"):
+                    git_integration = get_git_integration()
                     commit_result = asyncio.run(git_integration.commit_changes(
                         path=output_dir,
                         message="Initial project generation",
@@ -185,6 +194,7 @@ def create_project(
     except Exception as e:
         logger.exception("Error generating project")
         console.print(f"[bold red]Error generating project:[/bold red] {str(e)}")
+
 
 @app.command("add-feature")
 async def add_feature(
@@ -207,7 +217,9 @@ async def add_feature(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
+        context_enhancer = get_context_enhancer()
         context = await context_enhancer.enrich_context(context)
         
         # Check if project directory exists
@@ -222,6 +234,7 @@ async def add_feature(
             
             if not dry_run:
                 with console.status("[bold green]Creating branch...[/bold green]"):
+                    git_integration = get_git_integration()
                     branch_result = await git_integration.create_branch(
                         path=project_dir,
                         branch_name=branch,
@@ -236,6 +249,7 @@ async def add_feature(
         # Get project info
         with console.status("[bold green]Analyzing project...[/bold green]"):
             # Detect project type
+            ci_cd_integration = get_ci_cd_integration()
             project_type_result = await ci_cd_integration.detect_project_type(project_dir)
             project_type = project_type_result.get("project_type")
             
@@ -249,6 +263,7 @@ async def add_feature(
         
         with console.status("[bold green]Generating feature implementation...[/bold green]"):
             # Use the new feature addition method
+            code_generation_engine = get_code_generation_engine()
             result = await code_generation_engine.add_feature_to_project(
                 description=description,
                 project_dir=project_dir,
@@ -276,6 +291,7 @@ async def add_feature(
                 with console.status("[bold green]Generating tests...[/bold green]"):
                     # Create a list of new files with CodeFile objects
                     src_files = []
+                    CodeFile = get_code_file_class()
                     for file_path in result.get("new_files", []):
                         try:
                             with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
@@ -293,6 +309,7 @@ async def add_feature(
                             console.print(f"[yellow]Error reading file {file_path}: {str(e)}[/yellow]")
                     
                     if src_files:
+                        test_framework_integration = get_test_framework_integration()
                         test_result = await test_framework_integration.generate_test_files(
                             src_files=src_files,
                             project_type=project_type,
@@ -333,6 +350,7 @@ async def add_feature(
                         
                         if runtime_deps:
                             console.print(f"[bold]Runtime dependencies to install:[/bold] {', '.join(runtime_deps)}")
+                            package_manager_integration = get_package_manager_integration()
                             install_result = await package_manager_integration.install_dependencies(
                                 path=project_dir,
                                 dependencies=runtime_deps,
@@ -346,6 +364,7 @@ async def add_feature(
                         
                         if dev_deps:
                             console.print(f"[bold]Development dependencies to install:[/bold] {', '.join(dev_deps)}")
+                            package_manager_integration = get_package_manager_integration()
                             dev_install_result = await package_manager_integration.install_dependencies(
                                 path=project_dir,
                                 dependencies=[],
@@ -361,6 +380,7 @@ async def add_feature(
     except Exception as e:
         logger.exception("Error adding feature")
         console.print(f"[bold red]Error adding feature:[/bold red] {str(e)}")
+
 
 @app.command("refine-code")
 async def refine_code(
@@ -380,6 +400,7 @@ async def refine_code(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Check if file exists
@@ -396,6 +417,7 @@ async def refine_code(
         console.print("\n[bold]Processing feedback...[/bold]")
         
         with console.status("[bold green]Generating improvements...[/bold green]"):
+            feedback_manager = get_feedback_manager()
             result = await feedback_manager.process_feedback(
                 feedback=feedback,
                 original_code=original_code,
@@ -436,6 +458,7 @@ async def refine_code(
             }
             
             with console.status("[bold green]Applying changes...[/bold green]"):
+                feedback_manager = get_feedback_manager()
                 apply_result = await feedback_manager.apply_refinements(
                     refinements=refinements,
                     backup=backup
@@ -456,6 +479,7 @@ async def refine_code(
         logger.exception("Error refining code")
         console.print(f"[bold red]Error refining code:[/bold red] {str(e)}")
 
+
 @app.command("refine-project")
 def refine_project(
     feedback: str = typer.Argument(..., help="Feedback for project improvement"),
@@ -475,6 +499,7 @@ def refine_project(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Check if project directory exists
@@ -487,6 +512,7 @@ def refine_project(
         console.print("\n[bold]Processing feedback...[/bold]")
         
         with console.status("[bold green]Analyzing project and generating improvements...[/bold green]"):
+            feedback_manager = get_feedback_manager()
             result = asyncio.run(feedback_manager.refine_project(
                 project_dir=project_path,
                 feedback=feedback,
@@ -550,6 +576,7 @@ def refine_project(
             console.print("\n[bold]Applying changes...[/bold]")
             
             with console.status("[bold green]Applying changes...[/bold green]"):
+                feedback_manager = get_feedback_manager()
                 apply_result = asyncio.run(feedback_manager.apply_refinements(
                     refinements=result,
                     backup=backup
@@ -567,6 +594,7 @@ def refine_project(
     except Exception as e:
         logger.exception("Error refining project")
         console.print(f"[bold red]Error refining project:[/bold red] {str(e)}")
+
 
 @app.command("generate-ci")
 def generate_ci(
@@ -595,6 +623,7 @@ def generate_ci(
             console.print("\n[bold]Detecting project type...[/bold]")
             
             with console.status("[bold green]Analyzing project...[/bold green]"):
+                ci_cd_integration = get_ci_cd_integration()
                 detection_result = asyncio.run(ci_cd_integration.detect_project_type(project_dir))
                 project_type = detection_result.get("project_type")
             
@@ -608,6 +637,7 @@ def generate_ci(
         console.print(f"\n[bold]Generating {platform} configuration...[/bold]")
         
         with console.status(f"[bold green]Generating configuration...[/bold green]"):
+            ci_cd_integration = get_ci_cd_integration()
             result = asyncio.run(ci_cd_integration.generate_ci_configuration(
                 path=project_dir,
                 platform=platform,
@@ -623,9 +653,6 @@ def generate_ci(
     except Exception as e:
         logger.exception("Error generating CI/CD configuration")
         console.print(f"[bold red]Error generating CI/CD configuration:[/bold red] {str(e)}")
-
-
-
 
 @app.command("create-complex-project")
 def create_complex_project(
@@ -651,10 +678,12 @@ def create_complex_project(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Generate complex project
         with console.status("[bold green]Generating project plan and architecture...[/bold green]"):
+            code_generation_engine = get_code_generation_engine()
             project_plan = asyncio.run(code_generation_engine.generate_complex_project(
                 description=description,
                 output_dir=output_dir,
@@ -671,6 +700,7 @@ def create_complex_project(
         console.print(f"Files: [bold]{len(project_plan.files)}[/bold]")
         
         # Generate architecture visualization if available
+        generation_context_manager = get_generation_context_manager()
         architecture = generation_context_manager.get_global_context("architecture")
         if architecture:
             console.print("\n[bold blue]Architecture Overview:[/bold blue]")
@@ -700,6 +730,7 @@ def create_complex_project(
             feedback = Prompt.ask("\nPlease describe what you'd like to refine")
             
             with console.status("[bold green]Refining project based on feedback...[/bold green]"):
+                interactive_refiner = get_interactive_refiner()
                 refined_project, refinement_results = asyncio.run(interactive_refiner.process_refinement_feedback(
                     feedback=feedback,
                     project=project_plan
@@ -722,6 +753,7 @@ def create_complex_project(
             console.print("\n[bold]Creating project files...[/bold]")
             
             with console.status("[bold green]Creating files...[/bold green]"):
+                code_generation_engine = get_code_generation_engine()
                 result = asyncio.run(code_generation_engine.create_project_files(project_plan))
             
             console.print(f"[green]Created {result['file_count']} files[/green]")
@@ -731,6 +763,7 @@ def create_complex_project(
                 console.print("\n[bold]Initializing Git repository...[/bold]")
                 
                 with console.status("[bold green]Initializing Git...[/bold green]"):
+                    git_integration = get_git_integration()
                     git_result = asyncio.run(git_integration.init_repository(
                         path=output_dir,
                         initial_branch="main",
@@ -747,6 +780,7 @@ def create_complex_project(
                 console.print("\n[bold]Installing dependencies...[/bold]")
                 
                 with console.status("[bold green]Installing dependencies...[/bold green]"):
+                    package_manager_integration = get_package_manager_integration()
                     deps_result = asyncio.run(package_manager_integration.install_dependencies(
                         path=output_dir,
                         dependencies=project_plan.dependencies.get("runtime", []),
@@ -764,6 +798,7 @@ def create_complex_project(
                 console.print("\n[bold]Generating test files...[/bold]")
                 
                 with console.status("[bold green]Generating tests...[/bold green]"):
+                    test_framework_integration = get_test_framework_integration()
                     test_result = asyncio.run(test_framework_integration.generate_test_files(
                         src_files=project_plan.files,
                         project_type=project_plan.project_type,
@@ -780,6 +815,7 @@ def create_complex_project(
                 console.print("\n[bold]Generating CI/CD configuration...[/bold]")
                 
                 with console.status(f"[bold green]Generating {ci_platform} configuration...[/bold green]"):
+                    ci_cd_integration = get_ci_cd_integration()
                     ci_result = asyncio.run(ci_cd_integration.generate_ci_configuration(
                         path=output_dir,
                         platform=ci_platform,
@@ -796,6 +832,7 @@ def create_complex_project(
                 console.print("\n[bold]Creating initial commit...[/bold]")
                 
                 with console.status("[bold green]Creating commit...[/bold green]"):
+                    git_integration = get_git_integration()
                     commit_result = asyncio.run(git_integration.commit_changes(
                         path=output_dir,
                         message="Initial project generation",
@@ -839,6 +876,7 @@ def create_framework_project(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Prepare options
@@ -925,6 +963,7 @@ def create_framework_project(
             console.print("\n[bold]Creating project files...[/bold]")
             
             with console.status("[bold green]Creating files...[/bold green]"):
+                code_generation_engine = get_code_generation_engine()
                 creation_result = asyncio.run(code_generation_engine.create_project_files(project))
             
             console.print(f"[green]Created {creation_result['file_count']} files[/green]")
@@ -934,6 +973,7 @@ def create_framework_project(
                 console.print("\n[bold]Initializing Git repository...[/bold]")
                 
                 with console.status("[bold green]Initializing Git...[/bold green]"):
+                    git_integration = get_git_integration()
                     git_result = asyncio.run(git_integration.init_repository(
                         path=output_dir,
                         initial_branch="main",
@@ -953,6 +993,7 @@ def create_framework_project(
                     # Use package manager based on framework
                     project_type = result["project_type"]
                     
+                    package_manager_integration = get_package_manager_integration()
                     deps_result = asyncio.run(package_manager_integration.install_dependencies(
                         path=output_dir,
                         project_type=project_type
@@ -970,6 +1011,7 @@ def create_framework_project(
     except Exception as e:
         logger.exception(f"Error generating {framework} project")
         console.print(f"[bold red]Error generating {framework} project:[/bold red] {str(e)}")
+
 
 @app.command("refine-generated-project")
 async def refine_generated_project(
@@ -990,6 +1032,7 @@ async def refine_generated_project(
     
     try:
         # Get current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Check if project directory exists
@@ -1020,8 +1063,10 @@ async def refine_generated_project(
                             content = f.read()
                         
                         # Get file info
-                        file_type = detect_file_type(file_path)
+                        file_detector_func = get_file_detector_func()
+                        file_type = file_detector_func(file_path)
                         
+                        CodeFile = get_code_file_class()
                         project_files.append(CodeFile(
                             path=str(rel_path),
                             content=content,
@@ -1050,7 +1095,7 @@ async def refine_generated_project(
         # Try to infer project type
         with console.status("[bold green]Analyzing project...[/bold green]"):
             # Try to detect project type
-            from angela.toolchain.ci_cd import ci_cd_integration
+            ci_cd_integration = get_ci_cd_integration()
             detection_result = await ci_cd_integration.detect_project_type(project_dir)
             
             if detection_result["project_type"]:
@@ -1058,6 +1103,7 @@ async def refine_generated_project(
                 console.print(f"[green]Detected project type: {project.project_type}[/green]")
             
             # Analyze code relationships
+            generation_context_manager = get_generation_context_manager()
             analysis_result = await generation_context_manager.analyze_code_relationships(project.files)
             
             console.print(f"[green]Analyzed {analysis_result.get('entity_count', 0)} entities and {analysis_result.get('dependency_count', 0)} dependencies[/green]")
@@ -1070,6 +1116,7 @@ async def refine_generated_project(
         console.print("\n[bold]Processing feedback...[/bold]")
         
         with console.status("[bold green]Generating improvements based on feedback...[/bold green]"):
+            interactive_refiner = get_interactive_refiner()
             refined_project, refinement_results = await interactive_refiner.process_refinement_feedback(
                 feedback=feedback,
                 project=project,
@@ -1133,6 +1180,7 @@ async def refine_generated_project(
             console.print("\n[bold]Applying changes...[/bold]")
             
             with console.status("[bold green]Applying changes...[/bold green]"):
+                feedback_manager = get_feedback_manager()
                 apply_result = await feedback_manager.apply_refinements(
                     refinements=refinement_results,
                     backup=backup
@@ -1150,6 +1198,7 @@ async def refine_generated_project(
     except Exception as e:
         logger.exception("Error refining project")
         console.print(f"[bold red]Error refining project:[/bold red] {str(e)}")
+
 
 def group_files_by_directory(files: List[CodeFile]) -> Dict[str, List[CodeFile]]:
     """
@@ -1203,6 +1252,7 @@ def generate_tests(
             console.print("\n[bold]Detecting test framework...[/bold]")
             
             with console.status("[bold green]Analyzing project...[/bold green]"):
+                test_framework_integration = get_test_framework_integration()
                 detection_result = asyncio.run(test_framework_integration.detect_test_framework(project_dir))
                 test_framework = detection_result.get("test_framework")
             
@@ -1217,6 +1267,7 @@ def generate_tests(
         src_files = []
         with console.status("[bold green]Scanning project...[/bold green]"):
             # Get project type
+            ci_cd_integration = get_ci_cd_integration()
             project_type_result = asyncio.run(ci_cd_integration.detect_project_type(project_dir))
             project_type = project_type_result.get("project_type")
             
@@ -1262,7 +1313,7 @@ def generate_tests(
                                 content = f.read()
                             
                             # Create CodeFile object
-                            from angela.generation.engine import CodeFile
+                            CodeFile = get_code_file_class()
                             file_path = Path(root) / file
                             rel_path = file_path.relative_to(project_path)
                             
@@ -1282,6 +1333,7 @@ def generate_tests(
         console.print("\n[bold]Generating test files...[/bold]")
         
         with console.status("[bold green]Generating tests...[/bold green]"):
+            test_framework_integration = get_test_framework_integration()
             result = asyncio.run(test_framework_integration.generate_test_files(
                 src_files=src_files,
                 test_framework=test_framework,

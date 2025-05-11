@@ -254,7 +254,8 @@ class SemanticAnalyzer:
             self._logger.warning(f"File not found for semantic analysis: {path_obj}")
             return None
         
-        # Detect file type
+        # Detect file type using the API layer
+        detect_file_type = get_file_detector_func()
         file_info = detect_file_type(path_obj)
         language = file_info.get("language", "").lower()
         
@@ -1423,6 +1424,7 @@ Ensure your JSON is valid. Don't include any comments or explanations outside th
             entity_code = "\n".join(lines[start_line:end_line])
             
             # Get the language
+            detect_file_type = get_file_detector_func()
             file_info = detect_file_type(Path(filename))
             language = file_info.get("language", "").lower()
             
@@ -1515,12 +1517,14 @@ focused and to-the-point - ideally 3-5 sentences.
 """
             
             # Call AI service
+            GeminiRequest = get_gemini_request_class()
             api_request = GeminiRequest(
                 prompt=prompt,
                 max_tokens=1000,
                 temperature=0.3
             )
             
+            gemini_client = get_gemini_client()
             response = await gemini_client.generate_text(api_request)
             
             return response.text.strip()

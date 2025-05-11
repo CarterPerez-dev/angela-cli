@@ -172,7 +172,8 @@ def remove_directory(
     """Remove a directory."""
     try:
         # Run the operation
-        success = asyncio.run(delete_directory(
+        delete_directory_func = get_delete_directory_func()
+        success = asyncio.run(delete_directory_func(
             path, recursive=recursive, force=force, dry_run=dry_run
         ))
         
@@ -185,7 +186,7 @@ def remove_directory(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error removing directory: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -201,7 +202,8 @@ def touch_file(
     """Create a new file or update file timestamp."""
     try:
         # Run the operation (with no content for touch)
-        success = asyncio.run(create_file(path, content=None, dry_run=dry_run))
+        create_file_func = get_create_file_func()
+        success = asyncio.run(create_file_func(path, content=None, dry_run=dry_run))
         
         if success:
             if dry_run:
@@ -212,7 +214,7 @@ def touch_file(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error touching file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -233,10 +235,12 @@ def cat_file(
         file_path = Path(path)
         
         # Get file info to determine syntax highlighting
+        context_manager = get_context_manager()
         file_info = context_manager.get_file_info(file_path)
         
         # Read the file
-        content = asyncio.run(read_file(path, binary=binary))
+        read_file_func = get_read_file_func()
+        content = asyncio.run(read_file_func(path, binary=binary))
         
         # Display the content
         if binary:
@@ -281,7 +285,7 @@ def cat_file(
             # Simple text display
             console.print(content)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error reading file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -300,7 +304,8 @@ def remove_file(
     """Remove a file."""
     try:
         # Run the operation
-        success = asyncio.run(delete_file(path, force=force, dry_run=dry_run))
+        delete_file_func = get_delete_file_func()
+        success = asyncio.run(delete_file_func(path, force=force, dry_run=dry_run))
         
         if success:
             if dry_run:
@@ -311,7 +316,7 @@ def remove_file(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error removing file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -331,7 +336,8 @@ def copy_file_command(
     """Copy a file."""
     try:
         # Run the operation
-        success = asyncio.run(copy_file(
+        copy_file_func = get_copy_file_func()
+        success = asyncio.run(copy_file_func(
             source, destination, overwrite=force, dry_run=dry_run
         ))
         
@@ -344,7 +350,7 @@ def copy_file_command(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error copying file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -364,7 +370,8 @@ def move_file_command(
     """Move a file."""
     try:
         # Run the operation
-        success = asyncio.run(move_file(
+        move_file_func = get_move_file_func()
+        success = asyncio.run(move_file_func(
             source, destination, overwrite=force, dry_run=dry_run
         ))
         
@@ -377,7 +384,7 @@ def move_file_command(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error moving file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -411,7 +418,8 @@ def write_file_command(
             content = "\n".join(lines)
         
         # Run the operation
-        success = asyncio.run(write_file(
+        write_file_func = get_write_file_func()
+        success = asyncio.run(write_file_func(
             path, content, append=append, dry_run=dry_run
         ))
         
@@ -426,7 +434,7 @@ def write_file_command(
             console.print(f"[bold yellow]Operation cancelled.[/bold yellow]")
             sys.exit(1)
         
-    except FileSystemError as e:
+    except get_filesystem_error_class() as e:
         logger.exception(f"Error writing file: {str(e)}")
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         sys.exit(1)
@@ -444,6 +452,7 @@ def find_files(
 ):
     """Find files matching a pattern."""
     try:
+        context_manager = get_context_manager()
         base_dir = Path(path)
         if not base_dir.exists() or not base_dir.is_dir():
             console.print(f"[bold red]Error:[/bold red] Not a valid directory: {path}")
@@ -492,6 +501,7 @@ def rollback_command(
     """Roll back a previous file operation."""
     try:
         # Get recent operations
+        rollback_manager = get_rollback_manager()
         operations = asyncio.run(rollback_manager.get_recent_operations())
         
         if not operations:
@@ -586,6 +596,7 @@ def file_info(
 ):
     """Show detailed information about a file or directory."""
     try:
+        context_manager = get_context_manager()
         file_path = Path(path) if path else context_manager.cwd
         
         if not file_path.exists():

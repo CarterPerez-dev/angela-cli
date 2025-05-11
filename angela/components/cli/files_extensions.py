@@ -105,10 +105,12 @@ def extract_references(
 ):
     """Extract and resolve file references from text."""
     # Get the current context
+    context_manager = get_context_manager()
     context = context_manager.get_context_dict()
     
     # Run the extractor
     try:
+        file_resolver = get_file_resolver()
         references = asyncio.run(file_resolver.extract_references(text, context))
         
         if references:
@@ -124,6 +126,7 @@ def extract_references(
                     path_str = str(path)
                     
                     # Track as viewed file
+                    file_activity_tracker = get_file_activity_tracker()
                     file_activity_tracker.track_file_viewing(path, None, {
                         "reference": reference,
                         "extracted_via": "cli"
@@ -162,6 +165,7 @@ def recent_files(
         activity_types = None
         if activity_type:
             try:
+                ActivityType = get_activity_type_enum()
                 activity_types = [ActivityType(activity_type)]
             except ValueError:
                 console.print(f"[yellow]Invalid activity type: {activity_type}[/yellow]")
@@ -169,6 +173,7 @@ def recent_files(
                 return
         
         # Get recent activities
+        file_activity_tracker = get_file_activity_tracker()
         activities = file_activity_tracker.get_recent_activities(
             limit=limit,
             activity_types=activity_types
@@ -238,6 +243,7 @@ def most_active_files(
     """Show most actively used files."""
     try:
         # Get most active files
+        file_activity_tracker = get_file_activity_tracker()
         active_files = file_activity_tracker.get_most_active_files(limit=limit)
         
         if active_files:
@@ -296,6 +302,7 @@ def show_project_info():
     """Show detected project information."""
     try:
         # Get the current context
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         
         # Check if in a project
@@ -308,7 +315,7 @@ def show_project_info():
             return
         
         # Get enhanced project info
-        from angela.context.enhancer import context_enhancer
+        context_enhancer = get_context_enhancer()
         
         # Enrich context
         enriched = asyncio.run(context_enhancer.enrich_context(context))

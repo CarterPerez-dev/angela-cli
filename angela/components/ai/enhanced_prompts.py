@@ -11,16 +11,18 @@ import json
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Set, Union
 
-from angela.utils.logging import get_logger
-from angela.context.file_detector import detect_file_type
-from angela.ai.prompts import (
+
+from angela.api.ai import (
     build_prompt, SYSTEM_INSTRUCTIONS, EXAMPLES, FILE_OPERATION_EXAMPLES,
     ENHANCED_PROJECT_CONTEXT, ERROR_ANALYSIS_PROMPT, MULTI_STEP_OPERATION_PROMPT,
     CODE_GENERATION_PROMPT, RECENT_FILES_CONTEXT, RESOLVED_FILES_CONTEXT,
     FILE_OPERATION_PROMPT_TEMPLATE
 )
-from angela.context.project_state_analyzer import project_state_analyzer
-from angela.ai.semantic_analyzer import semantic_analyzer
+
+from angela.utils.logging import get_logger
+from angela.api.context import get_file_detector_func
+from angela.api.ai import get_gemini_client, get_gemini_request_class
+from angela.api.context import get_semantic_analyzer, get_project_state_analyzer
 
 logger = get_logger(__name__)
 
@@ -178,6 +180,7 @@ async def build_enhanced_prompt(
         
         # Get enhanced project state if available
         try:
+            project_state_analyzer = get_project_state_analyzer()
             project_state = await project_state_analyzer.get_project_state(project_root)
             
             # Add Git status
@@ -264,6 +267,7 @@ async def build_enhanced_prompt(
     # Add semantic code information if a specific entity is provided
     if entity_name and project_root:
         try:
+            semantic_analyzer = get_semantic_analyzer()
             entity_info = await semantic_analyzer.analyze_entity_usage(entity_name, project_root)
             
             if entity_info.get('found', False):
@@ -315,6 +319,7 @@ async def build_enhanced_prompt(
         if project_root and file_path:
             try:
                 file_path_obj = Path(file_path)
+                semantic_analyzer = get_semantic_analyzer()
                 module = await semantic_analyzer.analyze_file(file_path_obj)
                 
                 if module:
@@ -446,6 +451,7 @@ async def build_semantic_code_manipulation_prompt(
     
     try:
         # Get semantic information about the entity
+        semantic_analyzer = get_semantic_analyzer()
         entity_info = await semantic_analyzer.analyze_entity_usage(entity_name, project_root)
         
         if not entity_info.get('found', False):
@@ -466,7 +472,8 @@ async def build_semantic_code_manipulation_prompt(
             modified_code = original_code
         
         # Get file type
-        file_info = detect_file_type(Path(filename))
+        file_detector_func = get_file_detector_func()
+        file_info = file_detector_func(Path(filename))
         language = file_info.get('language', '').lower()
         
         # Format references
@@ -532,12 +539,14 @@ async def build_semantic_task_planning_prompt(
     
     project_root = context.get('project_root')
     if not project_root:
+        from angela.ai.prompts import build_prompt
         return build_prompt(request, context)  # Fall back to regular prompt
     
     # Build semantic code context
     semantic_code_context = ""
     
     if entity_names:
+        semantic_analyzer = get_semantic_analyzer()
         for entity_name in entity_names:
             try:
                 entity_info = await semantic_analyzer.analyze_entity_usage(entity_name, project_root)
@@ -559,6 +568,7 @@ async def build_semantic_task_planning_prompt(
     
     try:
         # Get project state
+        project_state_analyzer = get_project_state_analyzer()
         project_state = await project_state_analyzer.get_project_state(project_root)
         
         # Format Git information
