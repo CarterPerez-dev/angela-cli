@@ -28,11 +28,9 @@ def get_confirmation_helper():
 
 # Adaptive Confirmation API
 def get_adaptive_confirmation():
-    """Get the adaptive confirmation instance."""
-    # Import the Class and the instance from the component module
-    from angela.components.safety.adaptive_confirmation import AdaptiveConfirmationHandler, adaptive_confirmation
-    # Pass the Class as the second argument, and the instance via the factory
-    return registry.get_or_create("adaptive_confirmation", AdaptiveConfirmationHandler, factory=lambda: adaptive_confirmation)
+    """Get the adaptive confirmation handler function."""
+    from angela.components.safety.adaptive_confirmation import get_adaptive_confirmation as confirmation_func
+    return confirmation_func
 
 # Command Preview API
 def get_command_preview_generator():

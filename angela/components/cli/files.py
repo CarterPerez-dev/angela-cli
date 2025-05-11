@@ -34,7 +34,6 @@ from angela.api.execution import (
     get_rollback_manager
 )
 
-from angela.execution.rollback import rollback_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)

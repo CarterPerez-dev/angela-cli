@@ -1200,7 +1200,7 @@ async def refine_generated_project(
         console.print(f"[bold red]Error refining project:[/bold red] {str(e)}")
 
 
-def group_files_by_directory(files: List[CodeFile]) -> Dict[str, List[CodeFile]]:
+def group_files_by_directory(files: List['CodeFile']) -> Dict[str, List['CodeFile']]:
     """
     Group files by their directory.
     
