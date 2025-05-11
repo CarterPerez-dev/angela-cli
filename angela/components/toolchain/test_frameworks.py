@@ -14,11 +14,13 @@ import importlib
 import inspect
 
 from angela.utils.logging import get_logger
-# Updated imports to use API layer
+
 from angela.api.generation import get_code_file_class
 from angela.api.context import get_context_manager
 
+
 logger = get_logger(__name__)
+CodeFile = get_code_file_class()
 
 class TestFrameworkIntegration:
     """
@@ -1115,6 +1117,3 @@ func Benchmark{functions[0]}(b *testing.B) {{
         }
 
 
-
-# Then define CodeFile within this module
-CodeFile = get_code_file_class()
