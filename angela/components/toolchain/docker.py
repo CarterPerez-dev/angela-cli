@@ -191,6 +191,9 @@ class DockerIntegration:
             String with the appropriate command
         """
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Check if docker compose (v2) is available
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 "docker compose version",
@@ -204,7 +207,6 @@ class DockerIntegration:
         except Exception as e:
             self._logger.error(f"Error determining Docker Compose command: {str(e)}")
             return "docker compose"  # Default to v2 compose
-    
     #
     # Container Management
     #
@@ -236,13 +238,27 @@ class DockerIntegration:
                 check_safety=True
             )
             
-                if exit_code != 0:
-                    return {
-                        "success": False,
-                        "error": f"Error listing containers: {stderr}",
-                        "containers": []
-                    }
-                
+            if exit_code != 0:
+                return {
+                    "success": False,
+                    "error": f"Error listing containers: {stderr}",
+                    "containers": []
+                }
+            
+            # Parse JSON output
+            containers = []
+            
+            # Check if output is in JSON format (newer Docker versions)
+            if stdout.strip().startswith('{') or stdout.strip().startswith('['):
+                # Parse JSON output for newer Docker versions
+                for line in stdout.strip().split('\n'):
+                    if line.strip():
+                        try:
+                            container = json.loads(line)
+                            containers.append(container)
+                        except json.JSONDecodeError as e:
+                            self._logger.error(f"Error parsing container JSON: {str(e)}")
+            else:
                 # Parse tabular output
                 lines = stdout.strip().split('\n')
                 if len(lines) <= 1:  # Only header, no containers
@@ -269,15 +285,6 @@ class DockerIntegration:
                             "names": parts[6] if len(parts) > 6 else ""
                         }
                         containers.append(container)
-            else:
-                # Parse JSON output for newer Docker versions
-                for line in stdout.strip().split('\n'):
-                    if line.strip():
-                        try:
-                            container = json.loads(line)
-                            containers.append(container)
-                        except json.JSONDecodeError as e:
-                            self._logger.error(f"Error parsing container JSON: {str(e)}")
             
             return {
                 "success": True,
@@ -305,6 +312,9 @@ class DockerIntegration:
         self._logger.info(f"Getting details for container: {container_id_or_name}")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 f"docker inspect {container_id_or_name}",
@@ -369,6 +379,9 @@ class DockerIntegration:
         self._logger.info(f"Starting container: {container_id_or_name}")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 f"docker start {container_id_or_name}",
@@ -407,6 +420,9 @@ class DockerIntegration:
         self._logger.info(f"Stopping container: {container_id_or_name}")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Build command
             command = f"docker stop {container_id_or_name}"
             if timeout is not None:
@@ -450,6 +466,9 @@ class DockerIntegration:
         self._logger.info(f"Restarting container: {container_id_or_name}")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Build command
             command = f"docker restart {container_id_or_name}"
             if timeout is not None:
@@ -499,6 +518,9 @@ class DockerIntegration:
         self._logger.info(f"Removing container: {container_id_or_name}")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Build command
             command = f"docker rm {container_id_or_name}"
             if force:
@@ -567,6 +589,9 @@ class DockerIntegration:
             command += f" --until {until}"
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             if follow:
                 # For follow mode, we need to stream the output
                 # This is a simplified implementation - a more complex one would use
@@ -704,6 +729,9 @@ class DockerIntegration:
             docker_command += f" {command}"
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 docker_command,
@@ -760,6 +788,9 @@ class DockerIntegration:
         docker_command += f" {container_id_or_name} {command}"
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 docker_command,
@@ -785,7 +816,6 @@ class DockerIntegration:
                 "error": f"Error executing command in container: {str(e)}",
                 "command": docker_command
             }
-    
     #
     # Image Management
     #
@@ -803,6 +833,9 @@ class DockerIntegration:
         self._logger.info("Listing Docker images")
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Build command
             command = "docker images --format json"
             if show_all:
@@ -935,6 +968,9 @@ class DockerIntegration:
             command += " --no-cache"
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 command,
@@ -1187,6 +1223,8 @@ class DockerIntegration:
         
         # Determine project directory
         if project_directory is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             project_directory = context_manager.cwd
         else:
             project_directory = Path(project_directory)
@@ -1209,6 +1247,9 @@ class DockerIntegration:
             command += " --remove-orphans"
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 command,
@@ -1270,6 +1311,8 @@ class DockerIntegration:
         
         # Determine project directory
         if project_directory is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             project_directory = context_manager.cwd
         else:
             project_directory = Path(project_directory)
@@ -1296,6 +1339,9 @@ class DockerIntegration:
             command += " " + " ".join(services)
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             if follow:
                 # For follow mode, we need to stream the output
                 # This is a simplified implementation
@@ -1394,6 +1440,8 @@ class DockerIntegration:
         
         # Determine project directory
         if project_directory is None:
+            # Get context manager from API
+            context_manager = get_context_manager()
             project_directory = context_manager.cwd
         else:
             project_directory = Path(project_directory)
@@ -1414,6 +1462,9 @@ class DockerIntegration:
             command += " " + " ".join(services)
         
         try:
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
+            
             # Execute command
             stdout, stderr, exit_code = await execution_engine.execute_command(
                 command,

@@ -1,4 +1,4 @@
-# angela/safety/preview.py
+# angela/components/safety/preview.py
 """
 Preview generator for command execution.
 
@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
-from angela.execution.engine import execution_engine
+from angela.api.execution import get_execution_engine
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -489,6 +489,8 @@ async def generic_preview(command: str) -> Optional[str]:
             modified_command = command
         
         # Execute the command with the dry run flag
+        # Get execution engine from API
+        execution_engine = get_execution_engine()
         stdout, stderr, return_code = await execution_engine.execute_command(modified_command)
         
         if return_code == 0:

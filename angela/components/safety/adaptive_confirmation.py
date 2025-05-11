@@ -1,4 +1,4 @@
-# angela/safety/adaptive_confirmation.py
+# angela/components/safety/adaptive_confirmation.py
 
 import asyncio
 from typing import Dict, Any, Optional, List, Tuple
@@ -13,8 +13,7 @@ from rich.text import Text
 from rich.table import Table
 
 from angela.constants import RISK_LEVELS
-from angela.context.history import history_manager
-from angela.context.preferences import preferences_manager
+from angela.api.context import get_history_manager, get_preferences_manager
 from angela.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -78,6 +77,10 @@ async def get_adaptive_confirmation(
     if dry_run:
         await _show_dry_run_preview(command, risk_level, preview, explanation)
         return False
+    
+    # Get managers from API
+    preferences_manager = get_preferences_manager()
+    history_manager = get_history_manager()
     
     # Check if auto-execution is enabled for this risk level and command
     if preferences_manager.should_auto_execute(risk_level, command):
@@ -143,6 +146,7 @@ async def _show_auto_execution_notice(
 ) -> None:
     """Show a notice for auto-execution."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
+    preferences_manager = get_preferences_manager()
     
     # Use a more subtle notification for auto-execution
     console.print("\n")
@@ -171,6 +175,8 @@ async def _get_simple_confirmation(
     """Get a simple confirmation for medium/low risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
     risk_style = risk_name.lower() if risk_name.lower() in ['safe', 'low', 'medium', 'high', 'critical'] else 'medium'
+    preferences_manager = get_preferences_manager()
+    
     # Get actual color for rich components
     risk_color = RISK_COLORS.get(risk_style, "yellow")
     
@@ -218,6 +224,8 @@ async def _get_detailed_confirmation(
     """Get a detailed confirmation for high/critical risk operations."""
     risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
     risk_style = risk_name.lower() if risk_name.lower() in ['safe', 'low', 'medium', 'high', 'critical'] else 'high'
+    preferences_manager = get_preferences_manager()
+    
     # Get actual color for rich components
     risk_color = RISK_COLORS.get(risk_style, "red")
     
@@ -311,6 +319,10 @@ async def offer_command_learning(command: str) -> None:
     Args:
         command: The command that was executed
     """
+    # Get managers from API
+    preferences_manager = get_preferences_manager()
+    history_manager = get_history_manager()
+    
     # Check if the command should be offered for learning
     base_command = history_manager._extract_base_command(command)
     pattern = history_manager._patterns.get(base_command)

@@ -1,4 +1,4 @@
-# angela/safety/__init__.py
+# angela/components/safety/__init__.py
 """
 Safety validation for Angela CLI operations.
 
@@ -127,7 +127,7 @@ __all__ = [
     'check_command_safety',
     'check_operation_safety', 
     'validate_command_safety',
-    'validate_operation',     # Add this line
+    'validate_operation',
     'classify_command_risk',
     'analyze_command_impact',
     'generate_preview',

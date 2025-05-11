@@ -1,4 +1,4 @@
-# angela/toolchain/ci_cd.py
+# angela/components/toolchain/ci_cd.py
 """
 CI/CD configuration generation for Angela CLI.
 
@@ -14,7 +14,10 @@ import re
 from collections.abc import MutableMapping, Sequence
 
 from angela.utils.logging import get_logger
-from angela.context import context_manager
+# Updated imports to use API layer
+from angela.api.context import get_context_manager
+from angela.api.execution import get_execution_engine
+from angela.api.safety import get_command_validator
 
 logger = get_logger(__name__)
 
@@ -239,6 +242,8 @@ class CiCdIntegration:
             return result
         
         # Try from context
+        # Get context manager from API
+        context_manager = get_context_manager()
         context = context_manager.get_context_dict()
         if context.get("project_type"):
             return {
@@ -1925,21 +1930,27 @@ mod tests {
         
         # Use AI to parse the request
         prompt = f"""
-Extract key information from this CI/CD setup request:
-"{request}"
-
-Return a JSON object with these fields:
-1. platform: The CI/CD platform name (github_actions, gitlab_ci, jenkins, etc.)
-2. repository_url: Repository URL if mentioned
-3. deployment_targets: List of deployment environments to set up
-4. testing_requirements: Any specific testing requirements
-5. build_requirements: Any specific build requirements
-6. security_requirements: Any security scanning requirements
-"""
+    Extract key information from this CI/CD setup request:
+    "{request}"
     
+    Return a JSON object with these fields:
+    1. platform: The CI/CD platform name (github_actions, gitlab_ci, jenkins, etc.)
+    2. repository_url: Repository URL if mentioned
+    3. deployment_targets: List of deployment environments to set up
+    4. testing_requirements: Any specific testing requirements
+    5. build_requirements: Any specific build requirements
+    6. security_requirements: Any security scanning requirements
+    """
+        
         try:
+            # Import AI client from API layer
+            from angela.api.ai import get_gemini_client, get_gemini_request_class
+            
+            # Get client and request class
+            gemini_client = get_gemini_client()
+            GeminiRequest = get_gemini_request_class()
+            
             # Call AI service
-            from angela.ai.client import gemini_client, GeminiRequest
             api_request = GeminiRequest(prompt=prompt, max_tokens=1000)
             response = await gemini_client.generate_text(api_request)
             
@@ -1991,7 +2002,8 @@ Return a JSON object with these fields:
             Command output as a string
         """
         try:
-            from angela.execution.engine import execution_engine
+            # Get execution engine from API
+            execution_engine = get_execution_engine()
             command = ["git"] + args
             command_str = " ".join(command)
             
