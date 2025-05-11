@@ -25,6 +25,29 @@ def init_application():
     registry.register("adaptive_engine", get_adaptive_engine())
     registry.register("orchestrator", orchestrator)
     
+    # Initialize toolchain components
+    from angela.api.toolchain import get_universal_cli_translator, get_enhanced_universal_cli
+    from angela.api.toolchain import get_cross_tool_workflow_engine, get_ci_cd_integration
+    
+    # Register toolchain components
+    registry.register("universal_cli_translator", get_universal_cli_translator())
+    registry.register("enhanced_universal_cli", get_enhanced_universal_cli())
+    registry.register("cross_tool_workflow_engine", get_cross_tool_workflow_engine())
+    registry.register("ci_cd_integration", get_ci_cd_integration())
+    
+    # Initialize monitoring components
+    from angela.api.monitoring import get_proactive_assistant
+    proactive_assistant = get_proactive_assistant()
+    registry.register("proactive_assistant", proactive_assistant)
+    
+    # Start proactive assistant
+    try:
+        proactive_assistant.start()
+    except Exception as e:
+        from angela.utils.logging import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"Failed to start proactive assistant: {str(e)}")
+    
     # Initialize context and semantic context
     context_manager = get_context_manager()
     semantic_context_manager = get_semantic_context_manager()
@@ -37,7 +60,3 @@ def init_application():
     from angela.utils.logging import get_logger
     logger = get_logger(__name__)
     logger.info("Application initialization completed")
-
-
-# Export the main app and initialization function
-__all__ = ['app', 'init_application', '__version__']

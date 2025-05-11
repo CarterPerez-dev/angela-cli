@@ -3861,7 +3861,126 @@ Include only the JSON object with no additional text.
         
         return None  
 
-
+    # Functions to add to your orchestrator:
+    
+    async def detect_pipeline_opportunities(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Detect opportunities for CI/CD pipelines in the current context.
+        
+        Args:
+            context: Context information
+            
+        Returns:
+            Dictionary with pipeline opportunities
+        """
+        self._logger.info("Detecting CI/CD pipeline opportunities")
+        
+        ci_cd_integration = registry.get("ci_cd_integration")
+        if not ci_cd_integration:
+            return {
+                "success": False,
+                "error": "CI/CD Integration component not available"
+            }
+        
+        project_root = context.get("project_root")
+        if not project_root:
+            return {
+                "success": False,
+                "error": "No project root detected in context"
+            }
+        
+        return await ci_cd_integration.detect_project_type(project_root)
+    
+    async def suggest_complex_workflow(self, request: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Suggest a complex workflow based on a natural language request.
+        
+        Args:
+            request: Natural language request
+            context: Context information
+            
+        Returns:
+            Dictionary with suggested workflow information
+        """
+        self._logger.info(f"Suggesting complex workflow for: {request}")
+        
+        workflow_engine = registry.get("cross_tool_workflow_engine")
+        if not workflow_engine:
+            return {
+                "success": False,
+                "error": "Cross Tool Workflow Engine component not available"
+            }
+        
+        # Create a workflow using the engine
+        try:
+            workflow = await workflow_engine.create_workflow(
+                request=request,
+                context=context
+            )
+            
+            # Convert to dictionary for return
+            workflow_dict = workflow.dict() if hasattr(workflow, "dict") else workflow
+            
+            return {
+                "success": True,
+                "workflow": workflow_dict
+            }
+        except Exception as e:
+            self._logger.error(f"Error generating workflow: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Failed to generate workflow: {str(e)}"
+            }
+    
+    async def execute_cross_tool_workflow(
+        self,
+        request: str,
+        context: Dict[str, Any],
+        suggested_tools: Optional[List[str]] = None,
+        dry_run: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Execute a workflow involving multiple tools.
+        
+        Args:
+            request: Natural language request
+            context: Context information
+            suggested_tools: Optional list of suggested tools to use
+            dry_run: Whether to simulate execution without making changes
+            
+        Returns:
+            Dictionary with execution results
+        """
+        self._logger.info(f"Executing cross-tool workflow: {request}")
+        
+        workflow_engine = registry.get("cross_tool_workflow_engine")
+        if not workflow_engine:
+            return {
+                "success": False,
+                "error": "Cross Tool Workflow Engine component not available"
+            }
+        
+        # Create and execute workflow
+        try:
+            # Create a workflow
+            workflow = await workflow_engine.create_workflow(
+                request=request,
+                context=context,
+                tools=suggested_tools
+            )
+            
+            # Execute the workflow
+            return await workflow_engine.execute_workflow(
+                workflow=workflow,
+                dry_run=dry_run
+            )
+        except Exception as e:
+            self._logger.error(f"Error executing cross-tool workflow: {str(e)}")
+            return {
+                "success": False,
+                "error": f"Failed to execute cross-tool workflow: {str(e)}"
+            }
+            
 
 # Global orchestrator instance
 orchestrator = Orchestrator()
