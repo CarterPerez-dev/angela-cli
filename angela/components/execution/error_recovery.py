@@ -961,3 +961,5 @@ Valid strategy types:
                 ]
             }
         ]
+
+error_recovery_manager = ErrorRecoveryManager()       
