@@ -9,13 +9,9 @@ environmental information.
 # Define initialization function instead of running at import time
 def initialize_project_inference():
     """Initialize project inference for the current project in background."""
-    import asyncio
-    from angela.api.context import get_context_manager, get_project_inference
-    
-    if get_context_manager().project_root:
-        asyncio.create_task(
-            get_project_inference().infer_project_info(get_context_manager().project_root)
-        )
+    # Forward to the API implementation to ensure consistent behavior
+    from angela.api.context import initialize_project_inference as api_initialize
+    api_initialize()
 
 # Export the initialization function only
 __all__ = ['initialize_project_inference']
