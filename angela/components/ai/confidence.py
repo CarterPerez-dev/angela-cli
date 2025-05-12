@@ -61,9 +61,7 @@ class ConfidenceScorer:
         # Ensure we stay in valid range
         confidence = min(1.0, max(0.0, confidence))
         
-        self._logger.debug(f"Command confidence: {confidence:.2f} (hist: {historical_confidence:.2f}, " 
-                          f"comp: {complexity_confidence:.2f}, ent: {entity_confidence:.2f}, " 
-                          f"flags: {flags_confidence:.2f})")
+
         
         return confidence
     

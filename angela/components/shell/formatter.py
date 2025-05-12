@@ -575,8 +575,8 @@ class TerminalFormatter:
         
         # Split the details section into columns
         layout["details"].split_column(
-            Layout(name="insight", ratio=2),
-            Layout(name="meta", ratio=1)
+            Layout(name="insight", ratio=3),  # Larger ratio for insight
+            Layout(name="meta", ratio=2)      # Smaller ratio for meta
         )
         
         # Split the meta section into two equal columns
@@ -591,7 +591,7 @@ class TerminalFormatter:
             title=f"[bold {risk_color}]{risk_icon} Execute [{risk_name} Risk][/bold {risk_color}]",
             border_style=COLOR_PALETTE["border"],  # Consistent red border
             box=DEFAULT_BOX,
-            expand=True,
+            expand=False,  # Changed to false to prevent oversizing
             padding=(1, 2)
         )
         layout["command"].update(command_panel)
@@ -603,10 +603,20 @@ class TerminalFormatter:
                 title=f"[bold {COLOR_PALETTE['text']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['text']}]",
                 border_style=COLOR_PALETTE["border"],  # Consistent red border
                 box=DEFAULT_BOX,
-                expand=True, 
+                expand=False,  # Changed to false
                 padding=(1, 2)
             )
-            layout["insight"].update(insight_panel)
+        else:
+            # Provide a fallback panel when no explanation is available
+            insight_panel = Panel(
+                Text("No explanation available for this command.", style="dim"),
+                title=f"[bold {COLOR_PALETTE['text']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                expand=False,
+                padding=(1, 2)
+            )
+        layout["insight"].update(insight_panel)
         
         # Create the confidence panel
         if confidence_score is not None:
@@ -634,10 +644,20 @@ class TerminalFormatter:
                 title=f"[bold {COLOR_PALETTE['text']}]✧ AI Confidence ✧[/bold {COLOR_PALETTE['text']}]",
                 border_style=COLOR_PALETTE["border"],  # Consistent red border
                 box=DEFAULT_BOX,
-                expand=True,
+                expand=False,  # Changed to false
                 padding=(0, 1)
             )
-            layout["confidence"].update(confidence_panel)
+        else:
+            # Provide a fallback panel when no confidence score is available
+            confidence_panel = Panel(
+                Text("No confidence score available.", style="dim", justify="center"),
+                title=f"[bold {COLOR_PALETTE['text']}]✧ AI Confidence ✧[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                expand=False,
+                padding=(0, 1)
+            )
+        layout["confidence"].update(confidence_panel)
         
         # Create the risk panel
         risk_panel = Panel(
@@ -651,13 +671,14 @@ class TerminalFormatter:
             title=f"[bold {risk_color}]⚠ Risk Assessment[/bold {risk_color}]",
             border_style=COLOR_PALETTE["border"],  # Consistent red border
             box=DEFAULT_BOX,
-            expand=True,
+            expand=False,  # Changed to false
             padding=(0, 1)
         )
         layout["risk"].update(risk_panel)
         
         # Add the preview section if provided
         if preview:
+            # Add preview layout to details
             layout["details"].split_column(
                 Layout(name="insight", ratio=2),
                 Layout(name="meta", ratio=1),
@@ -669,7 +690,7 @@ class TerminalFormatter:
                 title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
                 border_style=COLOR_PALETTE["border"],  # Consistent red border
                 box=DEFAULT_BOX,
-                expand=True,
+                expand=False,  # Changed to false
                 padding=(1, 2)
             )
             layout["preview"].update(preview_panel)
@@ -1155,7 +1176,91 @@ class TerminalFormatter:
         base_command = command.split()[0] if command.split() else command
         self._console.print(f"Added [green]{base_command}[/green] to trusted commands.")
 
-
+    def display_command_summary(
+        self,
+        command: str,
+        success: bool,
+        stdout: str,
+        stderr: str,
+        return_code: int = 0,
+        execution_time: Optional[float] = None
+    ) -> None:
+        """
+        Display a comprehensive command execution summary.
+        
+        Args:
+            command: The executed command
+            success: Whether the command was successful
+            stdout: Standard output from the command
+            stderr: Standard error from the command
+            return_code: Command return code
+            execution_time: Execution time in seconds
+        """
+        # Command panel
+        self.print_command(command, title="Command")
+        
+        # Output panel with styling
+        if stdout.strip():
+            # Create a styled panel for stdout
+            stdout_panel = Panel(
+                Text(stdout.strip(), style=COLOR_PALETTE["text"]),
+                title=f"[bold {COLOR_PALETTE['success']}]{ASCII_DECORATIONS['output']} Output {ASCII_DECORATIONS['output']}[/bold {COLOR_PALETTE['success']}]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                expand=False,
+                padding=(1, 2)
+            )
+            self._console.print("")
+            self._console.print(stdout_panel)
+        elif success:
+            # Create a styled panel for success with no output
+            success_panel = Panel(
+                Text("Command executed successfully.", style=COLOR_PALETTE["success"]),
+                title=f"[bold {COLOR_PALETTE['success']}]{ASCII_DECORATIONS['success']} Success {ASCII_DECORATIONS['success']}[/bold {COLOR_PALETTE['success']}]",
+                border_style=COLOR_PALETTE["success"],
+                box=DEFAULT_BOX,
+                expand=False,
+                padding=(1, 2)
+            )
+            self._console.print("")
+            self._console.print(success_panel)
+            
+            
+            
+            
+            
+            
+        
+        # Error panel if command failed
+        if not success:
+            # Create a styled error panel
+            if stderr.strip():
+                error_panel = Panel(
+                    Text(stderr.strip(), style=COLOR_PALETTE["error"]),
+                    title=f"[bold {COLOR_PALETTE['error']}]{ASCII_DECORATIONS['error']} Error {ASCII_DECORATIONS['error']}[/bold {COLOR_PALETTE['error']}]",
+                    border_style=COLOR_PALETTE["error"],
+                    box=DEFAULT_BOX,
+                    expand=False,
+                    padding=(1, 2)
+                )
+                self._console.print("")
+                self._console.print(error_panel)
+            else:
+                # Error with no stderr output
+                error_panel = Panel(
+                    Text(f"Command failed with exit code {return_code}", style=COLOR_PALETTE["error"]),
+                    title=f"[bold {COLOR_PALETTE['error']}]{ASCII_DECORATIONS['error']} Error {ASCII_DECORATIONS['error']}[/bold {COLOR_PALETTE['error']}]",
+                    border_style=COLOR_PALETTE["error"],
+                    box=DEFAULT_BOX,
+                    expand=False,
+                    padding=(1, 2)
+                )
+                self._console.print("")
+                self._console.print(error_panel)
+        
+        # Display execution time if provided
+        if execution_time is not None:
+            self._console.print(f"[dim]Execution time: {execution_time:.6f}s[/dim]")
 
 # Global formatter instance
 terminal_formatter = TerminalFormatter()

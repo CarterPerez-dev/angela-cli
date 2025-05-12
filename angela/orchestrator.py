@@ -1744,6 +1744,7 @@ class Orchestrator:
 
 
     
+
     async def _process_command_request(
         self, 
         request: str, 
@@ -1773,7 +1774,7 @@ class Orchestrator:
         
         # Start a loading timer for initial processing
         loading_task = asyncio.create_task(
-            terminal_formatter.display_loading_timer("Angela’s decrypting the payload....")
+            terminal_formatter.display_loading_timer("Angela's decrypting the payload....")
         )
         
         try:
@@ -1899,33 +1900,26 @@ class Orchestrator:
                 
                 result["execution"] = execution_result
                 
-                # Display the execution results
-                if return_code == 0:
-                    if stdout.strip():
-                        terminal_formatter.print_output(
-                            stdout,
-                            OutputType.STDOUT,
-                            title="Output"
-                        )
-                    # No message about "Command executed successfully with no output"
-                else:
-                    if stderr.strip():
-                        terminal_formatter.print_output(
-                            stderr,
-                            OutputType.STDERR,
-                            title="Error"
-                        )
+                # Display the execution results using the terminal formatter
+                await terminal_formatter.display_command_summary(
+                    command=suggestion.command,
+                    success=return_code == 0,
+                    stdout=stdout,
+                    stderr=stderr,
+                    return_code=return_code,
+                    execution_time=execution_time
+                )
+                
+                # If execution failed, analyze error and suggest fixes
+                if not return_code == 0 and stderr:
+                    error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
+                    fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
                     
-                    # If execution failed, analyze error and suggest fixes
-                    if stderr:
-                        error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
-                        fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
-                        
-                        result["error_analysis"] = error_analysis
-                        result["fix_suggestions"] = fix_suggestions
-                        
-                        # Display error analysis
-                        terminal_formatter.print_error_analysis(error_analysis)
+                    result["error_analysis"] = error_analysis
+                    result["fix_suggestions"] = fix_suggestions
+                    
+                    # Display error analysis
+                    terminal_formatter.print_error_analysis(error_analysis)
                 
                 # Add to history
                 history_manager.add_command(

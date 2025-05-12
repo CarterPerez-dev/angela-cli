@@ -144,11 +144,9 @@ def request(
             if "confidence" in result:
                 confidence = result["confidence"]
                 confidence_color = "green" if confidence > 0.8 else "yellow" if confidence > 0.6 else "red"
-                console.print(f"[bold]Confidence:[/bold] [{confidence_color}]{confidence:.2f}[/{confidence_color}]")
+
             
-            # Show explanation
-            console.print("\n[bold]Explanation:[/bold]")
-            console.print(suggestion.explanation)
+
             
             # Show execution results if executed
             if "execution" in result:
