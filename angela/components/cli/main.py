@@ -134,57 +134,6 @@ def request(
             full_request, execute=execute, dry_run=dry_run
         ))
         
-        if "suggestion" in result:
-            suggestion = result["suggestion"]
-            
-            # Display the suggestion with rich formatting
-            terminal_formatter.print_command(suggestion.command, title="Command")
-            
-            # Show confidence if available
-            if "confidence" in result:
-                confidence = result["confidence"]
-                confidence_color = "green" if confidence > 0.8 else "yellow" if confidence > 0.6 else "red"
-
-            
-
-            
-            # Show execution results if executed
-            if "execution" in result:
-                execution = result["execution"]
-                console.print("\n[bold]Command Output:[/bold]")
-                
-                if execution["success"]:
-                    if execution["stdout"].strip():
-                        terminal_formatter.print_output(
-                            execution["stdout"],
-                            OutputType.STDOUT,
-                            title="Output"
-                        )
-                    else:
-                        console.print("[green]Command executed successfully with no output.[/green]")
-                else:
-                    console.print("[bold red]Command failed[/bold red]")
-                    if execution["stderr"].strip():
-                        terminal_formatter.print_output(
-                            execution["stderr"],
-                            OutputType.STDERR,
-                            title="Error"
-                        )
-                    
-                    # Show error analysis if available
-                    if "error_analysis" in result:
-                        terminal_formatter.print_error_analysis(result["error_analysis"])
-                        
-                    # Show fix suggestions if available
-                    if "fix_suggestions" in execution:
-                        console.print("\n[bold]Suggested fixes:[/bold]")
-                        for suggestion in execution["fix_suggestions"]:
-                            console.print(f"• {suggestion}")
-            
-        else:
-            # Fall back to simple response if no suggestion
-            panel_content = result.get("response", "I couldn't process that request.")
-            console.print(Panel(panel_content, title="Angela", expand=False))
         
         # In debug mode, show context information
         if config_manager.config.debug:

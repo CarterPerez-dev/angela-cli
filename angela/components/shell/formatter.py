@@ -1176,7 +1176,7 @@ class TerminalFormatter:
         base_command = command.split()[0] if command.split() else command
         self._console.print(f"Added [green]{base_command}[/green] to trusted commands.")
 
-    def display_command_summary(
+    async def display_command_summary(
         self,
         command: str,
         success: bool,
@@ -1224,12 +1224,6 @@ class TerminalFormatter:
             )
             self._console.print("")
             self._console.print(success_panel)
-            
-            
-            
-            
-            
-            
         
         # Error panel if command failed
         if not success:
@@ -1258,9 +1252,6 @@ class TerminalFormatter:
                 self._console.print("")
                 self._console.print(error_panel)
         
-        # Display execution time if provided
-        if execution_time is not None:
-            self._console.print(f"[dim]Execution time: {execution_time:.6f}s[/dim]")
 
 # Global formatter instance
 terminal_formatter = TerminalFormatter()
