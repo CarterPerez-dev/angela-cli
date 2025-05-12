@@ -1,20 +1,20 @@
 # angela/components/shell/formatter.py
 """
-⚡ Enhanced terminal formatter for Angela CLI ⚡
+Rich terminal formatting for Angela CLI.
 
-This module provides an extraordinary terminal experience with
-vibrant visuals, engaging animations, and stunning layout.
+This module provides enhanced terminal output formatting with
+support for async operations and interactive elements.
 """
 import asyncio
 import sys
 import time
-import random
 from typing import Optional, List, Dict, Any, Callable, Awaitable, Tuple, Set
 from enum import Enum
 from pathlib import Path
 import textwrap
+import random
 
-from rich.console import Console, Group
+from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
@@ -24,117 +24,89 @@ from rich.text import Text
 from rich.layout import Layout
 from rich.tree import Tree
 from rich.spinner import Spinner
-from rich.markdown import Markdown
-from rich.columns import Columns
 from rich import box
+from rich.align import Align
 from rich.style import Style
+from rich.columns import Columns
 
 from angela.api.intent import get_advanced_task_plan_class, get_plan_step_type_enum
 from angela.utils.logging import get_logger
 from angela.constants import RISK_LEVELS
 
-# ════════════════════════════════════════════════
-# Custom box styles for incredible visual appeal
-# ════════════════════════════════════════════════
-
-NEBULA_BOX = box.Box("╭─╮││╰─╯")
-
-
-COSMIC_BOX = box.Box("╭━╮┃┃╰━╯")
-
-
-QUANTUM_BOX = box.Box("┏━┓┃┃┗━┛")
-
-
-STELLAR_BOX = box.Box("╭═╮││╰═╯")
-
-# ════════════════════════════════════════════════
-# Stunning color palette that will blow minds
-# ════════════════════════════════════════════════
-
-COLOR_PALETTE = {
-    "primary": "#ff0055",           # Vibrant red
-    "secondary": "#8a2be2",         # Rich purple 
-    "tertiary": "#00c8ff",          # Bright blue
-    "accent1": "#00ffaa",           # Neon green
-    "accent2": "#00ffff",           # Cyan
-    "accent3": "#ffcc00",           # Yellow (used sparingly)
-    "white": "#ffffff",             # Pure white (used minimally)
-    "subtle": "#6c7280",            # Subdued color for less important elements
-    "success": "#00ff99",           # Vibrant success green
-    "warning": "#ffcc00",           # Warning yellow
-    "danger": "#ff3355",            # Danger red
-    "info": "#00c8ff",              # Information blue
-    "background": "#100030",        # Deep background
-    "purple_glow": "#c930ff",       # Purple with glow effect
-    "text_primary": "#e0e0ff",      # Primary text color
-    "text_secondary": "#c0c0dd",    # Secondary text color
-    "command_bg": "#220033",        # Command background
-    "command_border": "#ff0055",    # Command border
-    "output_bg": "#001a33",         # Output background
-    "output_border": "#00c8ff",     # Output border
-    "safe": "#00ff99",              # Safe risk level
-    "low": "#00c8ff",               # Low risk level
-    "medium": "#ffcc00",            # Medium risk level
-    "high": "#ff3355",              # High risk level
-    "critical": "#ff0055",          # Critical risk level
-}
-
-# ════════════════════════════════════════════════
-# Stunning ASCII artwork for visual impact
-# ════════════════════════════════════════════════
-
-ASCII_COMMAND = """
- ┏━━━━━━━━━━━━━━━━┓
- ┃  COMMAND PULSE ┃
- ┗━━━━━━━━━━━━━━━━┛
-"""
-
-ASCII_EXECUTION = """
- ▀▄▀▄▀▄ EXECUTING ▄▀▄▀▄▀
-"""
-
-ASCII_CONFIRMATION = """
- ┏━━━━━━━━━━━━━━━━━━━━━┓
- ┃ AWAITING DIRECTIVE  ┃
- ┗━━━━━━━━━━━━━━━━━━━━━┛
-"""
-
-ASCII_SUCCESS = """
- ┏━━━━━━━━━━━━━━━━━━━━━┓
- ┃  MISSION COMPLETE   ┃
- ┗━━━━━━━━━━━━━━━━━━━━━┛
-"""
-
-# ════════════════════════════════════════════════
-# Risk level names and stunning visual styling
-# ════════════════════════════════════════════════
-
+# Get risk level names mapping for display
 RISK_LEVEL_NAMES = {v: k for k, v in RISK_LEVELS.items()}
 
-# Visual styling for risk levels with mind-blowing effects
+# ╔══ Vibrant Color Palette ══╗
+COLORS = {
+    # Reds (primary)
+    "red": "#ff3366",          # Primary red
+    "bright_red": "#ff0055",   # Brighter red for emphasis
+    "dark_red": "#cc2255",     # Darker red for backgrounds
+    
+    # Purples (primary)
+    "purple": "#9933ff",       # True purple (not magenta/pink)
+    "bright_purple": "#aa55ff", # Brighter purple for highlights
+    "dark_purple": "#7722cc",  # Darker purple for backgrounds
+    
+    # Blues
+    "bright_blue": "#00aaff",  # Bright blue for text & highlights
+    "blue": "#3366ff",         # Standard blue
+    "dark_blue": "#0055cc",    # Dark blue for backgrounds
+    
+    # Cyans & Greens
+    "cyan": "#00ddff",         # Cyan for accents
+    "green": "#33cc77",        # Green for success
+    "bright_green": "#00ff88", # Bright green for emphasis
+    
+    # Minimal use colors
+    "yellow": "#ffcc33",       # Yellow (use sparingly)
+    "white": "#ffffff",        # White (use very sparingly)
+    
+    # Gradient colors for special effects
+    "gradient_1": "#ff3366",
+    "gradient_2": "#ff3399", 
+    "gradient_3": "#cc33ff",
+    "gradient_4": "#9933ff",
+    "gradient_5": "#6633ff",
+    "gradient_6": "#3366ff",
+}
+
+# Risk level specific color scheme
 RISK_COLORS = {
-    RISK_LEVELS["SAFE"]: COLOR_PALETTE["safe"],
-    RISK_LEVELS["LOW"]: COLOR_PALETTE["low"],
-    RISK_LEVELS["MEDIUM"]: COLOR_PALETTE["medium"],
-    RISK_LEVELS["HIGH"]: COLOR_PALETTE["high"],
-    RISK_LEVELS["CRITICAL"]: COLOR_PALETTE["critical"],
+    RISK_LEVELS["SAFE"]: f"[{COLORS['green']}]SAFE[/{COLORS['green']}]",
+    RISK_LEVELS["LOW"]: f"[{COLORS['cyan']}]LOW[/{COLORS['cyan']}]", 
+    RISK_LEVELS["MEDIUM"]: f"[{COLORS['yellow']}]MEDIUM[/{COLORS['yellow']}]",
+    RISK_LEVELS["HIGH"]: f"[{COLORS['bright_red']}]HIGH[/{COLORS['bright_red']}]",  
+    RISK_LEVELS["CRITICAL"]: f"[{COLORS['red']} bold]CRITICAL[/{COLORS['red']} bold]",
 }
 
-RISK_ICONS = {
-    RISK_LEVELS["SAFE"]: "✓ ",
-    RISK_LEVELS["LOW"]: "⚡ ",
-    RISK_LEVELS["MEDIUM"]: "⚠ ",
-    RISK_LEVELS["HIGH"]: "❗ ",
-    RISK_LEVELS["CRITICAL"]: "⛔ ",
+# Box styles
+BOX_STYLES = {
+    "default": box.ROUNDED,
+    "minimal": box.SIMPLE,
+    "bold": box.DOUBLE,
+    "ascii": box.ASCII
 }
 
-RISK_BOX_STYLES = {
-    RISK_LEVELS["SAFE"]: NEBULA_BOX,
-    RISK_LEVELS["LOW"]: NEBULA_BOX,
-    RISK_LEVELS["MEDIUM"]: COSMIC_BOX,
-    RISK_LEVELS["HIGH"]: QUANTUM_BOX,
-    RISK_LEVELS["CRITICAL"]: STELLAR_BOX,
+# Custom ASCII decorations
+ASCII_DECORATIONS = {
+    "command": "⚡",           # Lightning bolt for commands
+    "output": "✓",            # Checkmark for output
+    "error": "✗",             # X for errors
+    "risk": "⚠",              # Warning for risk
+    "confidence": "★",        # Star for confidence
+    "info": "✧",              # Sparkle for info
+    "preview": "⚡",           # Lightning for preview
+    "confirmation": "◈",      # Diamond for confirmation
+    "execution": "⟁",         # Double triangle for execution
+    "success": "✓",           # Checkmark for success
+    "warning": "⚠",           # Warning symbol
+    "insight": "✧",           # Sparkle for insights
+    "loading": "◉",           # Circle for loading
+    "plan": "⬢",              # Hexagon for plans
+    "file": "📄",             # File symbol
+    "search": "🔍",           # Magnifying glass
+    "cool_border": "╠══════╣", # Cool border
 }
 
 AdvancedTaskPlan = get_advanced_task_plan_class()
@@ -145,7 +117,7 @@ _console = Console(record=True, width=100)
 logger = get_logger(__name__)
 
 class OutputType(Enum):
-    """Types of command output with enhanced visual identity."""
+    """Types of command output."""
     STDOUT = "stdout"
     STDERR = "stderr"
     INFO = "info"
@@ -156,8 +128,8 @@ class OutputType(Enum):
 
 class TerminalFormatter:
     """
-    Enhanced terminal formatter with stunning visual effects,
-    mind-blowing animations, and extraordinary user experience.
+    Rich terminal formatter with support for asynchronous output
+    and interactive elements.
     """
 
     # Replace fun loading quotes with philosophical wisdom
@@ -225,27 +197,10 @@ class TerminalFormatter:
     ]
     
     def __init__(self):
-        """Initialize the terminal formatter with stunning capabilities."""
+        """Initialize the terminal formatter."""
         self._console = Console()
         self._logger = logger
         self._active_displays = set()
-        
-        # Additional properties for enhanced visual effects
-        self._current_animation_frame = 0
-        self._animation_frames = self._generate_animation_frames()
-        
-    def _generate_animation_frames(self) -> List[str]:
-        """Generate stunning animation frames for visual effects."""
-        return [
-            "◈ ◇ ◇ ◇ ◇",
-            "◇ ◈ ◇ ◇ ◇",
-            "◇ ◇ ◈ ◇ ◇",
-            "◇ ◇ ◇ ◈ ◇",
-            "◇ ◇ ◇ ◇ ◈",
-            "◇ ◇ ◇ ◈ ◇",
-            "◇ ◇ ◈ ◇ ◇",
-            "◇ ◈ ◇ ◇ ◇"
-        ]
 
     def _get_quantum_vortex_spinner(self, elapsed: float) -> Text:
         """Create a mesmerizing quantum vortex spinner animation."""
@@ -285,7 +240,7 @@ class TerminalFormatter:
         # Quantum particle trails
         particle_pos = int(elapsed * 5) % 3
         trail = " " * particle_pos + "∴" + " " * (2 - particle_pos)
-        spinner_text.append(trail, style=COLOR_PALETTE["tertiary"])
+        spinner_text.append(trail, style="bright_cyan")
         
         return spinner_text
     
@@ -307,8 +262,8 @@ class TerminalFormatter:
             flame_idx = int(elapsed * 14) % len(flame_chars)
             
             spinner_text.append(fire_symbols[fire_idx]) # Appending a plain character
-            spinner_text.append(flame_chars[flame_idx], style=COLOR_PALETTE["primary"])
-            spinner_text.append("~", style=COLOR_PALETTE["accent3"])
+            spinner_text.append(flame_chars[flame_idx], style="bright_red")
+            spinner_text.append("~", style="yellow")
             
         elif element_cycle == 1:  # Water
             water_symbols = ["≈", "≋", "≈", "∽", "∿", "≈"]
@@ -318,9 +273,9 @@ class TerminalFormatter:
             wave_level = int(2 + 2 * math.sin(elapsed * 6))
             waves = "~" * wave_level
             
-            spinner_text.append(water_symbols[water_idx], style=COLOR_PALETTE["tertiary"])
-            spinner_text.append(waves, style=COLOR_PALETTE["accent2"])
-            spinner_text.append("○", style=COLOR_PALETTE["tertiary"])
+            spinner_text.append(water_symbols[water_idx], style="bright_blue")
+            spinner_text.append(waves, style="cyan")
+            spinner_text.append("○", style="blue")
             
         elif element_cycle == 2:  # Earth
             earth_symbols = ["◦", "•", "●", "◎", "◉", "⦿", "◉", "◎", "●", "•"]
@@ -330,9 +285,9 @@ class TerminalFormatter:
             growth = [".", "․", "‥", "…", "⁘", "⁙"]
             growth_idx = int(elapsed * 6) % len(growth)
             
-            spinner_text.append(earth_symbols[earth_idx], style=COLOR_PALETTE["accent1"])
-            spinner_text.append(growth[growth_idx], style=COLOR_PALETTE["accent1"])
-            spinner_text.append("⏣", style=COLOR_PALETTE["accent1"])
+            spinner_text.append(earth_symbols[earth_idx], style="green")
+            spinner_text.append(growth[growth_idx], style="dark_green")
+            spinner_text.append("⏣", style="bright_green")
             
         else:  # Air
             air_symbols = ["≋", "≈", "≋", "≈", "≋", "≈"]
@@ -345,9 +300,9 @@ class TerminalFormatter:
             else:
                 wind = "«««"
                 
-            spinner_text.append(air_symbols[air_idx], style=COLOR_PALETTE["white"])
-            spinner_text.append(wind, style=COLOR_PALETTE["white"])
-            spinner_text.append("◌", style=COLOR_PALETTE["accent2"])
+            spinner_text.append(air_symbols[air_idx], style="white")
+            spinner_text.append(wind, style="bright_white")
+            spinner_text.append("◌", style="bright_cyan")
         
         return spinner_text
     
@@ -367,9 +322,9 @@ class TerminalFormatter:
         warp_speed = min(4, int(1 + warp_factor/2))  # Max length of 4
         
         # Center of animation
-        spinner_text.append("=", style=COLOR_PALETTE["tertiary"])
-        spinner_text.append(core_char * energy_level, style=COLOR_PALETTE["accent3"])
-        spinner_text.append("=", style=COLOR_PALETTE["tertiary"])
+        spinner_text.append("=", style=f"[{COLORS['bright_blue']}]")
+        spinner_text.append(core_char * energy_level, style=f"[{COLORS['bright_purple']}]")
+        spinner_text.append("=", style=f"[{COLORS['bright_blue']}]")
         
         # Starfield effect - stars zooming past at different speeds
         star_positions = []
@@ -379,11 +334,11 @@ class TerminalFormatter:
             intensity = min(1.0, 15 - pos) / 1.0  # Fade based on position
             
             if intensity > 0.7:
-                style = COLOR_PALETTE["white"]
+                style = f"[{COLORS['white']}]"
             elif intensity > 0.4:
-                style = COLOR_PALETTE["text_primary"]
+                style = f"[{COLORS['white']}]"
             else:
-                style = COLOR_PALETTE["text_secondary"]
+                style = f"[{COLORS['white']} dim]"
                 
             # Convert position to integer for display
             pos_int = int(pos)
@@ -407,30 +362,32 @@ class TerminalFormatter:
         for pos, star, style in star_positions:
             if 0 <= pos < 15:  # Ensure within bounds
                 # Store as markup string in the list
-                starfield_markup_list[pos] = f"[{style}]{star}[/{style}]"
+                starfield_markup_list[pos] = f"{style}{star}"
         
         # Add leading stars
         for i in range(warp_speed):
             # Join the markup strings from the list for the current segment
-            starfield_segment_markup = "".join(starfield_markup_list[i*3:(i+1)*3])
-            if starfield_segment_markup.strip():  # Only add if there's visible content
-                # Append the composed markup string, ensuring it's parsed by Text.from_markup
-                spinner_text.append(Text.from_markup(starfield_segment_markup))
+            starfield_segment = "".join(starfield_markup_list[i*3:(i+1)*3])
+            if starfield_segment.strip():  # Only add if there's visible content
+                spinner_text.append(starfield_segment)
         
         # Add warp drive energy fluctuation
         fluctuation = int(elapsed * 20) % 3
         if fluctuation == 0:
-            spinner_text.append("⚡", style=COLOR_PALETTE["accent2"])
+            spinner_text.append("⚡", style=f"[{COLORS['cyan']}]")
         elif fluctuation == 1:
-            spinner_text.append("⚡", style=COLOR_PALETTE["secondary"])
+            spinner_text.append("⚡", style=f"[{COLORS['bright_purple']}]")
         else:
-            spinner_text.append("⚡", style=COLOR_PALETTE["accent3"])
+            spinner_text.append("⚡", style=f"[{COLORS['yellow']}]")
         
         return spinner_text
     
     def _get_random_spinner(self, elapsed: float) -> Text:
         """Get a random spinner based on object ID determinism."""
+        # Use a hash of the current time's integer part to select a spinner
+        # This ensures the same spinner is used throughout a single load operation
         import random
+        # No need to import hashlib here as it's not used in the provided logic
         
         # We'll use the hash of the elapsed time's integer part to select a spinner,
         # but only hash it once at the beginning of a loading session
@@ -447,37 +404,68 @@ class TerminalFormatter:
         else:
             return self._get_interstellar_warp_spinner(elapsed)
 
-    def print_command(self, command: str, title: Optional[str] = None, risk_level: int = 0) -> None:
+    def create_styled_text(self, text: str, rainbow: bool = False) -> Text:
         """
-        Display a command with extraordinary styling and visual effects.
+        Create styled text with optional rainbow effect.
+        
+        Args:
+            text: The text to style
+            rainbow: Whether to apply a rainbow gradient effect
+            
+        Returns:
+            A styled Text object
+        """
+        if not rainbow:
+            return Text(text)
+            
+        styled_text = Text()
+        
+        # Rainbow gradient colors
+        gradient_colors = [
+            COLORS["gradient_1"],
+            COLORS["gradient_2"],
+            COLORS["gradient_3"],
+            COLORS["gradient_4"],
+            COLORS["gradient_5"],
+            COLORS["gradient_6"],
+        ]
+        
+        # Calculate color index for each character
+        for i, char in enumerate(text):
+            color_idx = i % len(gradient_colors)
+            styled_text.append(char, style=f"{gradient_colors[color_idx]}")
+            
+        return styled_text
+
+    def print_command(self, command: str, title: Optional[str] = None) -> None:
+        """
+        Display a command with syntax highlighting.
         
         Args:
             command: The command to display
             title: Optional title for the panel
-            risk_level: Risk level for styling (0-4)
         """
-        # Get risk styling
-        risk_color = RISK_COLORS.get(risk_level, COLOR_PALETTE["primary"])
-        risk_box = RISK_BOX_STYLES.get(risk_level, NEBULA_BOX)
+        title = title or f"{ASCII_DECORATIONS['command']} Command {ASCII_DECORATIONS['command']}"
         
-        # Create title with enhanced styling if provided
-        panel_title = f"[bold {risk_color}]⚡ {title or 'Command Pulse'} ⚡[/bold {risk_color}]"
-        
-        # Create extraordinary styled command display
-        syntax = Syntax(command, "bash", theme="monokai", word_wrap=True, background_color=COLOR_PALETTE["command_bg"])
-        
-        # Create visually stunning panel
-        panel = Panel(
-            syntax,
-            title=panel_title,
-            border_style=risk_color,
-            box=risk_box,
-            expand=False,
-            padding=(1, 2)
+        # Create a syntax object with proper styling
+        syntax = Syntax(
+            command, 
+            "bash", 
+            theme="monokai", 
+            word_wrap=True,
+            background_color="default"
         )
         
-        # Add visual separator and display
-        self._console.print("")
+        # Create a fancy panel with the syntax
+        panel = Panel(
+            syntax,
+            title=title,
+            title_align="center",
+            border_style=COLORS["bright_purple"],
+            box=BOX_STYLES["default"],
+            padding=(0, 1)
+        )
+        
         self._console.print(panel)
     
     def print_output(
@@ -487,7 +475,7 @@ class TerminalFormatter:
         title: Optional[str] = None
     ) -> None:
         """
-        Display command output with mind-blowing styling and visual effects.
+        Display command output with appropriate formatting.
         
         Args:
             output: The output text
@@ -497,140 +485,232 @@ class TerminalFormatter:
         if not output:
             return
             
-        # Set styling based on output type with enhanced visual appeal
+        # Set styling based on output type
         if output_type == OutputType.STDERR or output_type == OutputType.ERROR:
-            style = COLOR_PALETTE["danger"]
-            title = title or "⚠ Error Output ⚠"
-            border_style = style
-            box_style = QUANTUM_BOX
+            style = COLORS["bright_red"]
+            title = title or f"{ASCII_DECORATIONS['error']} Error {ASCII_DECORATIONS['error']}"
+            border_style = COLORS["red"]
         elif output_type == OutputType.WARNING:
-            style = COLOR_PALETTE["warning"]
-            title = title or "⚠ Warning ⚠"
-            border_style = style
-            box_style = COSMIC_BOX
+            style = COLORS["yellow"]
+            title = title or f"{ASCII_DECORATIONS['warning']} Warning {ASCII_DECORATIONS['warning']}"
+            border_style = COLORS["yellow"]
         elif output_type == OutputType.SUCCESS:
-            style = COLOR_PALETTE["success"]
-            title = title or "✓ Success ✓"
-            border_style = style
-            box_style = NEBULA_BOX
+            style = COLORS["green"]
+            title = title or f"{ASCII_DECORATIONS['success']} Success {ASCII_DECORATIONS['success']}"
+            border_style = COLORS["green"]
         elif output_type == OutputType.INFO:
-            style = COLOR_PALETTE["info"]
-            title = title or "ℹ Information ℹ"
-            border_style = style
-            box_style = NEBULA_BOX
-        else:  # Default for STDOUT with enhanced styling
-            style = COLOR_PALETTE["tertiary"]
-            title = title or "◈ Command Output ◈"
-            border_style = style
-            box_style = NEBULA_BOX
+            style = COLORS["bright_blue"]
+            title = title or f"{ASCII_DECORATIONS['info']} Info {ASCII_DECORATIONS['info']}"
+            border_style = COLORS["bright_blue"]
+        else:  # Default for STDOUT
+            style = COLORS["white"]
+            title = title or f"{ASCII_DECORATIONS['output']} Output {ASCII_DECORATIONS['output']}"
+            border_style = COLORS["bright_blue"]
         
-        # Create visually stunning panel
+        # Clean up the output - remove any trailing blank lines
+        cleaned_output = output.rstrip()
+        
+        # Create panel with output, sized to content
         panel = Panel(
-            output,
-            title=f"[bold {style}]{title}[/bold {style}]",
+            cleaned_output,
+            title=title,
+            title_align="center",
             border_style=border_style,
-            box=box_style,
-            expand=False,
-            padding=(1, 2)
+            box=BOX_STYLES["default"],
+            width=min(len(max(cleaned_output.split('\n'), key=len)) + 6, self._console.width - 4),
+            padding=(0, 1)
         )
         
-        # Add visual separator and display
-        self._console.print("")
-        self._console.print(panel)
-
-    def print_success_message(self, message: str, title: str = "Operation Complete") -> None:
-        """
-        Display a success message with stunning visual effects.
-        
-        Args:
-            message: The success message
-            title: The panel title
-        """
-        # Create a visually appealing success panel
-        panel = Panel(
-            f"[{COLOR_PALETTE['success']}]{message}[/{COLOR_PALETTE['success']}]",
-            title=f"[bold {COLOR_PALETTE['success']}]✓ {title} ✓[/bold {COLOR_PALETTE['success']}]",
-            border_style=COLOR_PALETTE["success"],
-            box=NEBULA_BOX,
-            expand=False,
-            padding=(1, 2)
-        )
-        
-        # Add visual separator and display
-        self._console.print("")
         self._console.print(panel)
     
     def print_error_analysis(self, analysis: Dict[str, Any]) -> None:
         """
-        Display error analysis with extraordinary visual styling and helpful insights.
+        Display error analysis with fix suggestions.
         
         Args:
             analysis: The error analysis dictionary
         """
-        # Create a visually striking table for error analysis
+        # Create a nice header
+        error_title = Text()
+        error_title.append(f"{ASCII_DECORATIONS['error']} ", style=COLORS["red"])
+        error_title.append("ERROR ANALYSIS", style=f"{COLORS['bright_red']} bold")
+        error_title.append(f" {ASCII_DECORATIONS['error']}", style=COLORS["red"])
+        
+        self._console.print(error_title, justify="center")
+        
+        # Create a table for the error analysis with vibrant colors
         table = Table(
-            title=f"[bold {COLOR_PALETTE['danger']}]⚠ Error Analysis ⚠[/bold {COLOR_PALETTE['danger']}]",
-            border_style=COLOR_PALETTE["danger"],
-            box=QUANTUM_BOX,
-            highlight=True,
             expand=False,
-            show_lines=True
+            box=BOX_STYLES["default"],
+            border_style=COLORS["dark_red"],
+            highlight=True,
+            width=min(100, self._console.width - 4)
         )
         
-        # Add columns with enhanced styling
-        table.add_column(f"[{COLOR_PALETTE['secondary']}]Aspect[/{COLOR_PALETTE['secondary']}]", style=f"{COLOR_PALETTE['secondary']}", justify="right")
-        table.add_column(f"[{COLOR_PALETTE['text_primary']}]Details[/{COLOR_PALETTE['text_primary']}]", style=f"{COLOR_PALETTE['text_primary']}")
+        table.add_column("Aspect", style=f"{COLORS['bright_purple']} bold")
+        table.add_column("Details", style=COLORS["bright_blue"])
         
-        # Add error summary with striking styling
-        table.add_row(
-            "Error", 
-            Text(analysis.get("error_summary", "Unknown error"), style=COLOR_PALETTE["danger"])
-        )
+        # Add error summary
+        error_text = Text(analysis.get("error_summary", "Unknown error"), style=f"{COLORS['bright_red']} bold")
+        table.add_row("Error", error_text)
         
-        # Add possible cause with enhanced visual cues
-        table.add_row(
-            "Possible Cause", 
-            Text(analysis.get("possible_cause", "Unknown"), style=COLOR_PALETTE["text_primary"])
-        )
+        # Add possible cause
+        table.add_row("Possible Cause", analysis.get("possible_cause", "Unknown"))
         
-        # Add command issues with improved visual hierarchy
+        # Add command issues
         if analysis.get("command_issues"):
             issues = "\n".join(f"• {issue}" for issue in analysis["command_issues"])
-            table.add_row("Command Issues", Text(issues, style=COLOR_PALETTE["text_primary"]))
+            table.add_row("Command Issues", issues)
         
-        # Add file issues with enhanced visual cues
+        # Add file issues
         if analysis.get("file_issues"):
             file_issues = []
             for issue in analysis["file_issues"]:
                 path = issue.get("path", "unknown")
                 if "suggestion" in issue:
-                    file_issues.append(f"• [{COLOR_PALETTE['danger']}]{path}[/{COLOR_PALETTE['danger']}]: {issue['suggestion']}")
+                    file_issues.append(f"• {path}: {issue['suggestion']}")
                 if "similar_files" in issue:
-                    similar = ", ".join(f"[{COLOR_PALETTE['tertiary']}]{f}[/{COLOR_PALETTE['tertiary']}]" for f in issue["similar_files"])
+                    similar = ", ".join(issue["similar_files"])
                     file_issues.append(f"  Did you mean: {similar}?")
             
             if file_issues:
-                table.add_row("File Issues", Text.from_markup("\n".join(file_issues)))
+                table.add_row("File Issues", "\n".join(file_issues))
         
-        # Display the table with visual separator
-        self._console.print("")
+        # Display the table
         self._console.print(table)
         
-        # Display fix suggestions if available with stunning styling
+        # Display fix suggestions if available
         if analysis.get("fix_suggestions"):
             suggestions = analysis["fix_suggestions"]
             if suggestions:
-                suggestion_items = "\n".join(f"[bold {COLOR_PALETTE['accent1']}]→[/bold {COLOR_PALETTE['accent1']}] {suggestion}" for suggestion in suggestions)
+                # Create a vibrant suggestions panel
+                suggestion_text = []
+                for i, suggestion in enumerate(suggestions, 1):
+                    suggestion_text.append(f"[{COLORS['bright_green']}]•[/{COLORS['bright_green']}] {suggestion}")
                 
-                # Create visually appealing suggestion panel
                 self._console.print(Panel(
-                    Text.from_markup(suggestion_items),
-                    title=f"[bold {COLOR_PALETTE['accent1']}]✨ Fix Suggestions ✨[/bold {COLOR_PALETTE['accent1']}]",
-                    border_style=COLOR_PALETTE["accent1"],
-                    box=NEBULA_BOX,
-                    expand=False,
+                    "\n".join(suggestion_text),
+                    title=f"{ASCII_DECORATIONS['success']} Fix Suggestions {ASCII_DECORATIONS['success']}",
+                    title_align="center",
+                    border_style=COLORS["green"],
+                    box=BOX_STYLES["default"],
                     padding=(1, 2)
                 ))
+    
+
+    async def stream_output(
+        self,
+        command: str,
+        show_spinner: bool = True,
+        show_output: bool = True,
+        callback: Optional[Callable[[str, OutputType], Awaitable[None]]] = None
+    ) -> Tuple[str, str, int]:
+        """
+        Stream command output asynchronously with rich formatting.
+        
+        Args:
+            command: The command to execute
+            show_spinner: Whether to show a spinner
+            show_output: Whether to display output
+            callback: Optional callback for when output is received
+            
+        Returns:
+            Tuple of (stdout, stderr, return_code)
+        """
+        # Import here to avoid circular imports
+        from angela.execution.engine import execution_engine
+        import random
+        import time
+        
+        stdout_chunks = []
+        stderr_chunks = []
+        return_code = None
+        start_time = time.time()
+        
+        # Choose a random philosophy quote
+        quote = random.choice(self.PHILOSOPHY_QUOTES)
+        
+        # Set up progress display if requested
+        if show_spinner:
+            progress = Progress(
+                SpinnerColumn(),
+                TextColumn(f"[{COLORS['bright_purple']} bold]{quote} [{COLORS['bright_purple']} bold]"),
+                TimeElapsedColumn(),
+                console=self._console
+            )
+        else:
+            progress = None
+        
+        try:
+            # Start progress if requested
+            if progress:
+                progress.start()
+                task = progress.add_task("Executing", total=None)
+            
+            # Create the process
+            proc = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            # Set up tasks to read output
+            async def read_stream(stream, output_type: OutputType):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                        
+                    try:
+                        line_str = line.decode('utf-8', errors='replace')
+                        
+                        # Store the output
+                        if output_type == OutputType.STDOUT:
+                            stdout_chunks.append(line_str)
+                        else:
+                            stderr_chunks.append(line_str)
+                        
+                        # Display if requested
+                        if show_output:
+                            if output_type == OutputType.STDOUT:
+                                self._console.print(line_str, end="")
+                            else:
+                                self._console.print(f"[{COLORS['bright_red']} bold]{line_str}[/{COLORS['bright_red']} bold]", end="")
+                        
+                        # Call callback if provided
+                        if callback:
+                            await callback(line_str, output_type)
+                            
+                    except Exception as e:
+                        self._logger.error(f"Error processing output: {str(e)}")
+            
+            # Create tasks for stdout and stderr
+            stdout_task = asyncio.create_task(read_stream(proc.stdout, OutputType.STDOUT))
+            stderr_task = asyncio.create_task(read_stream(proc.stderr, OutputType.STDERR))
+            
+            # Wait for the process to complete
+            return_code = await proc.wait()
+            
+            # Wait for the streams to complete
+            await stdout_task
+            await stderr_task
+            
+            # Update progress
+            if progress:
+                end_time = time.time()
+                execution_time = end_time - start_time
+                progress.update(task, description=f"[{COLORS['bright_green']} bold]Completed in {execution_time:.2f}s[/{COLORS['bright_green']} bold]", completed=True)
+                # Give a short pause to show completion time
+                await asyncio.sleep(0.5)
+        
+        finally:
+            # Clean up progress
+            if progress:
+                progress.stop()
+        
+        # Return the collected output
+        return "".join(stdout_chunks), "".join(stderr_chunks), return_code
+ 
 
     async def display_pre_confirmation_info(
         self,
@@ -644,7 +724,7 @@ class TerminalFormatter:
         execution_time: Optional[float] = None
     ) -> None:
         """
-        Display a comprehensive pre-confirmation information block with extraordinary styling.
+        Display a comprehensive pre-confirmation information block with stunning visuals.
         
         Args:
             command: The command to be executed
@@ -656,201 +736,162 @@ class TerminalFormatter:
             confidence_score: Optional AI confidence score (0-1)
             execution_time: Optional execution time if this is post-execution
         """
-        # Get console width to ensure proper text wrapping
+        # Get console width for proper layout
         console_width = self._console.width
-        max_text_width = min(console_width - 10, 80)  # Leave some margin
+        content_width = min(console_width, 100)
         
-        # Risk level styling with enhanced visual cues
+        # Risk level styling
         risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-        risk_color = RISK_COLORS.get(risk_level, COLOR_PALETTE["warning"])
-        risk_icon = RISK_ICONS.get(risk_level, "⚠ ")
-        risk_box = RISK_BOX_STYLES.get(risk_level, NEBULA_BOX)
+        risk_display = RISK_COLORS.get(risk_level, f"[{COLORS['yellow']}]UNKNOWN[/{COLORS['yellow']}]")
         
-        # Create a stunning layout for all information
+        # Create header
+        header_text = Text()
+        header_text.append(f"{ASCII_DECORATIONS['command']} ", style=COLORS["bright_purple"])
+        header_text.append("Execute", style=f"{COLORS['bright_blue']} bold")
+        header_text.append(" [", style=COLORS["bright_purple"])
+        header_text.append(risk_display, style="")
+        header_text.append(" Risk]", style=COLORS["bright_purple"])
+        
+        # Create a layout for a more compact, visually appealing display
         layout = Layout()
         
-        # Split into top and bottom sections
-        layout.split(
-            Layout(name="top", ratio=3),
-            Layout(name="bottom", ratio=2)
+        # Split into main sections
+        layout.split_column(
+            Layout(name="header"),
+            Layout(name="content")
         )
         
-        # Split top into command and explanation
-        layout["top"].split_row(
-            Layout(name="command", ratio=2),
-            Layout(name="explanation", ratio=3)
+        # Set the header
+        layout["header"].update(
+            Panel(
+                Syntax(command, "bash", theme="monokai", word_wrap=True, background_color="default"),
+                title=header_text,
+                title_align="center",
+                border_style=COLORS["bright_purple"],
+                box=BOX_STYLES["default"],
+                padding=(0, 1),
+            )
         )
         
-        # Split bottom into confidence, risk, and preview
-        layout["bottom"].split_row(
+        # Split content into sections
+        layout["content"].split_row(
+            Layout(name="left_panel", ratio=3),
+            Layout(name="right_panel", ratio=2),
+        )
+        
+        # Split left panel for explanation/insight
+        if explanation:
+            layout["left_panel"].update(
+                Panel(
+                    explanation,
+                    title=f"{ASCII_DECORATIONS['insight']} Command Insight {ASCII_DECORATIONS['insight']}",
+                    title_align="center",
+                    border_style=COLORS["bright_blue"],
+                    box=BOX_STYLES["default"],
+                    padding=(1, 2)
+                )
+            )
+        
+        # Split right panel into sections
+        layout["right_panel"].split_column(
             Layout(name="confidence", ratio=1),
             Layout(name="risk", ratio=1),
-            Layout(name="preview", ratio=2)
+            Layout(name="preview", ratio=2 if preview else 0),
         )
         
-        # 1. Command panel with stunning styling specific to risk level
-        title = f"[bold {risk_color}]{risk_icon}Execute [{risk_name} Risk][/bold {risk_color}]"
-        syntax = Syntax(command, "bash", theme="monokai", word_wrap=True, background_color=COLOR_PALETTE["command_bg"])
-        command_panel = Panel(
-            syntax,
-            title=title,
-            border_style=risk_color,
-            box=risk_box,
-            expand=True,
-            padding=(1, 2)
-        )
-        layout["command"].update(command_panel)
-        
-        # 2. Explanation panel with enhanced styling
-        if explanation:
-            # Ensure explanation doesn't get cut off
-            wrapped_explanation = textwrap.fill(explanation, width=max_text_width)
-            
-            explanation_panel = Panel(
-                Text(wrapped_explanation, style=COLOR_PALETTE["text_primary"]),
-                title=f"[bold {COLOR_PALETTE['secondary']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['secondary']}]",
-                border_style=COLOR_PALETTE["secondary"],
-                box=NEBULA_BOX,
-                expand=True,
-                padding=(1, 2)
-            )
-            layout["explanation"].update(explanation_panel)
-        else:
-            layout["explanation"].update(Panel(
-                "",
-                title="[dim]No explanation available[/dim]",
-                border_style="dim",
-                expand=True
-            ))
-        
-        # 3. Confidence score with extraordinary visual representation
+        # Confidence score section
         if confidence_score is not None:
-            confidence_color = COLOR_PALETTE["success"] if confidence_score > 0.8 else COLOR_PALETTE["tertiary"] if confidence_score > 0.6 else COLOR_PALETTE["danger"]
+            # Calculate star display
             confidence_stars = int(confidence_score * 5)
             confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
             
-            confidence_panel = Panel(
-                Group(
-                    Text(f"Score: [{confidence_color}]{confidence_score:.2f}[/{confidence_color}]", justify="center"),
-                    Text(confidence_display, style=confidence_color, justify="center"),
-                    Text("", justify="center"),
-                    Text("(AI confidence in command accuracy)", style="dim", justify="center")
-                ),
-                title=f"[bold {COLOR_PALETTE['tertiary']}]✧ AI Confidence ✧[/bold {COLOR_PALETTE['tertiary']}]",
-                border_style=confidence_color,
-                box=NEBULA_BOX,
-                expand=True,
-                padding=(1, 1)
-            )
-            layout["confidence"].update(confidence_panel)
-        else:
-            layout["confidence"].update(Panel(
-                "",
-                title="[dim]No confidence data[/dim]",
-                border_style="dim",
-                expand=True
-            ))
-        
-        # 4. Risk assessment panel with enhanced visual effects
-        risk_impact = self._format_impact_analysis(impact)
-        risk_info = Group(
-            Text(f"{risk_icon}Level: [{risk_color}]{risk_name}[/{risk_color}]", justify="center"),
-            Text("", justify="center"),
-            Text(f"Reason: {risk_reason}", style=COLOR_PALETTE["text_primary"], justify="center"),
-        )
-        
-        risk_panel = Panel(
-            risk_info,
-            title=f"[bold {risk_color}]⚠ Risk Assessment ⚠[/bold {risk_color}]",
-            border_style=risk_color,
-            box=risk_box,
-            expand=True,
-            padding=(1, 1)
-        )
-        layout["risk"].update(risk_panel)
-        
-        # 5. Preview panel with stunning styling
-        if preview:
-            # Ensure preview is properly formatted
-            preview_panel = Panel(
-                Text(preview, style=COLOR_PALETTE["text_primary"]),
-                title=f"[bold {COLOR_PALETTE['tertiary']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['tertiary']}]",
-                border_style=COLOR_PALETTE["tertiary"],
-                box=NEBULA_BOX,
-                expand=True,
-                padding=(1, 2)
-            )
-            layout["preview"].update(preview_panel)
-        else:
-            # Provide a visually appealing message for dry run
-            layout["preview"].update(Panel(
-                Text("Preview not available for this command. Use --dry-run for simulation.", style=COLOR_PALETTE["text_secondary"]),
-                title=f"[{COLOR_PALETTE['tertiary']}]⚠ Preview Unavailable ⚠[/{COLOR_PALETTE['tertiary']}]",
-                border_style=COLOR_PALETTE["tertiary"],
-                box=NEBULA_BOX,
-                expand=True,
-                padding=(1, 2)
-            ))
-        
-        # 6. Warning for critical operations
-        if risk_level >= 4:  # CRITICAL
-            critical_warning = Panel(
-                Text(f"⚠️  This is a CRITICAL risk operation  ⚠️\nIt may cause significant changes to your system or data loss.", style=COLOR_PALETTE["danger"]),
-                title=f"[bold {COLOR_PALETTE['danger']}]⚠ CRITICAL RISK WARNING ⚠[/bold {COLOR_PALETTE['danger']}]",
-                border_style=COLOR_PALETTE["danger"],
-                box=STELLAR_BOX,
-                expand=False,
-                padding=(1, 2)
-            )
-            self._console.print(critical_warning)
-        
-        # Print the complete layout
-        self._console.print(layout)
-
-    def _format_impact_analysis(self, impact: Dict[str, Any]) -> Text:
-        """
-        Format the command impact analysis into a visually stunning text.
-        
-        Args:
-            impact: The impact analysis dictionary
+            # Determine color based on confidence level
+            if confidence_score > 0.8:
+                confidence_color = COLORS["green"]
+            elif confidence_score > 0.6:
+                confidence_color = COLORS["bright_blue"]
+            else:
+                confidence_color = COLORS["bright_red"]
+                
+            confidence_section = Table.grid(padding=0)
+            confidence_section.add_column()
             
-        Returns:
-            A rich Text object with the formatted impact analysis
-        """
-        text = Text()
+            confidence_section.add_row(Text("Score:", style=f"{COLORS['bright_purple']} bold"))
+            confidence_section.add_row(Text(f"{confidence_score:.2f}", style=f"{confidence_color} bold"))
+            confidence_section.add_row(Text(confidence_display, style=confidence_color))
+            confidence_section.add_row("")
+            confidence_section.add_row(Text("(AI confidence in", style=f"{COLORS['purple']} italic"))
+            confidence_section.add_row(Text("command accuracy)", style=f"{COLORS['purple']} italic"))
+            
+            layout["confidence"].update(
+                Panel(
+                    confidence_section,
+                    title=f"{ASCII_DECORATIONS['confidence']} AI Confidence {ASCII_DECORATIONS['confidence']}",
+                    title_align="center",
+                    border_style=COLORS["purple"],
+                    box=BOX_STYLES["default"],
+                    padding=(0, 1)
+                )
+            )
+            
+        # Risk assessment section
+        risk_section = Table.grid(padding=0)
+        risk_section.add_column()
         
-        # Add operation types with enhanced styling
-        operations = impact.get("operations", ["unknown"])
-        text.append("Operations: ", style=f"bold {COLOR_PALETTE['secondary']}")
-        text.append(", ".join(operations), style=COLOR_PALETTE["text_primary"])
-        text.append("\n")
+        risk_section.add_row(Text("✓ Level:", style=f"{COLORS['bright_purple']} bold"))
+        risk_section.add_row(Text(risk_display, style=""))
+        risk_section.add_row("")
+        risk_section.add_row(Text("Reason:", style=f"{COLORS['bright_purple']} bold"))
+        risk_section.add_row(Text(risk_reason, style=COLORS["bright_blue"]))
         
-        # Add destructive warning if applicable with enhanced visual cues
-        if impact.get("destructive", False):
-            text.append("⚠️ Warning: ", style=f"bold {COLOR_PALETTE['danger']}")
-            text.append("This operation may delete or overwrite files", style=COLOR_PALETTE["danger"])
-            text.append("\n")
+        layout["risk"].update(
+            Panel(
+                risk_section,
+                title=f"{ASCII_DECORATIONS['risk']} Risk Assessment{ASCII_DECORATIONS['risk']}",
+                title_align="center",
+                border_style=COLORS["red"],
+                box=BOX_STYLES["default"],
+                padding=(0, 1)
+            )
+        )
         
-        # Add file creation info with visually appealing styling
-        if impact.get("creates_files", False):
-            text.append("Creates Files: ", style=f"bold {COLOR_PALETTE['accent1']}")
-            text.append("Yes", style=COLOR_PALETTE["accent1"])
-            text.append("\n")
+        # Preview section (if available)
+        if preview:
+            layout["preview"].update(
+                Panel(
+                    preview,
+                    title=f"{ASCII_DECORATIONS['preview']} Command Preview {ASCII_DECORATIONS['preview']}",
+                    title_align="center",
+                    border_style=COLORS["bright_blue"],
+                    box=BOX_STYLES["default"],
+                    padding=(0, 1)
+                )
+            )
         
-        # Add file modification info with stunning visual representation
-        if impact.get("modifies_files", False):
-            text.append("Modifies Files: ", style=f"bold {COLOR_PALETTE['tertiary']}")
-            text.append("Yes", style=COLOR_PALETTE["tertiary"])
-            text.append("\n")
+        # Print the layout
+        self._console.print(layout)
         
-        return text
+        # Add warning for critical operations
+        if risk_level >= 4:  # CRITICAL
+            warning_text = Text()
+            warning_text.append("⚠️  ", style=COLORS["red"])
+            warning_text.append("This is a CRITICAL risk operation", style=f"{COLORS['bright_red']} bold")
+            warning_text.append(" ⚠️\n", style=COLORS["red"])
+            warning_text.append("It may cause significant changes to your system or data loss.", style=COLORS["bright_red"])
+            
+            self._console.print(Panel(
+                warning_text,
+                border_style=COLORS["red"],
+                box=BOX_STYLES["bold"],
+                padding=(1, 2)
+            ))
 
     async def display_inline_confirmation(
         self,
         prompt_text: str = "Proceed with execution?"
     ) -> bool:
         """
-        Display an extraordinary inline confirmation prompt with stunning visual effects.
+        Display an inline confirmation prompt and get user input.
         
         Args:
             prompt_text: The confirmation prompt text
@@ -858,54 +899,27 @@ class TerminalFormatter:
         Returns:
             True if confirmed, False otherwise
         """
-        # Create an eye-catching confirmation prompt
-        from rich import box
+        # Create a fancy confirmation prompt
+        prompt_panel = Text()
+        prompt_panel.append(prompt_text, style=f"{COLORS['bright_purple']} bold")
+        prompt_panel.append("\n\n", style="")
+        prompt_panel.append("(", style=COLORS["bright_blue"])
+        prompt_panel.append("y", style=COLORS["green"])
+        prompt_panel.append("/", style=COLORS["bright_blue"])
+        prompt_panel.append("n", style=COLORS["red"])
+        prompt_panel.append(")", style=COLORS["bright_blue"])
         
-        # Extract risk level from prompt if present
-        risk_style = COLOR_PALETTE["tertiary"]  # Default color
+        self._console.print(Panel(
+            Align.center(prompt_panel),
+            title=f"{ASCII_DECORATIONS['confirmation']} Awaiting Confirmation {ASCII_DECORATIONS['confirmation']}",
+            title_align="center",
+            border_style=COLORS["bright_purple"],
+            box=BOX_STYLES["default"],
+            padding=(1, 2)
+        ))
         
-        # Check for risk levels in the prompt text
-        if "SAFE" in prompt_text:
-            risk_style = COLOR_PALETTE["safe"]
-            box_type = NEBULA_BOX
-        elif "LOW" in prompt_text:
-            risk_style = COLOR_PALETTE["low"]
-            box_type = NEBULA_BOX
-        elif "MEDIUM" in prompt_text:
-            risk_style = COLOR_PALETTE["medium"]
-            box_type = COSMIC_BOX
-        elif "HIGH" in prompt_text:
-            risk_style = COLOR_PALETTE["high"]
-            box_type = QUANTUM_BOX
-        elif "CRITICAL" in prompt_text:
-            risk_style = COLOR_PALETTE["critical"]
-            box_type = STELLAR_BOX
-        else:
-            box_type = NEBULA_BOX
-        
-        # Create a visually stunning confirmation prompt
-        panel_group = Group(
-            Text(prompt_text, style=COLOR_PALETTE["text_primary"], justify="center"),
-            Text("", justify="center"),  # Empty line for spacing
-            Text.from_markup(f"([bold {COLOR_PALETTE['success']}]y[/bold {COLOR_PALETTE['success']}]/[bold {COLOR_PALETTE['danger']}]n[/bold {COLOR_PALETTE['danger']}])", justify="center")
-        )
-        
-        confirmation_panel = Panel(
-            panel_group,
-            title=f"[bold {risk_style}]◈ Awaiting Confirmation ◈[/bold {risk_style}]",
-            border_style=risk_style,
-            box=box_type,
-            expand=False,
-            padding=(1, 4)
-        )
-        
-        self._console.print("")  # Add spacing
-        self._console.print(confirmation_panel)
-        
-        # Create stunning prompt indicator
-        self._console.print(Text(f"[bold {risk_style}]>>> [/bold {risk_style}]", end=""))
-        
-        # Get user input
+        # Get the user's response
+        self._console.print(f"[{COLORS['green']} bold]>>> [/{COLORS['green']} bold]", end="")
         response = input().strip().lower()
         
         # Consider empty response or y/yes as "yes"
@@ -921,7 +935,7 @@ class TerminalFormatter:
         with_philosophy: bool = True
     ) -> Tuple[str, str, int, float]:
         """
-        Display a command execution timer with stunning visual effects and philosophy quotes.
+        Display a command execution timer with philosophy quotes.
         
         Args:
             command: The command being executed
@@ -938,6 +952,7 @@ class TerminalFormatter:
         from rich.panel import Panel
         from rich.text import Text
         from rich.console import Group
+        from rich import box
         
         # Ensure no active live displays
         self._ensure_no_active_live()
@@ -958,17 +973,16 @@ class TerminalFormatter:
             # Get a random but consistent spinner for this execution session
             spinner = self._get_random_spinner(elapsed)
             
-            # Add execution message with enhanced styling
+            # Add execution message
             spinner_with_text = Text()
             spinner_with_text.append(spinner)
             spinner_with_text.append(" ")
-            spinner_with_text.append(f"{elapsed:.2f}s", style=f"bold {COLOR_PALETTE['accent1']}")
-            spinner_with_text.append(" - ", style=COLOR_PALETTE["text_secondary"])
-            spinner_with_text.append("Executing command...", style=COLOR_PALETTE["tertiary"])
+            spinner_with_text.append(f"{elapsed:.2f}s", style=f"{COLORS['bright_blue']} bold")
+            spinner_with_text.append(" - Executing command...")
             
             if with_philosophy:
-                # For the philosophy quote with stunning styling
-                quote_text = Text(quote, style=f"italic {COLOR_PALETTE['secondary']}")
+                # For the philosophy quote
+                quote_text = Text(quote, style=f"{COLORS['purple']} italic")
                 
                 # Add an empty line for spacing
                 spacer = Text("")
@@ -978,12 +992,11 @@ class TerminalFormatter:
             else:
                 content = spinner_with_text
             
-            # Create a visually striking panel
             panel = Panel(
                 content,
-                title=f"[bold {COLOR_PALETTE['tertiary']}]◈ Command Execution ◈[/bold {COLOR_PALETTE['tertiary']}]",
-                border_style=COLOR_PALETTE["tertiary"],
-                box=NEBULA_BOX,
+                title="Command Execution",
+                border_style=COLORS["bright_purple"],
+                box=BOX_STYLES["default"],
                 padding=(1, 2)
             )
             
@@ -1023,7 +1036,7 @@ class TerminalFormatter:
         stdout_task = asyncio.create_task(read_stream(process.stdout, True))
         stderr_task = asyncio.create_task(read_stream(process.stderr, False))
         
-        # Display the live progress with stunning visuals
+        # Display the live progress
         try:
             with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
                 # Wait for the command to complete while updating the display
@@ -1033,19 +1046,18 @@ class TerminalFormatter:
                 await stdout_task
                 await stderr_task
                 
-                execution_time = time.time() - start_time
-                
-                # Create a visually stunning completion panel
-                completed_panel = Panel(
-                    Text(f"Execution completed in {execution_time:.6f}s", style=COLOR_PALETTE["success"], justify="center"),
-                    title=f"[bold {COLOR_PALETTE['success']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['success']}]",
-                    border_style=COLOR_PALETTE["success"],
-                    box=NEBULA_BOX,
-                    expand=False,
-                    padding=(1, 2)
+                execution_time = time.time() - start_time # This is the correct variable
+                live.update(
+                    Panel(
+                        # Use execution_time here
+                        Text(f"Execution completed in {execution_time:.6f}s", style=f"{COLORS['bright_green']} bold"), 
+                        title=f"{ASCII_DECORATIONS['success']} Angela Initialized {ASCII_DECORATIONS['success']}",
+                        title_align="center",
+                        border_style=COLORS["green"],
+                        box=BOX_STYLES["default"],
+                        padding=(0, 1)
+                    )
                 )
-                
-                live.update(completed_panel)
                 
                 # Brief pause to show completion
                 await asyncio.sleep(0.5)
@@ -1103,13 +1115,14 @@ class TerminalFormatter:
             execution_time
         )
 
+        
     async def display_loading_timer(
         self,
         message: str,
         with_philosophy: bool = True
     ) -> None:
         """
-        Display a loading timer with stunning visual effects and philosophy quotes.
+        Display a loading timer with optional philosophy quotes.
         
         Args:
             message: The loading message to display
@@ -1123,6 +1136,7 @@ class TerminalFormatter:
         from rich.panel import Panel
         from rich.text import Text
         from rich.console import Group
+        from rich import box
         
         # Ensure no active live displays
         self._ensure_no_active_live()
@@ -1143,16 +1157,16 @@ class TerminalFormatter:
             # Get a random but consistent spinner for this loading session
             spinner = self._get_random_spinner(elapsed)
             
-            # Add timer and message to the spinner with enhanced styling
+            # Add timer and message to the spinner
             spinner_with_text = Text()
             spinner_with_text.append(spinner)
             spinner_with_text.append(" ")
-            spinner_with_text.append(f"{elapsed:.2f}s", style=f"bold {COLOR_PALETTE['accent1']}")
-            spinner_with_text.append(f" - {message}", style=COLOR_PALETTE["tertiary"])
+            spinner_with_text.append(f"{elapsed:.2f}s", style=f"{COLORS['bright_blue']} bold")
+            spinner_with_text.append(f" - {message}")
             
             if with_philosophy:
-                # For the philosophy quote with stunning styling
-                quote_text = Text(quote, style=f"italic {COLOR_PALETTE['secondary']}")
+                # For the philosophy quote
+                quote_text = Text(quote, style=f"{COLORS['purple']} italic")
                 
                 # Add an empty line for spacing
                 spacer = Text("")
@@ -1162,12 +1176,11 @@ class TerminalFormatter:
             else:
                 content = spinner_with_text
             
-            # Create a visually striking panel
             panel = Panel(
                 content,
-                title=f"[bold {COLOR_PALETTE['tertiary']}]◈ Angela initializing... ◈[/bold {COLOR_PALETTE['tertiary']}]",
-                border_style=COLOR_PALETTE["tertiary"],
-                box=NEBULA_BOX,
+                title="Angela initializing...",
+                border_style=COLORS["bright_purple"],
+                box=BOX_STYLES["default"],
                 padding=(1, 2)
             )
             
@@ -1190,6 +1203,7 @@ class TerminalFormatter:
         except Exception as e:
             self._logger.error(f"Error displaying loading timer: {str(e)}")
 
+    
     def _ensure_no_active_live(self):
         """Ensure no active Live displays by checking and resetting console state."""
         # Access the internal console state to check if it has an active Live
@@ -1209,126 +1223,803 @@ class TerminalFormatter:
                     self._console._buffer = []
             except Exception as e:
                 self._logger.error(f"Error cleaning up console state: {str(e)}")
-
-    def print_command_learning(self, command_type: str, count: int) -> None:
+            
+    def create_table(
+        self, 
+        title: str, 
+        columns: List[Tuple[str, Optional[str]]]
+    ) -> Table:
         """
-        Display command learning notification with extraordinary styling.
+        Create a rich table.
         
         Args:
-            command_type: Type of command that's being learned
-            count: Number of times this command has been used
+            title: The table title
+            columns: List of (column_name, style) tuples
+            
+        Returns:
+            A Rich Table object
         """
-        # Create a visually stunning panel for command learning
-        panel = Panel(
-            Text(f"I noticed you've used {command_type} {count} times.", style=COLOR_PALETTE["tertiary"]),
-            title=f"[bold {COLOR_PALETTE['secondary']}]✧ Command Learning ✧[/bold {COLOR_PALETTE['secondary']}]",
-            border_style=COLOR_PALETTE["secondary"],
-            box=COSMIC_BOX,
-            expand=False,
-            padding=(1, 2)
-        )
-        
-        # Add visual separator and display
-        self._console.print("")
-        self._console.print(panel)
-    
-    def print_command_added(self, command_type: str) -> None:
-        """
-        Display notification that a command was added to trusted commands with stunning styling.
-        
-        Args:
-            command_type: Type of command that was added
-        """
-        # Create a visually striking success message
-        self.print_success_message(
-            f"Command '{command_type}' has been added to your trusted commands list.",
-            "Auto-Execution Enabled"
-        )
-    
-    def print_command_output_result(self, stdout: str, stderr: str, return_code: int) -> None:
-        """
-        Display command execution results with extraordinary styling.
-        
-        Args:
-            stdout: Standard output from command
-            stderr: Standard error from command
-            return_code: Return code from command
-        """
-        # Check if command was successful
-        if return_code == 0:
-            # Command succeeded
-            if stdout.strip():
-                # Show output with stunning styling
-                self.print_output(
-                    stdout,
-                    OutputType.STDOUT,
-                    "⚡ Command Output ⚡"
-                )
-            else:
-                # Show success message for commands with no output
-                self.print_success_message(
-                    "Command executed successfully with no visible output.",
-                    "Command Complete"
-                )
-        else:
-            # Command failed, show error
-            if stderr.strip():
-                self.print_output(
-                    stderr,
-                    OutputType.STDERR,
-                    "⚠ Command Error ⚠"
-                )
-            else:
-                # Generic error message if no stderr
-                self.print_output(
-                    f"Command failed with return code {return_code}",
-                    OutputType.ERROR,
-                    "⚠ Execution Failed ⚠"
-                )
-
-    def print_adaptive_confirmation(self, prompt_text: str) -> None:
-        """
-        Display a request for adaptive confirmation with extraordinary styling.
-        
-        Args:
-            prompt_text: The confirmation prompt text
-        """
-        # Create a visually striking panel for adaptive confirmation
-        panel = Panel(
-            Text(prompt_text, style=COLOR_PALETTE["text_primary"], justify="center"),
-            title=f"[bold {COLOR_PALETTE['secondary']}]✧ Adaptive Learning ✧[/bold {COLOR_PALETTE['secondary']}]",
-            border_style=COLOR_PALETTE["secondary"],
-            box=COSMIC_BOX,
-            expand=False,
-            padding=(1, 2)
-        )
-        
-        # Add visual separator and display
-        self._console.print("")
-        self._console.print(panel)
-    
-    # Additional helper methods for visual enhancements
-    def create_table(self, title: str, columns: List[Tuple[str, str]], box_style=NEBULA_BOX) -> Table:
-        """Create a visually stunning table."""
         table = Table(
-            title=f"[bold {COLOR_PALETTE['tertiary']}]{title}[/bold {COLOR_PALETTE['tertiary']}]",
-            box=box_style,
-            border_style=COLOR_PALETTE["tertiary"],
-            highlight=True,
-            expand=False
+            title=title, 
+            expand=False, 
+            box=BOX_STYLES["default"],
+            border_style=COLORS["bright_purple"],
+            title_style=f"{COLORS['bright_blue']} bold",
+            header_style=f"{COLORS['purple']} bold"
         )
         
         for name, style in columns:
-            table.add_column(f"[{style}]{name}[/{style}]", style=style)
+            table.add_column(name, style=style or COLORS["bright_blue"])
             
         return table
     
-    def create_success_indicator(self, success: bool, text: str = "") -> Text:
-        """Create a visually stunning success/failure indicator."""
-        if success:
-            return Text(f"✓ {text}", style=COLOR_PALETTE["success"])
+    async def display_task_plan(self, plan: Any) -> None:
+        """
+        Display a task plan with rich interactive visualization.
+        
+        Args:
+            plan: The task plan to display
+        """
+        # Create a table for the plan steps
+        table = Table(
+            title=f"{ASCII_DECORATIONS['plan']} Plan for: {plan.goal} {ASCII_DECORATIONS['plan']}", 
+            box=BOX_STYLES["default"],
+            border_style=COLORS["bright_purple"],
+            title_style=f"{COLORS['bright_blue']} bold",
+            header_style=f"{COLORS['purple']} bold"
+        )
+        
+        table.add_column("#", style=COLORS["cyan"], no_wrap=True)
+        table.add_column("Command", style=COLORS["green"])
+        table.add_column("Explanation", style=COLORS["bright_blue"])
+        table.add_column("Risk", style=COLORS["yellow"], no_wrap=True)
+        table.add_column("Dependencies", style=COLORS["purple"], no_wrap=True)
+        
+        # Risk level names
+        risk_names = ["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        risk_styles = [COLORS["green"], COLORS["cyan"], COLORS["yellow"], COLORS["red"], COLORS["bright_red"]]
+        
+        # Add steps to the table
+        for i, step in enumerate(plan.steps):
+            risk_idx = step.estimated_risk if 0 <= step.estimated_risk < len(risk_names) else 0
+            risk_name = risk_names[risk_idx]
+            risk_style = risk_styles[risk_idx]
+            
+            # Format dependencies
+            deps = ", ".join([str(d+1) for d in step.dependencies]) if step.dependencies else "None"
+            
+            # Create syntax object
+            syntax = Syntax(step.command, "bash", theme="monokai", word_wrap=True)
+            
+            # Render to string instead of using .markup
+            _console.record = True
+            _console.print(syntax)
+            syntax_str = _console.export_text(styles=True)
+            _console.record = False
+            
+            table.add_row(
+                str(i + 1),
+                syntax_str,
+                step.explanation,
+                f"[{risk_style}]{risk_name}[/{risk_style}]",
+                deps
+            )
+        
+        # Display the table
+        self._console.print("\n")
+        
+        self._console.print(Panel(
+            "I've created a plan to accomplish your goal. Here are the steps I'll take:",
+            title=f"{ASCII_DECORATIONS['plan']} Task Plan {ASCII_DECORATIONS['plan']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        self._console.print(table)
+        
+        # Create a dependency visualization if there are non-trivial dependencies
+        has_dependencies = any(step.dependencies for step in plan.steps)
+        if has_dependencies:
+            await self._display_dependency_graph(plan)
+            
+
+
+    def print_suggestion(self, suggestion: Dict[str, Any], with_confidence: bool = True) -> None:
+        """
+        Print a command suggestion with rich formatting.
+        
+        Args:
+            suggestion: The command suggestion
+            with_confidence: Whether to show confidence score
+        """
+        self._console.print("\n")
+        
+        # Extract suggestion components
+        command = suggestion.get("command", "")
+        explanation = suggestion.get("explanation", "")
+        confidence = suggestion.get("confidence", 0.0)
+        
+        # Create a vibrant panel for the suggested command
+        self._console.print(Panel(
+            Syntax(command, "bash", theme="monokai", word_wrap=True, background_color="default"),
+            title=f"{ASCII_DECORATIONS['command']} Command {ASCII_DECORATIONS['command']}",
+            title_align="center",
+            border_style=COLORS["bright_purple"],
+            box=BOX_STYLES["default"],
+            padding=(0, 1)
+        ))
+        
+        # Show confidence if requested
+        if with_confidence:
+            confidence_color = COLORS["green"] if confidence > 0.8 else COLORS["bright_blue"] if confidence > 0.6 else COLORS["bright_red"]
+            confidence_stars = int(confidence * 5)
+            confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
+            
+            confidence_text = Text()
+            confidence_text.append("Confidence: ", style=f"{COLORS['bright_purple']} bold")
+            confidence_text.append(f"{confidence:.2f}", style=f"{confidence_color} bold")
+            confidence_text.append(f" {confidence_display}", style=confidence_color)
+            
+            self._console.print(confidence_text)
+        
+        # Show explanation
+        explanation_text = Text()
+        explanation_text.append("Explanation:\n", style=f"{COLORS['bright_purple']} bold")
+        explanation_text.append(explanation, style=COLORS["bright_blue"])
+        
+        self._console.print(explanation_text)
+        
+    def print_proactive_suggestion(self, suggestion: str, source: str = "AI") -> None:
+        """
+        Print a proactive suggestion.
+        
+        Args:
+            suggestion: The suggestion text
+            source: The source of the suggestion
+        """
+        self._console.print("\n")
+        self._console.print(Panel(
+            Text(suggestion, style=COLORS["bright_blue"]),
+            title=f"{ASCII_DECORATIONS['insight']} Suggestion from {source} {ASCII_DECORATIONS['insight']}",
+            title_align="center",
+            border_style=COLORS["bright_purple"],
+            box=BOX_STYLES["default"],
+            padding=(1, 2)
+        ))
+    
+    async def _display_dependency_graph(self, plan: Any) -> None:
+        """
+        Display a visual representation of the dependency graph.
+        
+        Args:
+            plan: The task plan with dependencies
+        """
+        # Create a dependency tree
+        tree = Tree(f"[{COLORS['bright_purple']} bold]Execution Flow[/{COLORS['bright_purple']} bold]", guide_style=f"{COLORS['bright_blue']} bold")
+        
+        # Track processed steps
+        processed = set()
+        
+        # Add steps with no dependencies first (roots)
+        roots = []
+        for i, step in enumerate(plan.steps):
+            if not step.dependencies:
+                roots.append(i)
+                node = tree.add(f"[{COLORS['cyan']}]Step {i+1}:[/{COLORS['cyan']}] {step.command[:30]}..." if len(step.command) > 30 else step.command)
+                processed.add(i)
+                
+                # Add children recursively
+                self._add_dependency_children(node, i, plan, processed)
+        
+        # Check if any steps were not processed (in case of circular dependencies)
+        if len(processed) < len(plan.steps):
+            for i, step in enumerate(plan.steps):
+                if i not in processed:
+                    node = tree.add(f"[{COLORS['cyan']}]Step {i+1}:[/{COLORS['cyan']}] {step.command[:30]}..." if len(step.command) > 30 else step.command)
+                    processed.add(i)
+                    
+                    # Add children recursively
+                    self._add_dependency_children(node, i, plan, processed)
+        
+        # Display the tree
+        self._console.print(f"\n[{COLORS['bright_purple']} bold]Dependency Graph:[/{COLORS['bright_purple']} bold]")
+        self._console.print(tree)
+    
+    def _add_dependency_children(
+        self, 
+        parent_node: Any, 
+        step_idx: int, 
+        plan: Any, 
+        processed: Set[int]
+    ) -> None:
+        """
+        Recursively add children to a dependency node.
+        
+        Args:
+            parent_node: The parent tree node
+            step_idx: The index of the current step
+            plan: The task plan
+            processed: Set of already processed steps
+        """
+        # Find steps that depend on this one
+        for i, step in enumerate(plan.steps):
+            if step_idx in step.dependencies and i not in processed:
+                node = parent_node.add(f"[{COLORS['cyan']}]Step {i+1}:[/{COLORS['cyan']}] {step.command[:30]}..." 
+                                       if len(step.command) > 30 else step.command)
+                processed.add(i)
+                
+                # Recurse
+                self._add_dependency_children(node, i, plan, processed)
+    
+    async def display_multi_step_execution(
+        self, 
+        plan: Any, 
+        results: List[Dict[str, Any]]
+    ) -> None:
+        """
+        Display the results of a multi-step execution.
+        
+        Args:
+            plan: The task plan that was executed
+            results: The execution results for each step
+        """
+        # Create a table for the execution results
+        table = Table(
+            title="Execution Results", 
+            box=BOX_STYLES["default"],
+            border_style=COLORS["bright_purple"],
+            title_style=f"{COLORS['bright_blue']} bold",
+            header_style=f"{COLORS['purple']} bold"
+        )
+        
+        table.add_column("#", style=COLORS["cyan"], no_wrap=True)
+        table.add_column("Command", style=COLORS["green"])
+        table.add_column("Status", style=COLORS["bright_blue"], no_wrap=True)
+        table.add_column("Output", style=COLORS["bright_blue"])
+        
+        # Add results to the table
+        for i, result in enumerate(results):
+            # Get the command
+            command = result.get("command", plan.steps[i].command if i < len(plan.steps) else "Unknown")
+            
+            # Get status
+            status = f"[{COLORS['green']}]Success[/{COLORS['green']}]" if result.get("success", False) else f"[{COLORS['bright_red']}]Failed[/{COLORS['bright_red']}]"
+            
+            # Get output (combine stdout and stderr)
+            stdout = result.get("stdout", "").strip()
+            stderr = result.get("stderr", "").strip()
+            
+            # Truncate output if too long
+            output = stdout
+            if stderr:
+                if output:
+                    output += "\n"
+                output += f"[{COLORS['red']}]{stderr}[/{COLORS['red']}]"
+            
+            if len(output) > 100:
+                output = output[:97] + "..."
+            
+            table.add_row(
+                str(i + 1),
+                Syntax(command, "bash", theme="monokai", word_wrap=True).markup,
+                status,
+                output
+            )
+        
+        # Display the table
+        self._console.print("\n")
+        self._console.print(Panel(
+            "Execution results for your multi-step task:",
+            title=f"{ASCII_DECORATIONS['execution']} Multi-Step Execution {ASCII_DECORATIONS['execution']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        self._console.print(table)
+        
+        # Display summary
+        success_count = sum(1 for r in results if r.get("success", False))
+        total_count = len(results)
+        
+        if success_count == total_count:
+            self._console.print(f"[{COLORS['bright_green']} bold]All {total_count} steps completed successfully![/{COLORS['bright_green']} bold]")
         else:
-            return Text(f"✗ {text}", style=COLOR_PALETTE["danger"])
+            self._console.print(f"[{COLORS['yellow']} bold]{success_count} of {total_count} steps completed successfully[/{COLORS['yellow']} bold]")
+            
+            # Show which steps failed
+            failed_steps = [i+1 for i, r in enumerate(results) if not r.get("success", False)]
+            if failed_steps:
+                self._console.print(f"[{COLORS['bright_red']} bold]Failed steps: {', '.join(map(str, failed_steps))}[/{COLORS['bright_red']} bold]")
+    
+    async def display_workflow(self, workflow: Any, variables: Dict[str, Any] = None) -> None:
+        """
+        Display a workflow with rich formatting.
+        
+        Args:
+            workflow: The workflow to display
+            variables: Optional variables for the workflow
+        """
+        # Create a table for the workflow steps
+        table = Table(
+            title=f"Workflow: {workflow.name}", 
+            box=BOX_STYLES["default"],
+            border_style=COLORS["bright_purple"],
+            title_style=f"{COLORS['bright_blue']} bold",
+            header_style=f"{COLORS['purple']} bold"
+        )
+        
+        table.add_column("#", style=COLORS["cyan"], no_wrap=True)
+        table.add_column("Command", style=COLORS["green"])
+        table.add_column("Explanation", style=COLORS["bright_blue"])
+        table.add_column("Options", style=COLORS["yellow"])
+        
+        # Add steps to the table
+        for i, step in enumerate(workflow.steps):
+            # Apply variable substitution if variables provided
+            command = step.command
+            if variables:
+                for var_name, var_value in variables.items():
+                    # Remove leading $ if present
+                    clean_name = var_name[1:] if var_name.startswith('$') else var_name
+                    
+                    # Substitute ${VAR} syntax
+                    command = command.replace(f"${{{clean_name}}}", str(var_value))
+                    
+                    # Substitute $VAR syntax
+                    command = command.replace(f"${clean_name}", str(var_value))
+            
+            options = []
+            if step.optional:
+                options.append("Optional")
+            if step.requires_confirmation:
+                options.append("Requires Confirmation")
+            
+            table.add_row(
+                str(i + 1),
+                Syntax(command, "bash", theme="monokai", word_wrap=True).markup,
+                step.explanation,
+                ", ".join(options) if options else ""
+            )
+        
+        # Display the table
+        self._console.print("\n")
+        self._console.print(Panel(
+            workflow.description,
+            title=f"{ASCII_DECORATIONS['plan']} Workflow: {workflow.name} {ASCII_DECORATIONS['plan']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        self._console.print(table)
+        
+        # Display variables if provided
+        if variables:
+            var_table = Table(
+                title="Variables", 
+                box=BOX_STYLES["default"],
+                border_style=COLORS["purple"],
+                title_style=f"{COLORS['bright_blue']} bold"
+            )
+            
+            var_table.add_column("Name", style=COLORS["cyan"])
+            var_table.add_column("Value", style=COLORS["green"])
+            
+            for var_name, var_value in variables.items():
+                var_table.add_row(var_name, str(var_value))
+            
+            self._console.print(var_table)
+    
+    async def display_file_analysis(self, analysis: Dict[str, Any]) -> None:
+        """
+        Display file content analysis results.
+        
+        Args:
+            analysis: The analysis results
+        """
+        self._console.print("\n")
+        self._console.print(Panel(
+            f"Analysis of {analysis.get('path', 'file')}",
+            title=f"{ASCII_DECORATIONS['file']} File Analysis {ASCII_DECORATIONS['file']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        # Display language and type info
+        file_type = analysis.get("type", "unknown")
+        language = analysis.get("language")
+        
+        file_info_text = Text()
+        file_info_text.append("File type: ", style=f"{COLORS['bright_purple']} bold")
+        if language:
+            file_info_text.append(f"{file_type} ({language})", style=COLORS["bright_blue"])
+        else:
+            file_info_text.append(file_type, style=COLORS["bright_blue"])
+            
+        self._console.print(file_info_text)
+        
+        # Display the analysis text
+        analysis_text = Text()
+        analysis_text.append("\nAnalysis:", style=f"{COLORS['bright_purple']} bold")
+        analysis_text.append(f"\n{analysis.get('analysis', 'No analysis available')}", style=COLORS["bright_blue"])
+        
+        self._console.print(analysis_text)
+    
+    async def display_file_manipulation(self, manipulation: Dict[str, Any]) -> None:
+        """
+        Display file manipulation results with diff.
+        
+        Args:
+            manipulation: The manipulation results
+        """
+        self._console.print("\n")
+        self._console.print(Panel(
+            f"Changes to {manipulation.get('path', 'file')}",
+            title=f"{ASCII_DECORATIONS['file']} File Manipulation {ASCII_DECORATIONS['file']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        # Display the instruction
+        instruction_text = Text()
+        instruction_text.append("Instruction: ", style=f"{COLORS['bright_purple']} bold")
+        instruction_text.append(manipulation.get('instruction', 'Unknown'), style=COLORS["bright_blue"])
+        
+        self._console.print(instruction_text)
+        
+        # Display the diff
+        diff_text = Text()
+        diff_text.append("\nChanges:", style=f"{COLORS['bright_purple']} bold")
+        
+        self._console.print(diff_text)
+        
+        syntax = Syntax(manipulation.get("diff", "No changes"), "diff", theme="monokai")
+        self._console.print(syntax)
+        
+        # Show whether changes were applied
+        if manipulation.get("changes_applied", False):
+            self._console.print(f"[{COLORS['bright_green']} bold]Changes have been applied to the file.[/{COLORS['bright_green']} bold]")
+        elif manipulation.get("dry_run", False):
+            self._console.print(f"[{COLORS['bright_blue']} bold]Dry run: Changes were not applied to the file.[/{COLORS['bright_blue']} bold]")
+        else:
+            self._console.print(f"[{COLORS['yellow']} bold]Changes were not applied to the file.[/{COLORS['yellow']} bold]")
+    
+    async def display_file_search_results(self, search_results: Dict[str, Any]) -> None:
+        """
+        Display file search results.
+        
+        Args:
+            search_results: The search results
+        """
+        self._console.print("\n")
+        self._console.print(Panel(
+            f"Search results in {search_results.get('path', 'file')}",
+            title=f"{ASCII_DECORATIONS['search']} File Search {ASCII_DECORATIONS['search']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"]
+        ))
+        
+        # Display the query
+        query_text = Text()
+        query_text.append("Query: ", style=f"{COLORS['bright_purple']} bold")
+        query_text.append(search_results.get('query', 'Unknown'), style=COLORS["bright_blue"])
+        
+        self._console.print(query_text)
+        
+        # Display match count
+        match_count = search_results.get("match_count", 0)
+        self._console.print(f"[{COLORS['bright_purple']} bold]Found {match_count} matches[/{COLORS['bright_purple']} bold]")
+        
+        # Display matches
+        if match_count > 0:
+            matches = search_results.get("matches", [])
+            
+            for i, match in enumerate(matches, 1):
+                self._console.print(f"\n[{COLORS['cyan']} bold]Match #{i}[/{COLORS['cyan']} bold] (Lines {match.get('line_start', '?')}-{match.get('line_end', '?')})")
+                
+                # Display the content with context
+                syntax = Syntax(match.get("content", ""), search_results.get("language", "text"), theme="monokai", line_numbers=True)
+                self._console.print(syntax)
+                
+                # Display explanation
+                if "explanation" in match:
+                    self._console.print(f"[{COLORS['bright_blue']} italic]{match['explanation']}[/{COLORS['bright_blue']} italic]")
+
+
+# ATTENTION: This method is overridden below to fix the duplication issue!
+def print_command_result(self, result: Dict[str, Any]) -> None:
+    """
+    Print a command execution result in a compact, visually appealing way.
+    This method avoids duplicating information that's already been shown.
+    
+    Args:
+        result: The command execution result dictionary
+    """
+    # Only print command and output - avoid repeating explanation or confidence
+    
+    # Extract components from the result
+    command = result.get("command", "")
+    stdout = result.get("stdout", "").strip()
+    stderr = result.get("stderr", "").strip()
+    
+    # Print the output (if any)
+    if stdout:
+        self.print_output(stdout, OutputType.STDOUT)
+    
+    # Print error output (if any)
+    if stderr:
+        self.print_output(stderr, OutputType.STDERR)
+
+# Add the method to TerminalFormatter
+TerminalFormatter.print_command_result = print_command_result
+
+async def display_complex_workflow_plan(self, workflow_plan: Any) -> None:
+    """
+    Display a complex workflow plan with vibrant styling.
+    
+    Args:
+        workflow_plan: The workflow plan to display
+    """
+    self._console.print("\n")
+    
+    header_text = Text()
+    header_text.append(f"{ASCII_DECORATIONS['plan']} ", style=COLORS["bright_purple"])
+    header_text.append("Complex Workflow", style=f"{COLORS['bright_blue']} bold") 
+    header_text.append(f" {ASCII_DECORATIONS['plan']}", style=COLORS["bright_purple"])
+    
+    # Display a header with the workflow name and description
+    self._console.print(Panel(
+        f"[{COLORS['bright_purple']} bold]{workflow_plan.name}[/{COLORS['bright_purple']} bold]\n\n"
+        f"[{COLORS['bright_blue']}]{workflow_plan.description}[/{COLORS['bright_blue']}]",
+        title=header_text,
+        title_align="center",
+        border_style=COLORS["purple"],
+        box=BOX_STYLES["default"]
+    ))
+    
+    # Create a table for the workflow steps
+    table = Table(
+        title="Execution Steps",
+        box=BOX_STYLES["default"],
+        border_style=COLORS["bright_purple"],
+        title_style=f"{COLORS['purple']} bold",
+        header_style=f"{COLORS['bright_blue']} bold"
+    )
+    
+    # Determine columns based on step properties
+    table.add_column("ID", style=COLORS["cyan"])
+    table.add_column("Tool", style=COLORS["bright_blue"])
+    table.add_column("Action", style=COLORS["green"])
+    table.add_column("Description", style=COLORS["bright_purple"])
+    table.add_column("Risk", style=COLORS["yellow"])
+    
+    # Extract step info and add to table
+    for step_id, step in workflow_plan.steps.items():
+        # Get tool and action
+        tool = getattr(step, "tool", "")
+        action = getattr(step, "action", "")
+        
+        # Get command if it exists
+        command = getattr(step, "command", "")
+        if command and not action:
+            action = command
+        
+        # Format the description
+        description = getattr(step, "description", "")
+        
+        # Format risk level
+        risk_level = getattr(step, "risk_level", 0)
+        risk_labels = ["SAFE", "LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        risk_colors = [
+            COLORS["green"], 
+            COLORS["cyan"], 
+            COLORS["yellow"], 
+            COLORS["red"], 
+            COLORS["bright_red"]
+        ]
+        
+        risk_idx = min(risk_level, len(risk_labels) - 1)
+        risk_text = f"[{risk_colors[risk_idx]}]{risk_labels[risk_idx]}[/{risk_colors[risk_idx]}]"
+        
+        # Add row to table
+        table.add_row(
+            step_id,
+            tool or "-",
+            Text.from_markup(Syntax(action, "bash", theme="monokai").markup) if action else "-",
+            description or "-",
+            risk_text
+        )
+    
+    # Display the steps table
+    self._console.print(table)
+    
+    # Create a visual representation of the workflow flow
+    flow_text = Text()
+    flow_text.append("Workflow Flow:\n", style=f"{COLORS['bright_purple']} bold")
+    
+    # For each step, show connections
+    for step_id, step in workflow_plan.steps.items():
+        flow_text.append(f"{step_id} ", style=COLORS["cyan"])
+        
+        # Check for next steps
+        next_steps = getattr(step, "next_steps", [])
+        if next_steps:
+            flow_text.append("→ ", style=COLORS["bright_blue"])
+            for i, next_step in enumerate(next_steps):
+                if i > 0:
+                    flow_text.append(", ", style=COLORS["bright_blue"])
+                flow_text.append(next_step, style=COLORS["cyan"])
+        else:
+            flow_text.append("(end)", style=COLORS["purple"])
+        
+        flow_text.append("\n")
+    
+    # Display flow
+    self._console.print(Panel(
+        flow_text,
+        title="Execution Flow",
+        title_align="center",
+        border_style=COLORS["bright_blue"],
+        box=BOX_STYLES["default"]
+    ))
+    
+    # Show summary info
+    tools_used = set()
+    for step in workflow_plan.steps.values():
+        tool = getattr(step, "tool", "")
+        if tool:
+            tools_used.add(tool)
+    
+    summary_text = Text()
+    summary_text.append(f"Total Steps: ", style=f"{COLORS['bright_purple']} bold")
+    summary_text.append(f"{len(workflow_plan.steps)}\n", style=COLORS["bright_blue"])
+    
+    summary_text.append(f"Tools Used: ", style=f"{COLORS['bright_purple']} bold")
+    summary_text.append(f"{', '.join(sorted(tools_used)) if tools_used else 'None'}\n", style=COLORS["bright_blue"])
+    
+    summary_text.append(f"Estimated Duration: ", style=f"{COLORS['bright_purple']} bold")
+    # Calculate estimated duration based on step count
+    estimated_duration = len(workflow_plan.steps) * 15  # Simple estimate: 15 seconds per step
+    minutes, seconds = divmod(estimated_duration, 60)
+    summary_text.append(f"{int(minutes)} minutes {seconds} seconds", style=COLORS["bright_blue"])
+    
+    # Display summary
+    self._console.print(Panel(
+        summary_text,
+        title="Workflow Summary",
+        title_align="center",
+        border_style=COLORS["purple"],
+        box=BOX_STYLES["default"]
+    ))
+
+async def display_result_summary(self, result: Dict[str, Any]) -> None:
+    """
+    Display a beautiful summary of a command execution result.
+    
+    Args:
+        result: The command execution result
+    """
+    # Extract data from the result
+    command = result.get("command", "")
+    stdout = result.get("stdout", "")
+    stderr = result.get("stderr", "")
+    success = result.get("success", False)
+    execution_time = result.get("execution_time", 0)
+    
+    # Create the output panels
+    panels = []
+    
+    # Always show the command - with vibrant styling
+    command_panel = Panel(
+        Syntax(command, "bash", theme="monokai", word_wrap=True),
+        title=f"{ASCII_DECORATIONS['command']} Command {ASCII_DECORATIONS['command']}",
+        title_align="center",
+        border_style=COLORS["bright_purple"],
+        box=BOX_STYLES["default"],
+        padding=(0, 1),
+        width=min(len(command) + 10, self._console.width - 4) 
+    )
+    
+    panels.append(command_panel)
+    
+    # Format the output (if any) - trim to content size
+    if stdout.strip():
+        stdout_panel = Panel(
+            stdout.strip(),
+            title=f"{ASCII_DECORATIONS['output']} Output {ASCII_DECORATIONS['output']}",
+            title_align="center",
+            border_style=COLORS["bright_blue"],
+            box=BOX_STYLES["default"],
+            padding=(0, 1),
+            width=min(len(max(stdout.strip().split('\n'), key=len, default="")) + 10, self._console.width - 4)
+        )
+        panels.append(stdout_panel)
+    
+    # Format error output (if any)
+    if stderr.strip():
+        stderr_panel = Panel(
+            stderr.strip(),
+            title=f"{ASCII_DECORATIONS['error']} Error {ASCII_DECORATIONS['error']}",
+            title_align="center",
+            border_style=COLORS["bright_red"],
+            box=BOX_STYLES["default"],
+            padding=(0, 1),
+            width=min(len(max(stderr.strip().split('\n'), key=len, default="")) + 10, self._console.width - 4)
+        )
+        panels.append(stderr_panel)
+    
+    # Print the panels one by one
+    for panel in panels:
+        self._console.print(panel)
+
+async def confirm_advanced_plan_execution(self, plan: Any, dry_run: bool = False) -> bool:
+    """
+    Get confirmation for executing an advanced plan.
+    
+    Args:
+        plan: The advanced plan to execute
+        dry_run: Whether this is a dry run
+        
+    Returns:
+        True if confirmed, False otherwise
+    """
+    if dry_run:
+        return True  # No confirmation needed for dry run
+    
+    # Check for high-risk steps
+    has_high_risk = False
+    for step_id, step in plan.steps.items():
+        if getattr(step, "estimated_risk", 0) >= 3:  # High risk
+            has_high_risk = True
+            break
+    
+    # Create a title
+    title_text = Text()
+    title_text.append(f"{ASCII_DECORATIONS['confirmation']} ", style=COLORS["bright_red"])
+    title_text.append("Confirm Plan Execution", style=f"{COLORS['bright_purple']} bold")
+    title_text.append(f" {ASCII_DECORATIONS['confirmation']}", style=COLORS["bright_red"])
+    
+    # Create confirmation text
+    confirm_text = Text()
+    
+    if has_high_risk:
+        confirm_text.append("⚠️  ", style=COLORS["bright_red"])
+        confirm_text.append("This plan contains HIGH RISK operations", style=f"{COLORS['bright_red']} bold")
+        confirm_text.append(" ⚠️\n\n", style=COLORS["bright_red"])
+    
+    confirm_text.append("Do you want to execute this advanced plan with ", style=COLORS["bright_blue"])
+    confirm_text.append(f"{len(plan.steps)}", style=f"{COLORS['bright_purple']} bold")
+    confirm_text.append(" steps?", style=COLORS["bright_blue"])
+    
+    # Add info about retry and recovery capabilities
+    confirm_text.append("\n\nThe system will automatically attempt recovery if any step fails.", style=f"{COLORS['green']}")
+    
+    # Display the confirmation panel
+    self._console.print(Panel(
+        Align.center(confirm_text),
+        title=title_text,
+        title_align="center",
+        border_style=COLORS["red"] if has_high_risk else COLORS["bright_purple"],
+        box=BOX_STYLES["default"],
+        padding=(1, 2)
+    ))
+    
+    # Get confirmation
+    self._console.print(f"[{COLORS['green']} bold]>>> [/{COLORS['green']} bold]", end="")
+    response = input().strip().lower()
+    
+    # Consider empty response or y/yes as "yes"
+    return not response or response in ("y", "yes")
+
+# Register the new method
+TerminalFormatter.display_complex_workflow_plan = display_complex_workflow_plan
+TerminalFormatter.display_result_summary = display_result_summary
+TerminalFormatter.confirm_advanced_plan_execution = confirm_advanced_plan_execution
 
 # Global formatter instance
 terminal_formatter = TerminalFormatter()
