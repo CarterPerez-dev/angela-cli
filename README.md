@@ -634,139 +634,176 @@ The system is organized into several key subsystems:
 ### Core Components
 
 ```
+├── MD/                          # Documentation files
+│   ├── MDHelpers/               # Helper docs
+│   │   ├── Files.md             # File explanations
+│   │   ├── commands.md          # Commands to run
+│   │   └── dependency_map.md    # Dependency map
+│   └── assets/                  # Image assets
+│       └── angela.webp          # Angela readme.md image asset
 ├── Makefile                     # Build automation
 ├── QUICKSTART.md                # Fast setup guide
 ├── README.md                    # Project overview
 ├── angela/                      # Main application
 │   ├── __init__.py              # Package initializer
 │   ├── __main__.py              # Executable entry
-│   ├── ai/                      # AI components
-│   │   ├── __init__.py          # AI package
-│   │   ├── analyzer.py          # Error analysis
-│   │   ├── client.py            # Gemini client
-│   │   ├── confidence.py        # Suggestion confidence
-│   │   ├── content_analyzer.py  # File content AI
-│   │   ├── content_analyzer_extensions.py # Content AI extras
-│   │   ├── enhanced_prompts.py  # Advanced AI prompts
-│   │   ├── file_integration.py  # AI file ops
-│   │   ├── intent_analyzer.py   # User intent AI
-│   │   ├── parser.py            # AI response parsing
-│   │   ├── prompts.py           # AI prompt templates
-│   │   └── semantic_analyzer.py # Code semantics AI
-│   ├── check_services.py        # Service status check
-│   ├── cli/                     # Command-line interface
-│   │   ├── __init__.py          # CLI package
-│   │   ├── docker.py            # Docker commands
-│   │   ├── files.py             # File commands
-│   │   ├── files_extensions.py  # Advanced file cmds
-│   │   ├── generation.py        # Code gen commands
-│   │   ├── main.py              # Main CLI app
-│   │   └── workflows.py         # Workflow commands
+│   ├── api/                     # API definitions
+│   │   ├── __init__.py          # API package init
+│   │   ├── ai.py                # AI module API
+│   │   ├── cli.py               # CLI module API
+│   │   ├── context.py           # Context module API
+│   │   ├── execution.py         # Execution API
+│   │   ├── generation.py        # Generation API
+│   │   ├── intent.py            # Intent module API
+│   │   ├── interfaces.py        # Interfaces API
+│   │   ├── monitoring.py        # Monitoring API
+│   │   ├── review.py            # Review module API
+│   │   ├── safety.py            # Safety module API
+│   │   ├── shell.py             # Shell module API
+│   │   ├── toolchain.py         # Toolchain API
+│   │   └── workflows.py         # Workflows API
+│   ├── cli/                     # Main CLI logic
+│   │   └── __init__.py          # Main CLI package
+│   ├── components/              # Core components
+│   │   ├── ai/                  # AI components
+│   │   │   ├── __init__.py          # AI package
+│   │   │   ├── analyzer.py          # Error analysis
+│   │   │   ├── client.py            # Gemini client
+│   │   │   ├── confidence.py        # Suggestion confidence
+│   │   │   ├── content_analyzer.py  # File content AI
+│   │   │   ├── content_analyzer_extensions.py # Content AI extras
+│   │   │   ├── enhanced_prompts.py  # Advanced AI prompts
+│   │   │   ├── file_integration.py  # AI file ops
+│   │   │   ├── intent_analyzer.py   # User intent AI
+│   │   │   ├── parser.py            # AI response parsing
+│   │   │   ├── prompts.py           # AI prompt templates
+│   │   │   └── semantic_analyzer.py # Code semantics AI
+│   │   ├── cli/                 # Command-line interface (component)
+│   │   │   ├── __init__.py          # CLI package
+│   │   │   ├── docker.py            # Docker commands
+│   │   │   ├── files.py             # File commands
+│   │   │   ├── files_extensions.py  # Advanced file cmds
+│   │   │   ├── generation.py        # Code gen commands
+│   │   │   ├── main.py              # Main CLI app
+│   │   │   └── workflows.py         # Workflow commands
+│   │   ├── context/             # Environmental awareness
+│   │   │   ├── __init__.py          # Context package
+│   │   │   ├── enhanced_file_activity.py # Advanced file track
+│   │   │   ├── enhancer.py          # Context enrichment
+│   │   │   ├── file_activity.py     # File activity log
+│   │   │   ├── file_detector.py     # File type detection
+│   │   │   ├── file_resolver.py     # File path resolution
+│   │   │   ├── history.py           # Command history
+│   │   │   ├── manager.py           # Core context
+│   │   │   ├── preferences.py       # User settings
+│   │   │   ├── project_inference.py # Project type ID
+│   │   │   ├── project_state_analyzer.py # Project state
+│   │   │   ├── semantic_context_manager.py # Code context
+│   │   │   └── session.py           # User session data
+│   │   ├── execution/           # Command execution
+│   │   │   ├── __init__.py          # Execution package
+│   │   │   ├── adaptive_engine.py   # Smart cmd exec
+│   │   │   ├── engine.py            # Command executor
+│   │   │   ├── error_recovery.py    # Error handling
+│   │   │   ├── filesystem.py        # File operations
+│   │   │   ├── hooks.py             # Execution hooks
+│   │   │   ├── rollback.py          # Undo operations
+│   │   │   └── rollback_commands.py # Rollback CLI
+│   │   ├── generation/          # Code generation
+│   │   │   ├── __init__.py          # Generation package
+│   │   │   ├── architecture.py      # Arch analysis
+│   │   │   ├── context_manager.py   # Gen context
+│   │   │   ├── documentation.py     # Doc generation
+│   │   │   ├── engine.py            # Code gen engine
+│   │   │   ├── frameworks.py        # Framework templates
+│   │   │   ├── models.py            # Gen data models
+│   │   │   ├── planner.py           # Project planning
+│   │   │   ├── refiner.py           # Code refinement
+│   │   │   └── validators.py        # Code validation
+│   │   ├── intent/              # Intent understanding
+│   │   │   ├── __init__.py          # Intent package
+│   │   │   ├── complex_workflow_planner.py # Complex workflows
+│   │   │   ├── enhanced_task_planner.py # Advanced planning
+│   │   │   ├── models.py            # Intent data models
+│   │   │   ├── planner.py           # Task planning
+│   │   │   └── semantic_task_planner.py # Semantic planning
+│   │   ├── interfaces/          # Component interfaces
+│   │   │   ├── __init__.py          # Interfaces pkg
+│   │   │   ├── execution.py         # Exec interfaces
+│   │   │   └── safety.py            # Safety interfaces
+│   │   ├── monitoring/          # Background monitoring
+│   │   │   ├── __init__.py          # Monitoring pkg
+│   │   │   ├── background.py        # Background tasks
+│   │   │   ├── network_monitor.py   # Network checks
+│   │   │   ├── notification_handler.py # Shell notifications
+│   │   │   └── proactive_assistant.py # Proactive help
+│   │   ├── review/              # Code review & feedback
+│   │   │   ├── __init__.py          # Review package
+│   │   │   ├── diff_manager.py      # Code diffs
+│   │   │   └── feedback.py          # Feedback processing
+│   │   ├── safety/              # Safety mechanisms
+│   │   │   ├── __init__.py          # Safety package
+│   │   │   ├── adaptive_confirmation.py # Smart confirms
+│   │   │   ├── classifier.py        # Risk assessment
+│   │   │   ├── confirmation.py      # User confirms
+│   │   │   ├── preview.py           # Command preview
+│   │   │   └── validator.py         # Command validation
+│   │   ├── shell/               # Shell integration
+│   │   │   ├── __init__.py          # Shell package
+│   │   │   ├── advanced_formatter.py # Rich CLI output
+│   │   │   ├── angela.bash          # Bash integration
+│   │   │   ├── angela.tmux          # Tmux integration
+│   │   │   ├── angela.zsh           # Zsh integration
+│   │   │   ├── angela_enhanced.bash # Adv Bash hooks
+│   │   │   ├── angela_enhanced.zsh  # Adv Zsh hooks
+│   │   │   ├── completion.py        # CLI completion
+│   │   │   ├── formatter.py         # CLI output format
+│   │   │   └── inline_feedback.py   # Terminal feedback
+│   │   ├── toolchain/           # Tool integrations
+│   │   │   ├── __init__.py          # Toolchain pkg
+│   │   │   ├── ci_cd.py             # CI/CD tools
+│   │   │   ├── cross_tool_workflow_engine.py # Multi-tool flows
+│   │   │   ├── docker.py            # Docker tools
+│   │   │   ├── enhanced_universal_cli.py # Adv CLI translation
+│   │   │   ├── git.py               # Git tools
+│   │   │   ├── package_managers.py  # Pkg manager tools
+│   │   │   ├── test_frameworks.py   # Test tool integration
+│   │   │   └── universal_cli.py     # CLI translation
+│   │   ├── utils/               # Utilities (component)
+│   │   │   ├── __init__.py          # Utils package
+│   │   │   ├── enhanced_logging.py  # Advanced logging
+│   │   │   └── logging.py           # Logging setup
+│   │   └── workflows/           # Workflow management (component)
+│   │       ├── __init__.py          # Workflows pkg
+│   │       ├── manager.py           # Workflow exec
+│   │       └── sharing.py           # Workflow sharing
 │   ├── config.py                # App configuration
 │   ├── constants.py             # Global constants
-│   ├── context/                 # Environmental awareness
-│   │   ├── __init__.py          # Context package
-│   │   ├── enhanced_file_activity.py # Advanced file track
-│   │   ├── enhancer.py          # Context enrichment
-│   │   ├── file_activity.py     # File activity log
-│   │   ├── file_detector.py     # File type detection
-│   │   ├── file_resolver.py     # File path resolution
-│   │   ├── history.py           # Command history
-│   │   ├── manager.py           # Core context
-│   │   ├── preferences.py       # User settings
-│   │   ├── project_inference.py # Project type ID
-│   │   ├── project_state_analyzer.py # Project state
-│   │   ├── semantic_context_manager.py # Code context
-│   │   └── session.py           # User session data
-│   ├── core/                    # Core infrastructure
+│   ├── core/                    # Core infrastructure (app level)
 │   │   ├── __init__.py          # Core package
 │   │   ├── events.py            # Event bus
-│   │   ├── registry.py          # Service locator
-│   │   └── service_registration.py # Service setup
-│   ├── diagnostic.py            # System diagnostics
-│   ├── execution/               # Command execution
-│   │   ├── __init__.py          # Execution package
-│   │   ├── adaptive_engine.py   # Smart cmd exec
-│   │   ├── engine.py            # Command executor
-│   │   ├── error_recovery.py    # Error handling
-│   │   ├── filesystem.py        # File operations
-│   │   ├── hooks.py             # Execution hooks
-│   │   ├── rollback.py          # Undo operations
-│   │   └── rollback_commands.py # Rollback CLI
-│   ├── generation/              # Code generation
-│   │   ├── __init__.py          # Generation package
-│   │   ├── architecture.py      # Arch analysis
-│   │   ├── context_manager.py   # Gen context
-│   │   ├── documentation.py     # Doc generation
-│   │   ├── engine.py            # Code gen engine
-│   │   ├── frameworks.py        # Framework templates
-│   │   ├── models.py            # Gen data models
-│   │   ├── planner.py           # Project planning
-│   │   ├── refiner.py           # Code refinement
-│   │   └── validators.py        # Code validation
-│   ├── integrations/            # System integrations
-│   │   ├── __init__.py          # Integrations pkg
-│   │   ├── enhanced_planner_integration.py # Planner integration
-│   │   ├── phase12_integration.py # Advanced features
-│   │   └── semantic_integration.py # Semantics link
-│   ├── intent/                  # Intent understanding
-│   │   ├── __init__.py          # Intent package
-│   │   ├── complex_workflow_planner.py # Complex workflows
-│   │   ├── enhanced_task_planner.py # Advanced planning
-│   │   ├── models.py            # Intent data models
-│   │   ├── planner.py           # Task planning
-│   │   └── semantic_task_planner.py # Semantic planning
-│   ├── interfaces/              # Component interfaces
-│   │   ├── __init__.py          # Interfaces pkg
-│   │   ├── execution.py         # Exec interfaces
-│   │   └── safety.py            # Safety interfaces
-│   ├── monitoring/              # Background monitoring
-│   │   ├── __init__.py          # Monitoring pkg
-│   │   ├── background.py        # Background tasks
-│   │   ├── network_monitor.py   # Network checks
-│   │   ├── notification_handler.py # Shell notifications
-│   │   └── proactive_assistant.py # Proactive help
+│   │   └── registry.py          # Service locator
 │   ├── orchestrator.py          # Core coordinator
-│   ├── review/                  # Code review & feedback
-│   │   ├── __init__.py          # Review package
-│   │   ├── diff_manager.py      # Code diffs
-│   │   └── feedback.py          # Feedback processing
-│   ├── safety/                  # Safety mechanisms
-│   │   ├── __init__.py          # Safety package
-│   │   ├── adaptive_confirmation.py # Smart confirms
-│   │   ├── classifier.py        # Risk assessment
-│   │   ├── confirmation.py      # User confirms
-│   │   ├── preview.py           # Command preview
-│   │   └── validator.py         # Command validation
-│   ├── shell/                   # Shell integration
-│   │   ├── __init__.py          # Shell package
-│   │   ├── advanced_formatter.py # Rich CLI output
-│   │   ├── angela.bash          # Bash integration
-│   │   ├── angela.tmux          # Tmux integration
-│   │   ├── angela.zsh           # Zsh integration
-│   │   ├── angela_enhanced.bash # Adv Bash hooks
-│   │   ├── angela_enhanced.zsh  # Adv Zsh hooks
-│   │   ├── completion.py        # CLI completion
-│   │   ├── formatter.py         # CLI output format
-│   │   └── inline_feedback.py   # Terminal feedback
-│   ├── toolchain/               # Tool integrations
-│   │   ├── __init__.py          # Toolchain pkg
-│   │   ├── ci_cd.py             # CI/CD tools
-│   │   ├── cross_tool_workflow_engine.py # Multi-tool flows
-│   │   ├── docker.py            # Docker tools
-│   │   ├── enhanced_universal_cli.py # Adv CLI translation
-│   │   ├── git.py               # Git tools
-│   │   ├── package_managers.py  # Pkg manager tools
-│   │   ├── test_frameworks.py   # Test tool integration
-│   │   └── universal_cli.py     # CLI translation
-│   ├── utils/                   # Utilities
-│   │   ├── __init__.py          # Utils package
-│   │   ├── enhanced_logging.py  # Advanced logging
-│   │   └── logging.py           # Logging setup
-│   └── workflows/               # Workflow management
-│       ├── __init__.py          # Workflows pkg
-│       ├── manager.py           # Workflow exec
-│       └── sharing.py           # Workflow sharing
+│   └── utils/                   # Utilities (app level)
+│       ├── async_utils.py       # Async utilities
+│       └── logging.py           # App-level logging
+├── docs/                        # Documentation sources
+│   ├── Makefile                 # Docs build script
+│   ├── make.bat                 # Docs build (Win)
+│   └── source/                  # Sphinx source files
+│       ├── _static/             # Static doc assets
+│       ├── _templates/          # Doc templates
+│       │   └── example-template.rst # Docs example template
+│       ├── conf.py              # Sphinx config
+│       ├── contributing.rst     # Contributing guide
+│       ├── examples.rst         # Examples documentation
+│       ├── ext/                 # Sphinx extensions
+│       │   └── usage_examples.py  # Docs extension
+│       ├── index.rst            # Docs main page
+│       ├── installation.rst     # Installation guide
+│       ├── introduction.rst     # Introduction guide
+│       ├── quickstart.rst       # Quickstart guide
+│       └── usage.rst            # Usage guide
 ├── pyproject.toml               # Python packaging
 ├── pytest.ini                   # Test configuration
 ├── requirements.txt             # Python dependencies
@@ -775,7 +812,38 @@ The system is organized into several key subsystems:
 │   ├── install-quick.sh         # Quick install
 │   ├── install.sh               # Main installer
 │   └── uninstall.sh             # Uninstaller
-└── setup.py                     # Python setup
+└── tests/                       # Test suite
+    ├── __init__.py              # Tests package
+    ├── conftest.py              # Pytest fixtures
+    ├── test_ai_client.py        # AI client tests
+    ├── test_basic.py            # Basic app tests
+    ├── test_context.py          # Context module tests
+    ├── test_context_enhancer.py # Context enhancer tests
+    ├── test_enhanced_planner.py # Planner tests
+    ├── test_enhanced_rollback.py # Rollback tests
+    ├── test_execution.py        # Execution tests
+    ├── test_file_activity.py    # File activity tests
+    ├── test_file_detector.py    # File detector tests
+    ├── test_file_resolver.py    # File resolver tests
+    ├── test_filesystem.py       # Filesystem tests
+    ├── test_integration.py      # Core integration tests
+    ├── test_integrations.py     # Component integration tests
+    ├── test_multi_step.py       # Multi-step tests
+    ├── test_orchestration.py    # Orchestration tests
+    ├── test_prompt_building.py  # Prompt building tests
+    ├── test_response_parsing.py # Response parsing tests
+    ├── test_safety.py           # Safety module tests
+    └── usage_examples/          # Test usage examples
+        ├── advanced_features.py   # Adv features examples
+        ├── command_execution.py   # Cmd exec examples
+        ├── context_awareness.py   # Context aware examples
+        ├── error_recovery.py      # Error recovery examples
+        ├── file_operations.py     # File ops examples
+        ├── git_operations.py      # Git ops examples
+        ├── safety_features.py     # Safety features examples
+        ├── testing_debugging.py   # Test/debug examples
+        ├── tools_integration.py   # Tool integration examples
+        └── workflows.py           # Workflow examples
 ```
 
 ### Key Design Patterns
