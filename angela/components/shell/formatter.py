@@ -544,7 +544,7 @@ class TerminalFormatter:
         execution_time: Optional[float] = None
     ) -> None:
         """
-        Display a comprehensive pre-confirmation information block.
+        Display a symmetrical and properly aligned pre-confirmation layout.
         
         Args:
             command: The command to be executed
@@ -564,74 +564,42 @@ class TerminalFormatter:
         risk_icon = RISK_ICONS.get(risk_level, "⚠")
         risk_color = RISK_COLORS.get(risk_level, COLOR_PALETTE["warning"])
         
-        # Create the layout grid for a balanced presentation
-        layout = Layout()
+        # Calculate main panel width - make sure it's centered
+        main_panel_width = min(console_width - 10, 80)  # Max 80 chars or less depending on terminal
         
-        # Split the layout into command and details sections
-        layout.split_row(
-            Layout(name="command", ratio=1),
-            Layout(name="details", ratio=1)
-        )
-        
-        # Split the details section into columns
-        layout["details"].split_column(
-            Layout(name="insight", ratio=3),  # Larger ratio for insight
-            Layout(name="meta", ratio=2)      # Smaller ratio for meta
-        )
-        
-        # Split the meta section into two equal columns
-        layout["meta"].split_row(
-            Layout(name="confidence"),
-            Layout(name="risk")
-        )
-        
-        # Create the command panel with consistent styling
+        # 1. Command panel (top)
         command_panel = Panel(
             Syntax(command, "bash", theme="monokai", word_wrap=True),
             title=f"[bold {risk_color}]{risk_icon} Execute [{risk_name} Risk][/bold {risk_color}]",
-            border_style=COLOR_PALETTE["border"],  # Consistent red border
+            border_style=COLOR_PALETTE["border"],
             box=DEFAULT_BOX,
-            expand=False,  # Changed to false to prevent oversizing
+            width=main_panel_width,
             padding=(1, 2)
         )
-        layout["command"].update(command_panel)
         
-        # Create the insight panel with explanation
-        if explanation:
-            insight_panel = Panel(
-                Text(explanation, style=COLOR_PALETTE["text"]),  # Consistent blue text
-                title=f"[bold {COLOR_PALETTE['text']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['text']}]",
-                border_style=COLOR_PALETTE["border"],  # Consistent red border
-                box=DEFAULT_BOX,
-                expand=False,  # Changed to false
-                padding=(1, 2)
-            )
-        else:
-            # Provide a fallback panel when no explanation is available
-            insight_panel = Panel(
-                Text("No explanation available for this command.", style="dim"),
-                title=f"[bold {COLOR_PALETTE['text']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['text']}]",
-                border_style=COLOR_PALETTE["border"],
-                box=DEFAULT_BOX,
-                expand=False,
-                padding=(1, 2)
-            )
-        layout["insight"].update(insight_panel)
+        # 2. Explanation and confidence score panels (side by side)
+        explanation_text = explanation or "No explanation available for this command."
+        explanation_panel = Panel(
+            Text(explanation_text, style=COLOR_PALETTE["text"]),
+            title=f"[bold {COLOR_PALETTE['text']}]✧ Command Insight ✧[/bold {COLOR_PALETTE['text']}]",
+            border_style=COLOR_PALETTE["border"],
+            box=DEFAULT_BOX,
+            width=main_panel_width // 2 - 1,  # Divide available space
+            padding=(1, 2)
+        )
         
-        # Create the confidence panel
+        # Confidence panel creation
         if confidence_score is not None:
-            # Calculate star display
             confidence_stars = int(confidence_score * 5)
             confidence_display = "★" * confidence_stars + "☆" * (5 - confidence_stars)
             
-            # Determine color based on confidence level
             if confidence_score > 0.8:
                 confidence_color = COLOR_PALETTE["success"]
             elif confidence_score > 0.6:
                 confidence_color = COLOR_PALETTE["info"]
             else:
                 confidence_color = COLOR_PALETTE["error"]
-                
+            
             confidence_panel = Panel(
                 Group(
                     Text("Score:", style=f"bold {COLOR_PALETTE['text']}", justify="center"),
@@ -642,61 +610,80 @@ class TerminalFormatter:
                     Text("command accuracy)", style="dim", justify="center")
                 ),
                 title=f"[bold {COLOR_PALETTE['text']}]✧ AI Confidence ✧[/bold {COLOR_PALETTE['text']}]",
-                border_style=COLOR_PALETTE["border"],  # Consistent red border
+                border_style=COLOR_PALETTE["border"],
                 box=DEFAULT_BOX,
-                expand=False,  # Changed to false
-                padding=(0, 1)
+                width=main_panel_width // 2 - 1,  # Divide available space
+                padding=(1, 2)
             )
         else:
-            # Provide a fallback panel when no confidence score is available
             confidence_panel = Panel(
                 Text("No confidence score available.", style="dim", justify="center"),
                 title=f"[bold {COLOR_PALETTE['text']}]✧ AI Confidence ✧[/bold {COLOR_PALETTE['text']}]",
                 border_style=COLOR_PALETTE["border"],
                 box=DEFAULT_BOX,
-                expand=False,
-                padding=(0, 1)
-            )
-        layout["confidence"].update(confidence_panel)
-        
-        # Create the risk panel
-        risk_panel = Panel(
-            Group(
-                Text(f"✓ Level:", style=f"bold {COLOR_PALETTE['text']}", justify="center"),
-                Text(f"{risk_name}", style=risk_color, justify="center"),
-                Text("", justify="center"),  # Empty line for spacing
-                Text("Reason:", style=f"bold {COLOR_PALETTE['text']}", justify="center"),
-                Text(risk_reason, style=COLOR_PALETTE["text"], justify="center")
-            ),
-            title=f"[bold {risk_color}]⚠ Risk Assessment[/bold {risk_color}]",
-            border_style=COLOR_PALETTE["border"],  # Consistent red border
-            box=DEFAULT_BOX,
-            expand=False,  # Changed to false
-            padding=(0, 1)
-        )
-        layout["risk"].update(risk_panel)
-        
-        # Add the preview section if provided
-        if preview:
-            # Add preview layout to details
-            layout["details"].split_column(
-                Layout(name="insight", ratio=2),
-                Layout(name="meta", ratio=1),
-                Layout(name="preview", ratio=1)
-            )
-            
-            preview_panel = Panel(
-                Text(preview, style=COLOR_PALETTE["text"]),  # Consistent blue text
-                title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
-                border_style=COLOR_PALETTE["border"],  # Consistent red border
-                box=DEFAULT_BOX,
-                expand=False,  # Changed to false
+                width=main_panel_width // 2 - 1,
                 padding=(1, 2)
             )
-            layout["preview"].update(preview_panel)
         
-        # Print the layout
-        self._console.print(layout)
+        # 3. Preview panel (if available)
+        if preview:
+            preview_panel = Panel(
+                Text(preview, style=COLOR_PALETTE["text"]),
+                title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                width=main_panel_width,
+                padding=(1, 2)
+            )
+        
+        # 4. Risk assessment panel
+        impact_summary = []
+        if impact.get("operations"):
+            ops = ", ".join(impact["operations"])
+            impact_summary.append(f"Operations: {ops}")
+        
+        if impact.get("affected_files"):
+            files = ", ".join(Path(f).name for f in impact["affected_files"])
+            impact_summary.append(f"Files: {files}")
+        
+        if impact.get("affected_dirs"):
+            dirs = ", ".join(Path(d).name for d in impact["affected_dirs"])
+            impact_summary.append(f"Directories: {dirs}")
+        
+        impact_text = "\n".join(impact_summary) if impact_summary else "No detailed impact available."
+        
+        risk_panel = Panel(
+            Group(
+                Text(f"Level: {risk_name}", style=risk_color),
+                Text(f"Reason: {risk_reason}", style=COLOR_PALETTE["text"]),
+                Text("", justify="center"),  # Empty line for spacing
+                Text("Impact Assessment:", style=f"bold {COLOR_PALETTE['text']}"),
+                Text(impact_text, style=COLOR_PALETTE["text"])
+            ),
+            title=f"[bold {risk_color}]⚠ Risk Assessment[/bold {risk_color}]",
+            border_style=COLOR_PALETTE["border"],
+            box=DEFAULT_BOX,
+            width=main_panel_width,
+            padding=(1, 2)
+        )
+        
+        # Now actually display everything in the right order and centered properly
+        
+        # 1. Display command panel centered
+        self._console.print()
+        self._console.print(Align.center(command_panel))
+        
+        # 2. Display explanation and confidence panels side by side
+        columns = Columns([explanation_panel, confidence_panel], equal=False, padding=0)
+        self._console.print(Align.center(columns, width=main_panel_width + 2))  # +2 for borders
+        
+        # 3. Display preview panel if available
+        if preview:
+            self._console.print(Align.center(preview_panel))
+        
+        # 4. Display risk panel
+        self._console.print(Align.center(risk_panel))
+        self._console.print()  # Add some space at the end
 
     async def display_inline_confirmation(
         self,
