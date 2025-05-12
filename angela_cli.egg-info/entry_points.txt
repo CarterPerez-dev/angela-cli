@@ -1,2 +1,0 @@
-[console_scripts]
-angela = angela.__main__:app
