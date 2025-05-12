@@ -249,16 +249,11 @@ async def offer_command_learning(command: str) -> None:
         
         if pattern.count >= threshold:
             # Get terminal formatter for inline confirmation
-            from angela.api.shell import get_terminal_formatter
+            from angela.api.shell import get_terminal_formatter, display_command_learning, display_trust_added_message
             terminal_formatter = get_terminal_formatter()
             
             # Create a fancy learning prompt with purple styling
-            console.print(Panel(
-                f"I noticed you've used [bold cyan]{base_command}[/bold cyan] {pattern.count} times.",
-                title="Command Learning",
-                border_style="magenta",  # Changed to magenta
-                expand=False
-            ))
+            await display_command_learning(base_command, pattern.count)
             
             # Use the new custom y/n formatting
             prompt_text = f"Would you like to auto-execute this command in the future?"
@@ -266,7 +261,6 @@ async def offer_command_learning(command: str) -> None:
             
             if add_to_trusted:
                 preferences_manager.add_trusted_command(command)
-                from angela.api.shell import display_trust_added_message
                 await display_trust_added_message(command)
             else:
                 # Record the rejection to increase the threshold for next time
