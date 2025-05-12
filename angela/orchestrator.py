@@ -1773,7 +1773,7 @@ class Orchestrator:
         
         # Start a loading timer for initial processing
         loading_task = asyncio.create_task(
-            terminal_formatter.display_loading_timer("Angela's decrypting the payload....")
+            terminal_formatter.display_loading_timer("Angela’s decrypting the payload....")
         )
         
         try:
@@ -1804,7 +1804,7 @@ class Orchestrator:
                 await loading_task
             except asyncio.CancelledError:
                 pass
-                    
+                
             # Analyze command risk and impact
             risk_level, risk_reason = classify_command_risk(suggestion.command)
             impact = analyze_command_impact(suggestion.command)
@@ -1899,20 +1899,33 @@ class Orchestrator:
                 
                 result["execution"] = execution_result
                 
-                # Display the execution results using the more concise method
-                # This will avoid duplicating the explanation and confidence
-                await terminal_formatter.display_result_summary(execution_result)
-                
-                # If execution failed, analyze error and suggest fixes
-                if not return_code == 0 and stderr:
-                    error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
-                    fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
+                # Display the execution results
+                if return_code == 0:
+                    if stdout.strip():
+                        terminal_formatter.print_output(
+                            stdout,
+                            OutputType.STDOUT,
+                            title="Output"
+                        )
+                    # No message about "Command executed successfully with no output"
+                else:
+                    if stderr.strip():
+                        terminal_formatter.print_output(
+                            stderr,
+                            OutputType.STDERR,
+                            title="Error"
+                        )
                     
-                    result["error_analysis"] = error_analysis
-                    result["fix_suggestions"] = fix_suggestions
-                    
-                    # Display error analysis
-                    terminal_formatter.print_error_analysis(error_analysis)
+                    # If execution failed, analyze error and suggest fixes
+                    if stderr:
+                        error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
+                        fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
+                        
+                        result["error_analysis"] = error_analysis
+                        result["fix_suggestions"] = fix_suggestions
+                        
+                        # Display error analysis
+                        terminal_formatter.print_error_analysis(error_analysis)
                 
                 # Add to history
                 history_manager.add_command(
@@ -1957,6 +1970,7 @@ class Orchestrator:
                 "error": str(e),
                 "success": False
             }
+            
 
     async def _process_multi_step_request(
         self, 
