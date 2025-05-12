@@ -518,7 +518,9 @@ class CommandPreviewGenerator:
             A string containing the preview, or None if preview is not available.
         """
         # This simply delegates to the existing function
-        return await generate_preview(command)
+        preview_text = await generate_preview(command)
+        
+        return preview_text
 
 # Create a global instance of the generator class
 command_preview_generator = CommandPreviewGenerator()    

@@ -32,6 +32,26 @@ def get_completion_handler():
     from angela.components.shell.completion import CompletionHandler, completion_handler # Import Class and instance
     return registry.get_or_create("completion_handler", CompletionHandler, factory=lambda: completion_handler)
 
+async def display_command_learning(base_command: str, count: int) -> None:
+    """Display command learning notification."""
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_command_learning(base_command, count)
+
+async def display_auto_execution_notice(command: str, risk_level: int, preview: Optional[str]) -> None:
+    """Display notice for auto-execution."""
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_auto_execution_notice(command, risk_level, preview)
+
+async def display_command_preview(command: str, preview: str) -> None:
+    """Display command preview."""
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_command_preview(command, preview)
+
+async def display_trust_added_message(command: str) -> None:
+    """Display message when command is added to trusted list."""
+    from angela.components.shell.formatter import terminal_formatter
+    await terminal_formatter.display_trust_added_message(command)
+
 # Advanced Formatter API Functions
 async def display_advanced_plan(plan: Any) -> None:
     """

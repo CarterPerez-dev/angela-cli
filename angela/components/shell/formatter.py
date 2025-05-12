@@ -826,7 +826,7 @@ class TerminalFormatter:
         stdout_task = asyncio.create_task(read_stream(process.stdout, True))
         stderr_task = asyncio.create_task(read_stream(process.stderr, False))
         
-        # Display the live progress
+        # Display the live progress with stunning visuals
         try:
             with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
                 # Wait for the command to complete while updating the display
@@ -837,58 +837,75 @@ class TerminalFormatter:
                 await stderr_task
                 
                 execution_time = time.time() - start_time
-                live.update(
-                    Panel(
-                        Text(f"Execution completed in {execution_time:.6f}s", style=COLOR_PALETTE["success"], justify="center"),
-                        title=f"[bold {COLOR_PALETTE['success']}]{ASCII_DECORATIONS['success']} Command Complete {ASCII_DECORATIONS['success']}[/bold {COLOR_PALETTE['success']}]",
-                        border_style=COLOR_PALETTE["border"],  # Consistent red border
-                        box=DEFAULT_BOX,
-                        padding=(1, 2)
-                    )
+                
+                # Create a visually stunning completion panel
+                completed_panel = Panel(
+                    Text(f"Execution completed in {execution_time:.6f}s", style=COLOR_PALETTE["success"], justify="center"),
+                    title=f"[bold {COLOR_PALETTE['success']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['success']}]",
+                    border_style=COLOR_PALETTE["success"],
+                    box=DEFAULT_BOX,
+                    expand=False,
+                    padding=(1, 2)
                 )
+                
+                live.update(completed_panel)
                 
                 # Brief pause to show completion
                 await asyncio.sleep(0.5)
         except Exception as e:
             self._logger.error(f"Error in execution timer: {str(e)}")
             # Ensure we still wait for the process
-            if process.returncode is None:
+            if process.returncode is None: # Check if process might still be running
                 try:
+                    # Wait for process with a timeout to avoid hanging indefinitely
                     await asyncio.wait_for(process.wait(), timeout=5.0) 
-                    return_code = process.returncode or -1
+                    return_code = process.returncode if process.returncode is not None else -1
                 except asyncio.TimeoutError:
-                    self._logger.error("Timeout waiting for process to complete after error")
-                    try:
-                        process.kill()
-                        await process.wait()
-                    except:
-                        pass
+                    self._logger.error("Timeout waiting for process to complete after error.")
+                    if process.returncode is None: # if still none after timeout, try to kill
+                        try:
+                            process.kill()
+                            await process.wait() # ensure it's reaped
+                        except ProcessLookupError:
+                            pass # process might have already exited
+                        except Exception as kill_e:
+                            self._logger.error(f"Error trying to kill process: {kill_e}")
                     return_code = -1 
                 except Exception as proc_e:
                     self._logger.error(f"Further error waiting for process: {proc_e}")
                     return_code = -1
-            else:
+            elif process.returncode is not None: # Process already finished, just get its code
                 return_code = process.returncode
-            
+            else: # Fallback if process object is in an unexpected state
+                return_code = -1
+
+            # Wait for the streams to complete, even in error cases
+            # Use try-except for each to ensure one doesn't prevent the other
             try:
                 await asyncio.wait_for(stdout_task, timeout=2.0)
-            except:
-                pass
+            except asyncio.TimeoutError:
+                self._logger.error("Timeout waiting for stdout_task to complete after error.")
+            except Exception as stream_e:
+                self._logger.error(f"Error waiting for stdout_task: {stream_e}")
             
             try:
                 await asyncio.wait_for(stderr_task, timeout=2.0)
-            except:
-                pass
+            except asyncio.TimeoutError:
+                self._logger.error("Timeout waiting for stderr_task to complete after error.")
+            except Exception as stream_e:
+                self._logger.error(f"Error waiting for stderr_task: {stream_e}")
             
+            # Recalculate execution_time up to the point of error handling completion
             execution_time = time.time() - start_time
         
         # Return the results
         return (
             "".join(stdout_chunks),
             "".join(stderr_chunks),
-            return_code if isinstance(return_code, int) else -1,
+            return_code if isinstance(return_code, int) else -1, # Ensure return_code is an int
             execution_time
         )
+
 
     async def display_loading_timer(
         self,
@@ -1020,12 +1037,125 @@ class TerminalFormatter:
             if not stdout.strip() and not stderr.strip():
                 # If no output, show a success message
                 self._console.print("")
-                self._console.print(f"[bold {COLOR_PALETTE['success']}]{ASCII_DECORATIONS['success']} Command executed successfully with no output.[/bold {COLOR_PALETTE['success']}]")
+                self._console.print(f"[bold {COLOR_PALETTE['success']}]{ASCII_DECORATIONS['success']} Command executed successfully [/bold {COLOR_PALETTE['success']}]")
         else:
             if not stderr.strip():
                 # If no error output but command failed
                 self._console.print("")
                 self._console.print(f"[bold {COLOR_PALETTE['error']}]{ASCII_DECORATIONS['error']} Command failed with exit code {result.get('return_code', 1)}[/bold {COLOR_PALETTE['error']}]")
+
+
+    async def display_command_learning(
+        self, 
+        base_command: str, 
+        count: int
+    ) -> None:
+        """
+        Display a notification that a command has been used multiple times.
+        
+        Args:
+            base_command: The command that was executed
+            count: Number of times the command has been used
+        """
+        # Use a fancy learning prompt with purple styling (consistent with your palette)
+        self._console.print(Panel(
+            f"I noticed you've used [bold cyan]{base_command}[/bold cyan] {count} times.",
+            title="Command Learning",
+            border_style=COLOR_PALETTE["confirmation"],  # Purple border for consistency
+            expand=False
+        ))
+    
+    async def display_auto_execution_notice(
+        self,
+        command: str, 
+        risk_level: int,
+        preview: Optional[str]
+    ) -> None:
+        """
+        Show a notice for auto-execution with consistent styling.
+        
+        Args:
+            command: The command being auto-executed
+            risk_level: Risk level of the command
+            preview: Optional preview of what the command will do
+        """
+        from angela.api.context import get_preferences_manager
+        preferences_manager = get_preferences_manager()
+        
+        # Use a more subtle notification for auto-execution with your consistent styling
+        self._console.print("\n")
+        self._console.print(Panel(
+            Syntax(command, "bash", theme="monokai", word_wrap=True),
+            title="Auto-Executing Trusted Command",
+            border_style=COLOR_PALETTE["success"],  # Use success color from your palette
+            expand=False
+        ))
+        
+        # Only show preview if it's enabled in preferences
+        if preview and preferences_manager.preferences.ui.show_command_preview:
+            self._console.print(Panel(
+                preview,
+                title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],  # Consistent red border
+                box=DEFAULT_BOX,
+                expand=False
+            ))
+        
+        # Create the loading task with your spinner styling
+        loading_task = asyncio.create_task(
+            self.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
+        )
+        
+        try:
+            # Wait a minimum amount of time for visual feedback
+            await asyncio.sleep(0.5)
+            
+            # Now we're ready to continue, cancel the loading task
+            loading_task.cancel()
+            try:
+                await loading_task
+            except asyncio.CancelledError:
+                pass  # Expected
+        except Exception as e:
+            logger.error(f"Error managing loading display: {str(e)}")
+            # Ensure the task is cancelled
+            if not loading_task.done():
+                loading_task.cancel()
+    
+    async def display_command_preview(
+        self,
+        command: str, 
+        preview: str
+    ) -> None:
+        """
+        Display a command preview with consistent styling.
+        
+        Args:
+            command: The command being previewed
+            preview: Preview of what the command will do
+        """
+        self._console.print(Panel(
+            preview,
+            title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
+            border_style=COLOR_PALETTE["border"],  # Consistent red border
+            box=DEFAULT_BOX,
+            expand=False
+        ))
+    
+    async def display_trust_added_message(
+        self,
+        command: str
+    ) -> None:
+        """
+        Display a message when a command is added to trusted list.
+        
+        Args:
+            command: The command that was trusted
+        """
+        base_command = command.split()[0] if command.split() else command
+        self._console.print(f"Added [green]{base_command}[/green] to trusted commands.")
+
+
 
 # Global formatter instance
 terminal_formatter = TerminalFormatter()

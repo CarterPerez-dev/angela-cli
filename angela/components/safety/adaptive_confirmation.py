@@ -125,48 +125,10 @@ async def _show_auto_execution_notice(
     preferences_manager = get_preferences_manager()
     
     # Get terminal formatter from API
-    from angela.api.shell import get_terminal_formatter
-    terminal_formatter = get_terminal_formatter()
+    from angela.api.shell import display_auto_execution_notice
+    await display_auto_execution_notice(command, risk_level, preview)
     
-    # Use a more subtle notification for auto-execution
-    console.print("\n")
-    console.print(Panel(
-        Syntax(command, "bash", theme="monokai", word_wrap=True),
-        title="Auto-Executing Trusted Command",
-        border_style="green",
-        expand=False
-    ))
-    
-    # Only show preview if it's enabled in preferences
-    if preview and preferences_manager.preferences.ui.show_command_preview:
-        console.print(Panel(
-            preview,
-            title="Command Preview",
-            border_style="blue",
-            expand=False
-        ))
-    
-    # Create the loading task
-    loading_task = asyncio.create_task(
-        terminal_formatter.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
-    )
-    
-    try:
-        # Wait a minimum amount of time for visual feedback
-        await asyncio.sleep(0.5)
-        
-        # Now we're ready to continue, cancel the loading task
-        loading_task.cancel()
-        try:
-            await loading_task
-        except asyncio.CancelledError:
-            pass  # Expected
-    except Exception as e:
-        logger.error(f"Error managing loading display: {str(e)}")
-        # Ensure the task is cancelled
-        if not loading_task.done():
-            loading_task.cancel()
-            
+
 
 async def _get_simple_confirmation(
     command: str, 
@@ -304,7 +266,8 @@ async def offer_command_learning(command: str) -> None:
             
             if add_to_trusted:
                 preferences_manager.add_trusted_command(command)
-                console.print(f"Added [green]{base_command}[/green] to trusted commands.")
+                from angela.api.shell import display_trust_added_message
+                await display_trust_added_message(command)
             else:
                 # Record the rejection to increase the threshold for next time
                 preferences_manager.increment_command_rejection_count(command)

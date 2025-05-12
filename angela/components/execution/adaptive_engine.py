@@ -195,30 +195,11 @@ class AdaptiveExecutionEngine:
         execution_engine = get_execution_engine()
         
         # Show execution spinner if enabled
-        if use_spinners:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[bold blue]Executing command...[/bold blue]"),
-                TimeElapsedColumn(),
-                console=console
-            ) as progress:
-                task = progress.add_task("Executing", total=None)
-                
-                # Execute the command
-                stdout, stderr, return_code = await execution_engine.execute_command(
-                    command,
-                    check_safety=False  # We've already done safety checks
-                )
-                
-                # Complete the progress
-                progress.update(task, completed=True)
-        else:
-            # Execute without spinner
-            console.print("[bold blue]Executing command...[/bold blue]")
-            stdout, stderr, return_code = await execution_engine.execute_command(
-                command,
-                check_safety=False  # We've already done safety checks
-            )
+        from angela.api.shell import display_execution_timer
+        stdout, stderr, return_code, execution_time = await display_execution_timer(
+            command,
+            with_philosophy=True
+        )
         
         # Store result in session for reference
         session_manager = get_session_manager()
