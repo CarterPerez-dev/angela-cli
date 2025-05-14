@@ -49,7 +49,7 @@
 -------------
 
 
-![Angela CLI Refactoring Flow ERD Style](https://www.mermaidchart.com/raw/7e57db50-c76e-4be4-acca-6fb29ff5e388?theme=light&version=v0.1&format=svg)
+![Angela CLI Refactoring Flow ERD Style](./assets/flowchart.svg) 
 
 
 
