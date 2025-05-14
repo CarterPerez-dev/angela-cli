@@ -298,17 +298,9 @@ Thanks for helping make Angela smarter! ✨
 <a id="angela-ui-example"></a>
 ![Angela UI Example](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/UI.png)
 
-#### Angela Logo
-<a id="angela-logo"></a>
-![Angela Logo/Mascot](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp)
-
 #### Confirmation Prompt
 <a id="confirmation-prompt"></a>
 ![Confirmation Prompt](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/confirmation.png)
-
-#### Angela Workflow Diagram
-<a id="angela-workflow-diagram"></a>
-![Angela Workflow Diagram](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/flow.svg)
 
 #### Generate Help Command
 <a id="generate-help-command"></a>
