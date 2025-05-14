@@ -930,7 +930,7 @@ class ConfidenceScorer:
         complexity_score = self._check_complexity(request, command, command_analysis) # Now defined
         
         # Step 5: Analyze semantic similarity between request and command
-        semantic_analysis = self._check_semantic_similarity(request, command, context) 
+        semantic_analysis = self._check_semantic_similarity(request, command, command_analysis, context) 
         
         # Step 6: Check for entity matches
         entity_match_score = self._check_entities(request, command, request_entities, command_analysis, context) # Now defined
@@ -1741,6 +1741,7 @@ class ConfidenceScorer:
         self, 
         request: str, 
         command: str, 
+        command_analysis: CommandAnalysis,
         context: Dict[str, Any]
     ) -> SemanticAnalysis:
         """
