@@ -85,10 +85,7 @@ I've successfully built the skeleton and much of the nervous system of Angela. H
         *   The basic theme (colors, boxes) is established, theme, UI, Rich Styling.
         *   Angela can display suggested commands, previews, risk warnings, and confirmation prompts with a consistent look.
         *   The "Angela Initialized" and success/failure messages after command execution are now more reliably displayed.
-        *   The loading/execution timer is in place and is working amazing. It randomly outputs 1/50 philosophy quotes....because philosophy is cool. Im kinda going for that 'Her' Movie vibe, I mean, this is essentially what Angela is.....am I in love with her you ask?!.....no......of course not.....why would you think that?......😅😅 
-        * Anyway, here is an example of what the UI is looking like at the moment --->
-
-PICTURE HERE
+        *   The loading/execution timer is in place and is working amazing. It randomly outputs 1/50 philosophy quotes....because philosophy is cool. Im kinda going for that 'Her' Movie vibe.
 
 3.  **Context is Key (`components/context/`):**
     *   `preferences.py` & `history.py`: Angela remembers your settings and what you've done before, which feeds into adaptive confirmation.
