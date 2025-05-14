@@ -16,6 +16,10 @@ from rich.prompt import Prompt, Confirm
 from rich.markdown import Markdown
 
 
+import asyncio
+from angela.components.cli.utils import async_command
+
+
 from angela.utils.logging import get_logger
 from angela.api.generation import (
     get_code_generation_engine,
@@ -197,7 +201,7 @@ def create_project(
 
 
 @app.command("add-feature")
-async def add_feature(
+def add_feature(
     description: str = typer.Argument(..., help="Description of the feature to add"),
     project_dir: str = typer.Option(".", help="Project directory"),
     branch: Optional[str] = typer.Option(None, help="Create a feature branch"),
@@ -209,6 +213,20 @@ async def add_feature(
     """
     Add a new feature to an existing project.
     """
+    return asyncio.run(_add_feature_async(
+        description, project_dir, branch, generate_tests, install_deps, dry_run, auto_commit
+    ))
+
+async def _add_feature_async(
+    description: str,
+    project_dir: str,
+    branch: Optional[str],
+    generate_tests: bool,
+    install_deps: bool,
+    dry_run: bool,
+    auto_commit: bool
+):
+    """Async implementation of add_feature."""
     console.print(Panel(
         f"[bold green]Adding feature to project:[/bold green]\n{description}",
         title="Feature Addition",
@@ -226,7 +244,7 @@ async def add_feature(
         project_path = Path(project_dir)
         if not project_path.exists() or not project_path.is_dir():
             console.print(f"[bold red]Project directory does not exist: {project_dir}[/bold red]")
-            return
+            return {"success": False, "error": f"Project directory does not exist: {project_dir}"}
         
         # Create a feature branch if requested
         if branch:
@@ -376,11 +394,30 @@ async def add_feature(
                                 console.print(f"[green]Successfully installed development dependencies[/green]")
                             else:
                                 console.print(f"[yellow]Failed to install development dependencies: {dev_install_result.get('error', 'Unknown error')}[/yellow]")
+        
+        # Auto-commit changes if requested
+        if auto_commit and not dry_run and result.get("success", False):
+            console.print("\n[bold]Committing changes...[/bold]")
+            
+            with console.status("[bold green]Committing...[/bold green]"):
+                git_integration = get_git_integration()
+                commit_result = await git_integration.commit_changes(
+                    path=project_dir,
+                    message=f"Add feature: {description}",
+                    auto_stage=True
+                )
+                
+                if commit_result["success"]:
+                    console.print("[green]Successfully committed changes[/green]")
+                else:
+                    console.print(f"[yellow]Failed to commit changes: {commit_result.get('error', 'Unknown error')}[/yellow]")
+        
+        return result
     
     except Exception as e:
         logger.exception("Error adding feature")
         console.print(f"[bold red]Error adding feature:[/bold red] {str(e)}")
-
+        return {"success": False, "error": str(e)}
 
 @app.command("refine-code")
 async def refine_code(
@@ -852,10 +889,9 @@ def create_complex_project(
         logger.exception("Error generating complex project")
         console.print(f"[bold red]Error generating complex project:[/bold red] {str(e)}")
 
-# angela/components/cli/generation.py
-# ...
+
 @app.command("create-framework-project")
-async def create_framework_project( # <--- Change def to async def
+def create_framework_project(
     framework: str = typer.Argument(..., help="Framework to generate (e.g., react, django)"),
     description: str = typer.Argument(..., help="Description of the project to generate"),
     output_dir: str = typer.Option(".", help="Directory where the project should be generated"),
@@ -867,6 +903,27 @@ async def create_framework_project( # <--- Change def to async def
     git_init: bool = typer.Option(True, help="Initialize Git repository"),
     dry_run: bool = typer.Option(False, help="Preview without creating files")
 ):
+    """
+    Generate a framework-specific project structure.
+    """
+    return asyncio.run(_create_framework_project_async(
+        framework, description, output_dir, variant, typescript, 
+        with_auth, enhanced, install_deps, git_init, dry_run
+    ))
+
+async def _create_framework_project_async(
+    framework: str,
+    description: str,
+    output_dir: str,
+    variant: Optional[str],
+    typescript: Optional[bool],
+    with_auth: Optional[bool],
+    enhanced: bool,
+    install_deps: bool,
+    git_init: bool,
+    dry_run: bool
+):
+    """Async implementation of create_framework_project."""
     console.print(Panel(
         f"[bold green]Generating {framework} project:[/bold green]\n{description}",
         title="Framework Project Generation",
@@ -894,14 +951,14 @@ async def create_framework_project( # <--- Change def to async def
         
         with console.status(f"[bold green]Generating {framework} project...[/bold green]"):
             if enhanced:
-                result = await framework_generator.generate_standard_project_structure( # Now 'await' is valid
+                result = await framework_generator.generate_standard_project_structure(
                     framework=framework,
                     description=description,
                     output_dir=output_dir,
                     options=options
                 )
             else:
-                result = await framework_generator.generate_framework_structure( # And here too
+                result = await framework_generator.generate_framework_structure(
                     framework=framework,
                     description=description,
                     output_dir=output_dir,
@@ -910,7 +967,7 @@ async def create_framework_project( # <--- Change def to async def
         
         if not result["success"]:
             console.print(f"[bold red]Error generating {framework} project:[/bold red] {result.get('error', 'Unknown error')}")
-            return
+            return result
         
         # Display result information
         console.print("\n[bold blue]Framework Project:[/bold blue]")
@@ -923,7 +980,7 @@ async def create_framework_project( # <--- Change def to async def
         
         # Group files by directory
         grouped_files = {}
-        for file_obj in result["files"]: # Changed 'file' to 'file_obj' to avoid conflict with built-in
+        for file_obj in result["files"]:
             directory = Path(file_obj.path).parent.as_posix()
             if directory == ".":
                 directory = "Root"
@@ -934,12 +991,12 @@ async def create_framework_project( # <--- Change def to async def
             grouped_files[directory].append(file_obj)
         
         # Display files by directory
-        for directory, files_in_dir in grouped_files.items(): # Changed 'files' to 'files_in_dir'
+        for directory, files_in_dir in grouped_files.items():
             table = Table(title=f"Files in {directory}")
             table.add_column("Path", style="cyan")
             table.add_column("Purpose", style="green")
             
-            for file_obj in files_in_dir: # Changed 'file' to 'file_obj'
+            for file_obj in files_in_dir:
                 table.add_row(file_obj.path, file_obj.purpose)
             
             console.print(table)
@@ -947,7 +1004,7 @@ async def create_framework_project( # <--- Change def to async def
         # Create project if not dry run
         if not dry_run:
             # Create CodeProject object
-            from angela.api.generation import get_code_project_class # Use API
+            from angela.api.generation import get_code_project_class
             CodeProject = get_code_project_class()
             
             project = CodeProject(
@@ -963,11 +1020,11 @@ async def create_framework_project( # <--- Change def to async def
             # Create files
             console.print("\n[bold]Creating project files...[/bold]")
             
-            from angela.api.generation import get_code_generation_engine # Use API
+            from angela.api.generation import get_code_generation_engine
             code_generation_engine = get_code_generation_engine()
             
             with console.status("[bold green]Creating files...[/bold green]"):
-                creation_result = await code_generation_engine.create_project_files(project) # Use await
+                creation_result = await code_generation_engine.create_project_files(project)
             
             console.print(f"[green]Created {creation_result['file_count']} files[/green]")
             
@@ -975,11 +1032,11 @@ async def create_framework_project( # <--- Change def to async def
             if git_init:
                 console.print("\n[bold]Initializing Git repository...[/bold]")
                 
-                from angela.api.toolchain import get_git_integration # Use API
+                from angela.api.toolchain import get_git_integration
                 git_integration = get_git_integration()
                 
                 with console.status("[bold green]Initializing Git...[/bold green]"):
-                    git_result = await git_integration.init_repository( # Use await
+                    git_result = await git_integration.init_repository(
                         path=output_dir,
                         initial_branch="main",
                         gitignore_template=result["project_type"]
@@ -994,14 +1051,14 @@ async def create_framework_project( # <--- Change def to async def
             if install_deps:
                 console.print("\n[bold]Installing dependencies...[/bold]")
                 
-                from angela.api.toolchain import get_package_manager_integration # Use API
+                from angela.api.toolchain import get_package_manager_integration
                 package_manager_integration = get_package_manager_integration()
                 
                 with console.status("[bold green]Installing dependencies...[/bold green]"):
                     # Use package manager based on framework
                     project_type = result["project_type"]
                     
-                    deps_result = await package_manager_integration.install_dependencies( # Use await
+                    deps_result = await package_manager_integration.install_dependencies(
                         path=output_dir,
                         project_type=project_type
                     )
@@ -1014,14 +1071,16 @@ async def create_framework_project( # <--- Change def to async def
             console.print(f"\n[bold green]Framework project generated successfully in: {output_dir}[/bold green]")
         else:
             console.print("\n[bold yellow]Dry run - no files were created[/bold yellow]")
+            
+        return result
     
     except Exception as e:
         logger.exception(f"Error generating {framework} project")
         console.print(f"[bold red]Error generating {framework} project:[/bold red] {str(e)}")
-
+        return {"success": False, "error": str(e)}
 
 @app.command("refine-generated-project")
-async def refine_generated_project(
+def refine_generated_project(
     project_dir: str = typer.Argument(..., help="Directory of the generated project"),
     feedback: str = typer.Argument(..., help="Feedback for project improvement"),
     focus: Optional[List[str]] = typer.Option(None, help="Files to focus on (glob patterns supported)"),
@@ -1031,6 +1090,18 @@ async def refine_generated_project(
     """
     Refine a generated project based on natural language feedback.
     """
+    return asyncio.run(_refine_generated_project_async(
+        project_dir, feedback, focus, apply, backup
+    ))
+
+async def _refine_generated_project_async(
+    project_dir: str,
+    feedback: str,
+    focus: Optional[List[str]],
+    apply: bool,
+    backup: bool
+):
+    """Async implementation of refine_generated_project."""
     console.print(Panel(
         f"[bold green]Refining project based on feedback:[/bold green]\n{feedback}",
         title="Project Refinement",
@@ -1046,7 +1117,7 @@ async def refine_generated_project(
         project_path = Path(project_dir)
         if not project_path.exists() or not project_path.is_dir():
             console.print(f"[bold red]Project directory does not exist: {project_dir}[/bold red]")
-            return
+            return {"success": False, "error": f"Project directory does not exist: {project_dir}"}
         
         # Load project files
         with console.status("[bold green]Loading project files...[/bold green]"):
@@ -1201,10 +1272,18 @@ async def refine_generated_project(
                 console.print("[yellow]No changes were applied[/yellow]")
         else:
             console.print("\n[bold yellow]Changes were not applied. Use --apply to apply changes.[/bold yellow]")
+        
+        return {
+            "success": True,
+            "refinement_results": refinement_results,
+            "applied": apply,
+            "files_changed": apply_result["files_changed"] if apply else 0
+        }
     
     except Exception as e:
         logger.exception("Error refining project")
         console.print(f"[bold red]Error refining project:[/bold red] {str(e)}")
+        return {"success": False, "error": str(e)}
 
 
 def group_files_by_directory(files: List['CodeFile']) -> Dict[str, List['CodeFile']]:

@@ -22,7 +22,7 @@ from angela.api.toolchain import get_docker_integration
 from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
 from angela.api.execution import get_execution_engine
-
+from angela.components.cli.utils import async_command
 
 logger = get_logger(__name__)
 console = Console()

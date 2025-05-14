@@ -13,13 +13,15 @@ import json
 import re
 import sys
 
+
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.utils.logging import get_logger
-from angela.api.generation import get_code_file_class
+
+from angela.components.generation.models import CodeFile
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
-CodeFile = get_code_file_class()
+
 
 class FrameworkGenerator:
     """
@@ -1438,6 +1440,8 @@ Keep the structure focused on the core framework files, don't include optional o
 Ensure the structure follows best practices for {framework} projects.
 """
         try:
+        
+            gemini_client = get_gemini_client()
             # Call AI service
             api_request = GeminiRequest(
                 prompt=prompt,
@@ -2441,6 +2445,8 @@ Ensure the structure follows best practices for {framework} projects.
             prompt += f"\nApp name: {options.get('app_name', 'main')}"
         
         try:
+        
+            gemini_client = get_gemini_client()
             # Call AI service
             api_request = GeminiRequest(
                 prompt=prompt,

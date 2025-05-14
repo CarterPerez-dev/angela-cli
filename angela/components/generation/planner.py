@@ -14,17 +14,16 @@ import re
 from pydantic import BaseModel, Field
 
 
-from angela.api.generation import get_generation_context_manager, get_code_file_class, get_code_project_class
+
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.context import get_context_manager
 from angela.utils.logging import get_logger
-
+from angela.components.generation.models import CodeFile, CodeProject
 
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
-CodeFile = get_code_file_class()
-CodeProject = get_code_project_class()
+
 
 class ComponentRelationship(BaseModel):
     """Model for relationships between architecture components."""
@@ -357,6 +356,9 @@ class ProjectPlanner:
         """
         self._logger.info(f"Creating detailed project architecture for: {description}")
         
+        
+        from angela.api.generation import get_generation_context_manager
+
         # Get context if not provided
         if context is None:
             context_manager = get_context_manager()

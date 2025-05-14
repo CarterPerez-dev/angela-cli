@@ -14,7 +14,8 @@ import time
 import sys
 
 # Import models from the new models module instead of defining them here
-from angela.api.generation import get_generation_context_manager, validate_code, get_code_file_class, get_code_project_class
+from angela.components.generation.models import CodeFile, CodeProject
+from angela.components.generation.validators import validate_code
 from angela.api.ai import get_gemini_client, get_gemini_request_class
 from angela.api.context import get_context_manager, get_context_enhancer
 from angela.utils.logging import get_logger
@@ -22,8 +23,7 @@ from angela.api.execution import get_filesystem_functions
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
-CodeFile = get_code_file_class()
-CodeProject = get_code_project_class()
+
 
 class CodeGenerationEngine:
     """
@@ -1633,6 +1633,10 @@ Follow the project's existing coding style and patterns.
         """
         self._logger.info(f"Generating complex project from description: {description}")
         
+        
+        from angela.api.generation import get_generation_context_manager # Import inside method
+        generation_context_manager = get_generation_context_manager()          
+        
         start_time = time.time()
         
         # Get current context if not provided
@@ -1901,6 +1905,10 @@ If no specific framework is clearly indicated, return "None".
         """
         self._logger.debug(f"Generating content for file: {file.path}")
         
+        
+        from angela.api.generation import get_generation_context_manager 
+        generation_context_manager = get_generation_context_manager()    
+
         # Build prompt for file content generation
         prompt = self._build_complex_file_content_prompt(file, project, dependencies)
         

@@ -15,14 +15,14 @@ import difflib
 
 from angela.utils.logging import get_logger
 from angela.api.ai import get_gemini_client, get_gemini_request_class
-from angela.api.generation import get_code_file_class, get_code_project_class
+from angela.components.generation.models import CodeFile, CodeProject
 from angela.api.review import get_feedback_manager, get_diff_manager
-from angela.api.generation import get_generation_context_manager
+
+
 
 logger = get_logger(__name__)
 GeminiRequest = get_gemini_request_class()
-CodeFile = get_code_file_class()
-CodeProject = get_code_project_class()
+
 
 class InteractiveRefiner:
     """
@@ -340,6 +340,7 @@ Only include files that are directly relevant to the feedback.
         Returns:
             Dictionary with file context
         """
+        from angela.api.generation import get_generation_context_manager        
         # Start with basic context
         context = {
             "file_path": file.path,
