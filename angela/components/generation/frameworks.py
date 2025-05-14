@@ -2450,7 +2450,7 @@ Ensure the structure follows best practices for {framework} projects.
             # Call AI service
             api_request = GeminiRequest(
                 prompt=prompt,
-                max_tokens=4000,
+                max_tokens=1100,
                 temperature=0.2
             )
             

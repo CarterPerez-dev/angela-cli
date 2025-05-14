@@ -18,9 +18,9 @@ from angela.utils.logging import get_logger
 logger = get_logger(__name__)
 
 # Directory for storing backup files for rollback operations
-BACKUP_DIR = Path(tempfile.gettempdir()) / "angela-backups"
+BACKUP_DIR = Path(tempfile.gettempdir()) / "angela-backups" # This was Path.home() / ".angela" / "backups"
 
-def _get_operation_safety_checker():
+def _get_operation_safety_checker(): # THIS IS THE HELPER FUNCTION DEFINED IN THIS FILE
     """Get operation safety function with lazy import to avoid circular dependencies."""
     from angela.core.registry import registry
     # First try to get from registry
@@ -33,11 +33,10 @@ def _get_operation_safety_checker():
         from angela.components.safety import check_operation_safety
         return check_operation_safety
     except ImportError:
-        from angela.utils.logging import get_logger
-        logger = get_logger(__name__)
+        # from angela.utils.logging import get_logger # Logger is already defined at module level
+        # logger = get_logger(__name__)
         logger.error("Could not import operation safety checker")
         return None
-
 
 
 class FileSystemError(Exception):
@@ -75,8 +74,12 @@ async def create_directory(
     
     try:
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('create_directory', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for create_directory.")
+            raise FileSystemError("Safety checker unavailable.")
+        
+        if not await safety_checker_func('create_directory', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # If this is a dry run, stop here
@@ -137,8 +140,12 @@ async def delete_directory(
             raise FileSystemError(f"Path is not a directory: {path_obj}")
         
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('delete_directory', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for delete_directory.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        if not await safety_checker_func('delete_directory', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # Create a backup for rollback if needed
@@ -189,8 +196,12 @@ async def create_file(
     
     try:
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('create_file', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for create_file.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        if not await safety_checker_func('create_file', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # If this is a dry run, stop here
@@ -203,7 +214,7 @@ async def create_file(
         
         # Make sure parent directory exists
         if not path_obj.parent.exists():
-            await create_directory(path_obj.parent, dry_run=False)
+            await create_directory(path_obj.parent, dry_run=False) # Keep dry_run=False for internal ops
         
         # Handle backup if the file already exists
         if path_obj.exists():
@@ -255,8 +266,14 @@ async def read_file(
             raise FileSystemError(f"Path is not a file: {path_obj}")
         
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('read_file', operation_params, False):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for read_file.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        # For read_file, the dry_run flag to check_operation_safety is typically False,
+        # as reading is generally safe. The safety check might still prevent reading sensitive files.
+        if not await safety_checker_func('read_file', operation_params, False): # <<< CALL THE RETURNED FUNCTION
             raise FileSystemError("Operation not permitted due to safety constraints")
         
         # Read the file
@@ -303,8 +320,12 @@ async def write_file(
     
     try:
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('write_file', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for write_file.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        if not await safety_checker_func('write_file', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # If this is a dry run, stop here
@@ -315,7 +336,7 @@ async def write_file(
         
         # Make sure parent directory exists
         if not path_obj.parent.exists():
-            await create_directory(path_obj.parent, dry_run=False)
+            await create_directory(path_obj.parent, dry_run=False) # Keep dry_run=False for internal ops
         
         # Handle backup if the file already exists
         if path_obj.exists():
@@ -371,8 +392,12 @@ async def delete_file(
             raise FileSystemError(f"Path is not a file: {path_obj}")
         
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('delete_file', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for delete_file.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        if not await safety_checker_func('delete_file', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # Create a backup for rollback if needed
@@ -440,8 +465,12 @@ async def copy_file(
                 await _backup_file(dest_obj)
         
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('copy_file', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for copy_file.")
+            raise FileSystemError("Safety checker unavailable.")
+            
+        if not await safety_checker_func('copy_file', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # If this is a dry run, stop here
@@ -451,7 +480,7 @@ async def copy_file(
         
         # Make sure parent directory exists
         if not dest_obj.parent.exists():
-            await create_directory(dest_obj.parent, dry_run=False)
+            await create_directory(dest_obj.parent, dry_run=False) # Keep dry_run=False for internal ops
         
         # Copy the file
         shutil.copy2(source_obj, dest_obj)
@@ -509,8 +538,12 @@ async def move_file(
                 await _backup_file(dest_obj)
         
         # Check if the operation is safe
-        safety_checker = get_operation_safety_checker()
-        if not await safety_checker.check_operation_safety('move_file', operation_params, dry_run):
+        safety_checker_func = _get_operation_safety_checker() # <<< USE THE UNDERSCORE
+        if not safety_checker_func:
+            logger.error("Critical: Operation safety checker function is not available for move_file.")
+            raise FileSystemError("Safety checker unavailable.")
+
+        if not await safety_checker_func('move_file', operation_params, dry_run): # <<< CALL THE RETURNED FUNCTION
             return False
         
         # Create a backup of the source file
@@ -524,7 +557,7 @@ async def move_file(
         
         # Make sure parent directory exists
         if not dest_obj.parent.exists():
-            await create_directory(dest_obj.parent, dry_run=False)
+            await create_directory(dest_obj.parent, dry_run=False) # Keep dry_run=False for internal ops
         
         # Move the file
         shutil.move(str(source_obj), str(dest_obj))
@@ -566,7 +599,7 @@ async def _backup_file(path: Path) -> Path:
     except Exception as e:
         logger.warning(f"Failed to create backup of {path}: {str(e)}")
         # Not raising an exception here as this is a non-critical operation
-        return None
+        return None # Explicitly return None on failure
 
 
 async def _backup_directory(path: Path) -> Path:
@@ -596,4 +629,4 @@ async def _backup_directory(path: Path) -> Path:
     except Exception as e:
         logger.warning(f"Failed to create backup of directory {path}: {str(e)}")
         # Not raising an exception here as this is a non-critical operation
-        return None
+        return None # Explicitly return None on failure

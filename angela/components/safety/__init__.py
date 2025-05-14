@@ -11,6 +11,9 @@ from .validator import validate_command_safety, validate_operation
 from .preview import generate_preview
 from .confirmation import get_confirmation, requires_confirmation
 from .adaptive_confirmation import get_adaptive_confirmation, offer_command_learning
+from angela.utils.logging import get_logger
+
+logger = get_logger(__name__) 
 
 
 def classify_command_risk(command: str):
