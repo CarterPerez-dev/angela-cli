@@ -37,10 +37,19 @@ async def display_command_learning(base_command: str, count: int) -> None:
     from angela.components.shell.formatter import terminal_formatter
     await terminal_formatter.display_command_learning(base_command, count)
 
-async def display_auto_execution_notice(command: str, risk_level: int, preview: Optional[str], dry_run: bool = False) -> None:
+async def display_auto_execution_notice(
+    command: str,
+    risk_level: int,
+    preview: Optional[str],
+    dry_run: bool = False,
+    skip_loading: bool = False  
+) -> None:
     """Display notice for auto-execution."""
     from angela.components.shell.formatter import terminal_formatter
-    await terminal_formatter.display_auto_execution_notice(command, risk_level, preview, dry_run=dry_run)
+    # Pass the new parameter along
+    await terminal_formatter.display_auto_execution_notice(
+        command, risk_level, preview, dry_run=dry_run, skip_loading=skip_loading
+    )
 
 async def display_command_preview(command: str, preview: str) -> None:
     """Display command preview."""

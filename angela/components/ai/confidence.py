@@ -2394,22 +2394,29 @@ class ConfidenceScorer:
         resolved_matches = 0
         if context:
             for req_text, req_type in request_entity_texts.items():
-                # Look for files or directories mentioned in context
                 if req_type in (EntityType.FILE, EntityType.DIRECTORY):
-                    # Get the most recent files from the activity tracker
-                    recent_files = file_activity_tracker.get_recent_files(10)
-                    for file_info in recent_files:
-                        file_path = file_info.get('path', '')
+                    # Get the most active files
+                    most_active_files_info = file_activity_tracker.get_most_active_files(limit=10) # Use the correct method
+                    recent_file_paths = [file_info.get('path') for file_info in most_active_files_info if file_info.get('path')]
+
+                    for file_path_str in recent_file_paths:
+                        # ... (rest of the logic is the same as Option 1) ...
+                        if not file_path_str:
+                            continue
+                        file_path = file_path_str
                         file_name = os.path.basename(file_path)
                         
                         # Check if this recent file matches or contains the request entity
-                        if (req_text in file_path or file_name == req_text or 
+                        if (req_text in file_path or file_name == req_text or
                             difflib.SequenceMatcher(None, file_name, req_text).ratio() > 0.8):
                             # Now check if this resolved file appears in the command
-                            for cmd_text, cmd_type in command_entity_texts.items():
+                            for cmd_text, cmd_type_from_cmd_entities in command_entity_texts.items(): # Renamed cmd_type to avoid conflict
                                 if file_path in cmd_text or file_name in cmd_text:
                                     resolved_matches += 1
                                     break
+                            # Break from the outer loop too if a match for req_text is found
+                            if resolved_matches > 0 and any(file_path in cmd_text or file_name in cmd_text for cmd_text, _ in command_entity_texts.items()):
+                                break
         
         # Calculate entity match score
         total_request_entities = len(significant_request_entities)

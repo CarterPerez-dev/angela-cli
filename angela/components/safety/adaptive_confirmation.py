@@ -63,7 +63,6 @@ async def get_adaptive_confirmation(
             logger.info(f"Auto-proceeding with high trust command (history/success): {command}")
 
     if can_auto_proceed:
-        await _show_auto_execution_notice(command, risk_level, preview, dry_run=dry_run)
         return True
 
 
@@ -103,7 +102,8 @@ async def _show_auto_execution_notice(
 ) -> None:
     """Show a notice for auto-execution."""
     from angela.api.shell import display_auto_execution_notice
-    await display_auto_execution_notice(command, risk_level, preview, dry_run=dry_run)
+    # Set skip_loading=True to avoid duplicate loading animations
+    await display_auto_execution_notice(command, risk_level, preview, dry_run=dry_run, skip_loading=True)
 
 async def _get_simple_confirmation(
     command: str, 

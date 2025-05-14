@@ -1201,7 +1201,8 @@ class TerminalFormatter:
         command: str, 
         risk_level: int,
         preview: Optional[str],
-        dry_run: bool = False
+        dry_run: bool = False,
+        skip_loading: bool = False  # New parameter to control loading animation
     ) -> None:
         """
         Show a notice for auto-execution with enhanced styling.
@@ -1210,6 +1211,8 @@ class TerminalFormatter:
             command: The command being auto-executed
             risk_level: Risk level of the command
             preview: Optional preview of what the command will do
+            dry_run: Whether this is a dry run
+            skip_loading: Whether to skip the loading animation
         """
         # Risk styling
         risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
@@ -1246,26 +1249,23 @@ class TerminalFormatter:
                 expand=False
             ))
         
-        if not dry_run: 
+        if not dry_run and not skip_loading: # <<< USE THE NEW PARAMETER HERE
             loading_task = asyncio.create_task(
                 self.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
             )
-
             try:
-                # Wait a minimum amount of time for visual feedback
-                await asyncio.sleep(0.5)
-
-                # Now we're ready to continue, cancel the loading task
+                await asyncio.sleep(0.5) # Or whatever your logic was
                 loading_task.cancel()
                 try:
                     await loading_task
                 except asyncio.CancelledError:
-                    pass  # Expected
+                    pass
             except Exception as e:
-                logger.error(f"Error managing loading display: {str(e)}")
-                # Ensure the task is cancelled
+                self._logger.error(f"Error managing loading display: {str(e)}")
                 if not loading_task.done():
                     loading_task.cancel()
+        elif skip_loading:
+            self._logger.debug("Skipping loading animation in display_auto_execution_notice because skip_loading is True.")
         
     
     async def display_command_preview(
