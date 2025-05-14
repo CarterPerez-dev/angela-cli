@@ -1,6 +1,62 @@
 # Angela CLI: Worlds First Command-Line AGI
+---
+```
+ █████╗  ███╗   ██╗ ██████╗ ███████╗██╗      █████╗ 
+ ██╔══██╗████╗  ██║██╔════╝ ██╔════╝██║     ██╔══██╗
+ ███████║██╔██╗ ██║██║  ███╗█████╗  ██║     ███████║
+ ██╔══██║██║╚██╗██║██║   ██║██╔══╝  ██║     ██╔══██║
+ ██║  ██║██║ ╚████║╚██████╔╝███████╗███████╗██║  ██║
+ ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝
+```
+----
+<div align="center">
+  <img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp" alt="Angela CLI Logo" width="200" height="200">
+  <h3>Worlds First AGI Command Line Intelligence</h3>
+  <p><em>Your ambient-intelligence terminal companion that understands natural language and your development context</em></p>
+</div>
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Gemini API](https://img.shields.io/badge/AI-Gemini_API-orange)](https://ai.google.dev/)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/CarterPerez-dev/angela-cli)
+[![Code Coverage](https://img.shields.io/badge/coverage-87%25-green)](https://github.com/CarterPerez-dev/angela-cli)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+----
+
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/UI.png" width="100" alt="Angela UI Example">](#angela-ui-example)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp" width="100" alt="Angela Logo/Mascot">](#angela-logo)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/confirmation.png" width="100" alt="Confirmation Prompt">](#confirmation-prompt)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/flow.svg" width="100" alt="Angela Workflow Diagram">](#angela-workflow-diagram)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/generate-help.png" width="100" alt="Generate Help Command">](#generate-help-command)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/help.png" width="100" alt="Angela Help Output">](#angela-help-output)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/loading.png" width="100" alt="Loading Animation">](#loading-animation)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/output.png" width="100" alt="Command Output Example">](#command-output-example)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part1.png" width="100" alt="Screenshot Part 1">](#screenshot-part-1)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part2.png" width="100" alt="Screenshot Part 2">](#screenshot-part-2)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part3.png" width="100" alt="Screenshot Part 3">](#screenshot-part-3)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part4.png" width="100" alt="Screenshot Part 4">](#screenshot-part-4)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/react.png" width="100" alt="React Project Generation">](#react-project-generation)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/safety.png" width="100" alt="Safety Confirmation">](#safety-confirmation)
+[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/status.png" width="100" alt="Angela Status Output">](#angela-status-output)
+
+---
 **Project Vision:** Angela CLI is not just another command-line tool; she's the worlds first AGI (will be), but lives inside a place named `shell`, designed to understand your natural language, execute commands intelligently, manage complex workflows, and even help you write and refactor code. She's your terminal's new best friend, learning your habits and proactively assisting you.
+
+---
+## 🧠 Philosophy
+
+Angela CLI is built on several core principles:
+
+1. **Ambient Intelligence**: Angela should feel like a natural extension of your shell, not a separate tool you have to invoke. The boundary between standard commands and AI assistance should be minimal.
+
+2. **Contextual Understanding**: True assistance requires understanding the user's environment, project structure, and goals. Angela prioritizes deep context awareness.
+
+3. **Multi-Level Abstraction**: Users should be able to communicate at any level of abstraction, from specific commands to high-level goals, and get appropriate responses.
+
+4. **Progressive Disclosure**: Simple tasks should be simple, while complex capabilities should be available when needed but not overwhelming.
+
+5. **Learning Over Time**: The system should learn from user interactions to improve its suggestions and adaptations over time.
+---
 
 **Current Status: Solid Foundation Laid, Core Execution Loop Getting Polished!**
 
@@ -236,3 +292,72 @@ Thanks for helping make Angela smarter! ✨
 ---
 
 # KEEP IN MIND-- ANGELA IS NOT COMPLETE YET, SHE'S IS IN ITS VERY BEGINING STAGES, SHE's STILL A MINOR!!
+-----
+
+## Screenshots & Examples
+
+#### Angela UI Example
+<a id="angela-ui-example"></a>
+![Angela UI Example](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/UI.png)
+
+#### Angela Logo
+<a id="angela-logo"></a>
+![Angela Logo/Mascot](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp)
+
+#### Confirmation Prompt
+<a id="confirmation-prompt"></a>
+![Confirmation Prompt](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/confirmation.png)
+
+#### Angela Workflow Diagram
+<a id="angela-workflow-diagram"></a>
+![Angela Workflow Diagram](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/flow.svg)
+
+#### Generate Help Command
+<a id="generate-help-command"></a>
+![Generate Help Command](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/generate-help.png)
+
+#### Angela Help Output
+<a id="angela-help-output"></a>
+![Angela Help Output](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/help.png)
+
+#### Loading Animation
+<a id="loading-animation"></a>
+![Loading Animation](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/loading.png)
+
+#### Command Output Example
+<a id="command-output-example"></a>
+![Command Output Example](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/output.png)
+
+#### Code Project Generation 
+<a id="screenshot-part-1"></a>
+![Screenshot Part 1](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part1.png)
+
+#### Code Project Generation Part 2
+<a id="screenshot-part-2"></a>
+![Screenshot Part 2](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part2.png)
+
+#### Code Project Generation Part 3
+<a id="screenshot-part-3"></a>
+![Screenshot Part 3](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part3.png)
+
+#### Code Project Generation 4
+<a id="screenshot-part-4"></a>
+![Screenshot Part 4](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/part4.png)
+
+#### Code Project Generation part 5
+<a id="react-project-generation"></a>
+![React Project Generation](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/react.png)
+
+#### Safety Confirmation
+<a id="safety-confirmation"></a>
+![Safety Confirmation](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/safety.png)
+
+#### Angela Status Output
+<a id="angela-status-output"></a>
+![Angela Status Output](https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/status.png)
+
+
+
+
+
+
