@@ -2171,10 +2171,24 @@ class ConfidenceScorer:
             # Check for short flag format with combined options
             elif flag.startswith('-') and len(flag) > 2:
                 # For commands that don't typically use combined flags
-                if base_command in ['find', 'git', 'docker'] and not re.match(r'-[a-zA-Z0-9]+$', flag): # Check against 'flag' variable
+                if base_command in ['find', 'git', 'docker'] and not re.match(r'-[a-zA-Z0-9]+$', flag):
                     malformed_flags += 1
-                elif base_command not in ['head', 'tail', 'chmod', 'dd'] and re.search(r'\d', flag[1:]): # Check for digits in flag chars
+                elif base_command not in ['head', 'tail', 'chmod', 'dd'] and re.search(r'\d', flag[1:]):
                     malformed_flags += 1
+        
+        # Reduce score for malformed flags
+        if malformed_flags > 0:
+            validation_score -= malformed_flags * 0.1
+            validation_score = max(0.3, validation_score)  # Don't go below 0.3
+        
+        # Check for environment variables in the command
+        env_score = 0.8  # Start with a good score for environment vars
+        env_vars = os.environ.keys()
+        
+        # Check for environment variables in arguments
+        for arg in command_analysis.args:
+            # Check for variable references in arguments
+            if arg.startswith('$'):
                 var_name = arg[1:]
                 if var_name not in env_vars:
                     env_score = max(0.4, env_score - 0.1)
@@ -2184,7 +2198,7 @@ class ConfidenceScorer:
             # Check if command is in PATH
             cmd_in_path = False
             if 'PATH' in env_vars:
-                path_dirs = env_vars['PATH'].split(':')
+                path_dirs = os.environ['PATH'].split(':')
                 for path_dir in path_dirs:
                     cmd_path = os.path.join(path_dir, command_analysis.base_command)
                     if os.path.exists(cmd_path) and os.access(cmd_path, os.X_OK):
@@ -2195,7 +2209,9 @@ class ConfidenceScorer:
                 # Could be a built-in shell command or alias, don't penalize too much
                 env_score = max(0.5, env_score - 0.1)
         
-        return min(1.0, max(0.3, env_score))
+        # Combine the flag validation score with environment score
+        overall_score = (validation_score * 0.7) + (env_score * 0.3)
+        return min(1.0, max(0.3, overall_score))
     
     def _analyze_risk(
         self, 
