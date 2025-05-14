@@ -147,7 +147,6 @@ class PreferencesManager:
                 self._prefs.trust.untrusted_commands.remove(base_command)
             
             self._save_preferences()
-            print(f"DEBUG: Added base command '{base_command}' to trusted list")
         else:
             print(f"DEBUG: Base command '{base_command}' already in trusted list")
                        
