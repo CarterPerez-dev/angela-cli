@@ -338,6 +338,29 @@ class ConfidenceScorer:
         }
         
         self._logger.debug("Advanced ConfidenceScorer initialized")
+
+
+    def _extract_base_command(self, command: str) -> str:
+        """
+        Extract the base command without arguments.
+        """
+        # Extract the first word (command name)
+        parts = command.strip().split()
+        if not parts:
+            return ""
+        base = parts[0]
+        
+        # For some commands, include the first argument if it's an operation
+        # (you can expand this list as needed)
+        if base in ["git", "docker", "npm", "pip", "apt", "apt-get", "yarn", "cargo", "go", "kubectl", "aws", "az", "gcloud"]:
+            if len(parts) > 1 and not parts[1].startswith("-"):
+                base = f"{base} {parts[1]}"
+        
+        return base
+
+
+
+
     
     def _initialize_command_categories(self):
         """Initialize mappings of commands to their categories and subcategories."""
@@ -877,6 +900,8 @@ class ConfidenceScorer:
             Confidence score (0.0-1.0) representing how well the command matches
             the user's request, with higher scores indicating higher confidence
         """
+
+        
         start_time = time.time()
         
         # Update statistics
@@ -893,33 +918,34 @@ class ConfidenceScorer:
         
         # Step 1: Parse and analyze the command structure
         command_analysis = self._analyze_command(command)
+        # --- END OF MOVE ---
         
         # Step 2: Extract entities from both request and command
         request_entities = self._extract_entities(request)
         
         # Step 3: Analyze command history relevance
-        historical_analysis = self._check_history(command, command_analysis)
+        historical_analysis = self._check_history(command, command_analysis) # Now command_analysis is defined
         
         # Step 4: Check command complexity vs. request complexity
-        complexity_score = self._check_complexity(request, command, command_analysis)
+        complexity_score = self._check_complexity(request, command, command_analysis) # Now defined
         
         # Step 5: Analyze semantic similarity between request and command
-        semantic_analysis = self._check_semantic_similarity(request, command, context)
+        semantic_analysis = self._check_semantic_similarity(request, command, context) 
         
         # Step 6: Check for entity matches
-        entity_match_score = self._check_entities(request, command, request_entities, command_analysis, context)
+        entity_match_score = self._check_entities(request, command, request_entities, command_analysis, context) # Now defined
         
         # Step 7: Validate command flags and options
-        flag_validation_score = self._check_command_flags(command, command_analysis)
+        flag_validation_score = self._check_command_flags(command, command_analysis) # Now defined
         
         # Step 8: Check contextual relevance
-        context_relevance_score = self._check_contextual_relevance(request, command, command_analysis, context)
+        context_relevance_score = self._check_contextual_relevance(request, command, command_analysis, context) # Now defined
         
         # Step 9: Analyze risk and safety aspects
-        risk_analysis = self._analyze_risk(command, command_analysis, context)
+        risk_analysis = self._analyze_risk(command, command_analysis, context) # Now defined
         
         # Step 10: Check user preferences
-        user_preference_score = self._check_user_preferences(command, command_analysis, context)
+        user_preference_score = self._check_user_preferences(command, command_analysis, context) # Now defined
         
         # Step 11: Calculate final weighted score
         confidence = (
@@ -1522,83 +1548,66 @@ class ConfidenceScorer:
     def _check_history(self, command: str, command_analysis: CommandAnalysis) -> HistoricalAnalysis:
         """
         Check command history for relevance and success patterns.
-        
-        Args:
-            command: The suggested command
-            command_analysis: Detailed command analysis
-            
-        Returns:
-            HistoricalAnalysis with scores and details
         """
-        # Get history manager instance
         history_manager = get_history_manager()
         
-        # Extract the base command
-        base_command = command_analysis.base_command
-        
-        # Get command usage statistics
-        frequency = history_manager.get_command_frequency(base_command)
-        success_rate = history_manager.get_command_success_rate(base_command)
+        # This call was already correct from the previous step
+        frequency = history_manager.get_command_frequency(command_analysis.base_command)
+        success_rate = history_manager.get_command_success_rate(command_analysis.base_command)
         
         # Get similar commands from history
         similar_commands = []
-        for cmd_record in history_manager.get_recent_commands(20):
-            cmd = cmd_record.get('command', '')
+        for cmd_record_obj in history_manager.get_recent_commands(20):
+            cmd = cmd_record_obj.command
             if cmd and cmd != command:
-                # Calculate similarity score
                 similarity = self._calculate_command_similarity(command, cmd)
-                if similarity > 0.5:  # Only include commands with decent similarity
-                    success = cmd_record.get('success', True)
+                if similarity > 0.5:
+                    success = cmd_record_obj.success
                     similar_commands.append((cmd, similarity, success))
         
-        # Sort by similarity (highest first)
         similar_commands.sort(key=lambda x: x[1], reverse=True)
-        
-        # Select top 5 most similar
         similar_commands = [(cmd, sim) for cmd, sim, success in similar_commands[:5]]
-        
-        # Get last used timestamp
+
         last_used = None
-        for cmd_record in history_manager.get_recent_commands(10):
-            if cmd_record.get('command', '') == command:
-                try:
-                    last_used = datetime.fromisoformat(cmd_record.get('timestamp', ''))
-                    break
-                except (ValueError, TypeError):
-                    pass
+        for cmd_record_obj in history_manager.get_recent_commands(10):
+            if cmd_record_obj.command == command:
+                last_used = cmd_record_obj.timestamp
+                break
         
         # Calculate pattern match score based on command usage patterns
-        common_patterns = history_manager.get_common_command_patterns()
+        command_contexts = history_manager.get_common_command_contexts()
         pattern_match_score = 0.0
         
-        for pattern, count in common_patterns:
-            # Simple pattern matching for now
-            if pattern in command:
-                pattern_match_score = min(1.0, pattern_match_score + 0.2)
-                
-        # Calculate environment match score
-        # (How often is this command used in similar contexts)
-        environment_match_score = 0.7  # Default moderate score
+        recent_base_commands = []
+        for cmd_record_obj in history_manager.get_recent_commands(3):
+            # This line now correctly calls the method within the ConfidenceScorer class
+            recent_base_commands.append(self._extract_base_command(cmd_record_obj.command))
+
+        # This line now correctly calls the method within the ConfidenceScorer class
+        current_base_cmd = self._extract_base_command(command)
+
+        for prev_cmd_base in recent_base_commands:
+            if prev_cmd_base in command_contexts:
+                if current_base_cmd in command_contexts[prev_cmd_base]:
+                    pattern_match_score = min(1.0, pattern_match_score + 0.2)
+                    break 
         
-        # Calculate overall historical confidence
+        if pattern_match_score < 0.1 and current_base_cmd in command_contexts:
+            for next_cmd_candidate in command_contexts[current_base_cmd]:
+                if next_cmd_candidate in recent_base_commands:
+                    pattern_match_score = min(1.0, pattern_match_score + 0.1)
+                    break
+                
+        environment_match_score = 0.7
+        
         if frequency == 0:
-            # New command, never seen before
-            historical_score = 0.5  # Neutral score for new commands
+            historical_score = 0.5
         else:
-            # Scale frequency up to 10 uses for full effect
             frequency_factor = min(frequency / 10.0, 1.0)
-            
-            # Success rate is already between 0 and 1
-            # Weight frequency and success rate
             historical_score = 0.3 + (0.7 * ((frequency_factor * 0.6) + (success_rate * 0.4)))
-            
-            # Adjust for pattern matching
             historical_score = (historical_score * 0.8) + (pattern_match_score * 0.2)
-            
-            # Adjust for environment matching
             historical_score = (historical_score * 0.9) + (environment_match_score * 0.1)
         
-        # Create the historical analysis
         return HistoricalAnalysis(
             frequency=frequency,
             success_rate=success_rate,
