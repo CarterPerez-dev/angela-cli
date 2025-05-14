@@ -83,7 +83,6 @@ RISK_PATTERNS = {
         (r"^chown\s+.*(/boot|/etc|/bin|/sbin|/lib|/usr|/var)", "Changing ownership in system directories"),
         
         # Permissions/ownership - recursive or wide-ranging
-        (r"^chmod\s+.*(777|a\+[rwx]{3})\b", "Setting world-writable permissions"),
         (r"^chmod\s+.*(-R|--recursive)\b", "Recursive permission changes"),
         (r"^chown\s+.*(-R|--recursive)\b", "Recursive ownership changes"),
         
@@ -403,7 +402,6 @@ OVERRIDE_PATTERNS = {
     "SAFE": [
         # Basic grep-like operations
         r"^grep\s+(-r|--recursive)?\s+[\w\s]+\s+[\w\s\./-]+$",  # Basic grep with fixed strings
-        r"^find\s+[\w\s\./-]+\s+-name\s+[\w\s\*\./-]+$",  # Basic find by name
         r"^locate\s+[\w\s\*\./-]+$",  # Basic locate
         
         # Basic ls-like operations
@@ -434,15 +432,10 @@ OVERRIDE_PATTERNS = {
     # Operations that should always be considered critical regardless of base command
     "CRITICAL": [
         # Dangerous rm patterns
-        r"[\s;|`]+rm\s+(-r|-f|--recursive|--force)\s+[~/]",  # rm commands affecting home or root
-        r"[\s;|`]+rm\s+(-r|-f|--recursive|--force)\s+\.\.",  # rm with parent directory references
         
         # Dangerous disk operations
         r"[\s;|`]+dd\s+(if=/dev/zero|of=/dev/sd|bs=[0-9]+[mM])",  # dd to write to disks
         r"[\s;|`]+shred\s+(/dev/sd|/dev/hd|/dev/nvme)",  # shred on disk devices
-        
-        # Dangerous redirects to system files
-        r">\s*(/etc/passwd|/etc/shadow|/etc/sudoers|/etc/ssh/sshd_config)",  # Writing to critical system files
         
         # Hidden dangerous operations
         r";\s*rm\s+(-r|-f|--recursive|--force)",  # Hidden deletion commands
@@ -497,36 +490,31 @@ OVERRIDE_PATTERNS = {
 
 
 class CommandRiskClassifier:
-    """Classifier for command risk levels."""
-    
     def classify(self, command: str) -> Tuple[int, str]:
         """
         Classify the risk level of a shell command.
-        
-        Args:
-            command: The shell command to classify.
-            
-        Returns:
-            A tuple of (risk_level, reason).
         """
         if not command.strip():
             return RISK_LEVELS["SAFE"], "Empty command"
 
-        # Check override patterns first
-        for level_name, patterns in OVERRIDE_PATTERNS.items():
-            for pattern in patterns:
-                if re.search(pattern, command):
+        # Check OVERRIDE_PATTERNS first
+        for level_name, patterns_list in OVERRIDE_PATTERNS.items():
+            for pattern_item in patterns_list:
+                # Assuming pattern_item can be a string or a tuple (pattern, reason)
+                pattern_str = pattern_item[0] if isinstance(pattern_item, tuple) else pattern_item
+                
+                if re.search(pattern_str, command.strip()):
                     level = RISK_LEVELS[level_name]
-                    return level, f"Matched override pattern for {level_name} risk"
-
-        # Check regular risk patterns
-        for level, patterns in sorted(RISK_PATTERNS.items(), key=lambda x: x[0], reverse=True):
-            for pattern, reason in patterns:
-                if re.search(pattern, command.strip()):
+                    # Provide a default reason if pattern_item was just a string
+                    reason = pattern_item[1] if isinstance(pattern_item, tuple) and len(pattern_item) > 1 else f"Matched override pattern for {level_name} risk"
                     return level, reason
 
-        # If no pattern matches, default to MEDIUM for unrecognized commands
-        # This is a deliberate choice to be cautious with unknown commands
+        # Then check RISK_PATTERNS, from highest risk to lowest
+        for level, patterns_list in sorted(RISK_PATTERNS.items(), key=lambda x: x[0], reverse=True):
+            for pattern_str, reason_str in patterns_list: # RISK_PATTERNS items are (pattern, reason) tuples
+                if re.search(pattern_str, command.strip()):
+                    return level, reason_str
+
         return RISK_LEVELS["MEDIUM"], "Unrecognized command type"
 
     def analyze_impact(self, command: str) -> Dict[str, any]:

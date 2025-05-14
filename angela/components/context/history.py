@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timedelta
@@ -367,6 +368,41 @@ class HistoryManager:
             result[cmd] = [cmd for cmd, count in followers.most_common(3)]
         
         return result
+
+    def get_favorite_commands(self, limit: int = 5) -> List[str]:
+        """Get a list of favorite/most frequently successful commands."""
+        # Consider commands used at least X times with Y success rate
+        MIN_FREQUENCY = 3
+        MIN_SUCCESS_RATE = 0.8
+        
+        candidates = []
+        for base_cmd, pattern_obj in self._patterns.items():
+            if pattern_obj.count >= MIN_FREQUENCY and pattern_obj.success_rate >= MIN_SUCCESS_RATE:
+                # Score could be count * success_rate
+                candidates.append((base_cmd, pattern_obj.count * pattern_obj.success_rate))
+        
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        return [cmd for cmd, score in candidates[:limit]]
+
+    def get_common_flags_for_command(self, base_command_to_check: str, limit: int = 3) -> List[str]:
+        """Get most commonly used flags for a given base command."""
+        flag_counts = {}
+        for record in self._history:
+            if self._extract_base_command(record.command) == base_command_to_check:
+                try:
+                    tokens = shlex.split(record.command)
+                    flags_in_record = [t for t in tokens if t.startswith('-')]
+                    for flag in flags_in_record:
+                        flag_counts[flag] = flag_counts.get(flag, 0) + 1
+                except ValueError: # shlex parsing error
+                    continue
+        
+        if not flag_counts:
+            return []
+            
+        sorted_flags = sorted(flag_counts.items(), key=lambda x: x[1], reverse=True)
+        return [flag for flag, count in sorted_flags[:limit]]
+
 
 # Global history manager instance
 history_manager = HistoryManager()

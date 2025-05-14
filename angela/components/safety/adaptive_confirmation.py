@@ -200,23 +200,20 @@ async def offer_command_learning(command: str) -> None:
     """
     After a successful execution, offer to add the command to trusted commands.
     """
-
-    # Get managers from API
     preferences_manager = get_preferences_manager()
     history_manager = get_history_manager()
-    
-    # Extract base command for consistent comparison
     base_command = command.split()[0] if command.split() else ""
     if not base_command:
-        return  # Skip if we couldn't extract a base command
-    
-    # CRITICAL FIX: Skip if command is already trusted
+        return
+
+    # 1. CRITICAL FIX: Skip if command is already trusted
     if base_command in preferences_manager.preferences.trust.trusted_commands:
         logger.debug(f"Command '{base_command}' already trusted, skipping learning prompt")
-        return
-    
-    # Check if this command should be offered for learning
-    pattern = history_manager._patterns.get(base_command)
+        return # <<< IF IT'S ALREADY TRUSTED, IT EXITS HERE
+
+    # 2. Check if this command should be offered for learning
+    pattern = history_manager._patterns.get(base_command) # This accesses a "private" attribute of HistoryManager
+
     
     # Only offer for commands used a few times but not yet trusted
     if pattern and pattern.count >= 2:

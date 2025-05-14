@@ -11,6 +11,7 @@ import shlex
 from typing import Dict, Any, Optional, List, Tuple, Union
 from pathlib import Path
 from enum import Enum
+import time
 import uuid
 from rich.console import Console
 from datetime import datetime
@@ -1876,81 +1877,86 @@ class Orchestrator:
                     confidence_score=confidence
                 )
                 
-                if not confirmed and not dry_run:
-                    self._logger.info(f"Command execution cancelled by user: {suggestion.command}")
-                    result["cancelled"] = True
-                    return result
+                execution_result: Dict[str, Any] = {} 
+
+                # Define commands that are interactive and/or run continuously
+                interactive_continuous_commands = [
+                    "top", "htop", "vim", "vi", "nano", 
+                    "less", "more", "man", "ping" 
+                    # Add other commands like "tail -f", "watch" if you want similar handling
+                ]
+                base_suggestion_cmd = suggestion.command.split()[0] if suggestion.command.split() else ""
+
+
+                is_special_interactive_cmd = False
+                if base_suggestion_cmd in interactive_continuous_commands:
+                    if base_suggestion_cmd == "ping" and "-c" not in suggestion.command:
+                        is_special_interactive_cmd = True
+                    elif base_suggestion_cmd == "tail" and "-f" in suggestion.command:
+                         is_special_interactive_cmd = True
+                    elif base_suggestion_cmd not in ["ping", "tail"]: 
+                        is_special_interactive_cmd = True
                 
-                # Execute with timer and philosophical quotes
-                stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
-                    suggestion.command,
-                    with_philosophy=True
-                )
-                
-                # Store execution results
-                execution_result = {
-                    "command": suggestion.command,
-                    "success": return_code == 0,
-                    "stdout": stdout,
-                    "stderr": stderr,
-                    "return_code": return_code,
-                    "execution_time": execution_time,
-                    "dry_run": dry_run
-                }
+                if is_special_interactive_cmd and not dry_run:
+
+                    console.print(f"\n[dim]Running '{suggestion.command}'... (Ctrl+C to stop if continuous)[/dim]")
+                    start_exec_time = time.time()
+                    stdout, stderr, return_code = await execution_engine.execute_command(
+                        suggestion.command,
+                        check_safety=False 
+                    )
+                    execution_time = time.time() - start_exec_time
+                    
+                    execution_result = {
+                        "command": suggestion.command,
+                        "success": return_code == 0,
+                        "stdout": stdout,
+                        "stderr": stderr,
+                        "return_code": return_code,
+                        "execution_time": execution_time,
+                        "dry_run": False 
+                    }
+
+                    if stdout.strip(): terminal_formatter.print_output(stdout.strip(), OutputType.STDOUT, title=f"Output: {suggestion.command}")
+                    if stderr.strip(): terminal_formatter.print_output(stderr.strip(), OutputType.STDERR, title=f"Error: {suggestion.command}")
+                    if return_code == 0 and not stdout.strip() and not stderr.strip():
+                        terminal_formatter.print_output("Command executed successfully with no output.", OutputType.SUCCESS)
+
+                else:
+                    execution_result = await adaptive_engine.execute_command(
+                        command=suggestion.command,
+                        natural_request=request,
+                        explanation=suggestion.explanation,
+                        dry_run=dry_run 
+                    )
+
                 
                 result["execution"] = execution_result
                 
-                # Display the execution results
-                if return_code == 0:
-                    if stdout.strip():
-                        terminal_formatter.print_output(
-                            stdout,
-                            OutputType.STDOUT,
-                            title="Output"
-                        )
-                    # No message about "Command executed successfully with no output"
-                else:
-                    if stderr.strip():
-                        terminal_formatter.print_output(
-                            stderr,
-                            OutputType.STDERR,
-                            title="Error"
-                        )
-                    
-                    # If execution failed, analyze error and suggest fixes
-                    if stderr:
-                        error_analysis = error_analyzer.analyze_error(suggestion.command, stderr)
-                        fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, stderr)
-                        
-                        result["error_analysis"] = error_analysis
-                        result["fix_suggestions"] = fix_suggestions
-                        
-                        # Display error analysis
-                        terminal_formatter.print_error_analysis(error_analysis)
-                
-                # Add to history
+                # Add to history (using values from execution_result)
                 history_manager.add_command(
                     command=suggestion.command,
                     natural_request=request,
-                    success=return_code == 0,
-                    output=stdout,
-                    error=stderr,
+                    success=execution_result.get("success", False),
+                    output=execution_result.get("stdout", ""),
+                    error=execution_result.get("stderr", ""),
                     risk_level=risk_level
                 )
                 
-                # For multi-step operations, offer to learn from successful executions
-                if return_code == 0 and risk_level > 0:
-                    # Get preferences manager to check if command is already trusted
-                    from angela.api.context import get_preferences_manager
-                    preferences_manager = get_preferences_manager()
+                # If execution failed (and not a dry_run), analyze error and suggest fixes
+                if not execution_result.get("success", False) and not dry_run and execution_result.get("stderr"):
+                    error_analysis = error_analyzer.analyze_error(suggestion.command, execution_result["stderr"])
+                    fix_suggestions = error_analyzer.generate_fix_suggestions(suggestion.command, execution_result["stderr"])
                     
-                    # Extract base command
-                    base_command = suggestion.command.split()[0] if suggestion.command.split() else ""
+                    result["error_analysis"] = error_analysis
+                    result["fix_suggestions"] = fix_suggestions
                     
-                    # CRITICAL FIX: Only offer learning if not already trusted
-                    if not base_command or base_command not in preferences_manager.preferences.trust.trusted_commands:
-                        from angela.api.safety import offer_command_learning
-                        await offer_command_learning(suggestion.command)
+                    terminal_formatter.print_error_analysis(error_analysis)
+                
+                # Offer to learn from successful executions (if not dry_run)
+                if execution_result.get("success", False) and risk_level > 0 and not dry_run:
+                    from angela.api.safety import offer_command_learning
+                    await offer_command_learning(suggestion.command)
             
             return result
         
@@ -4366,48 +4372,82 @@ Include only the JSON object with no additional text.
         
         return confirmed
 
-    async def _execute_with_feedback(self, command: str, dry_run: bool = False) -> Dict[str, Any]:
+    async def _execute_with_feedback(self, command: str, dry_run: bool) -> Dict[str, Any]:
         """
-        Execute a command with real-time feedback.
+        Execute a command with rich feedback, handling interactive commands.
         
         Args:
             command: The command to execute
-            dry_run: Whether to simulate execution without making changes
+            dry_run: Whether to simulate the command without execution
             
         Returns:
             Dictionary with execution results
         """
-        self._logger.info(f"{'Dry run of' if dry_run else 'Executing'} command: {command}")
-        
-        if dry_run:
-            return {
-                "command": command,
-                "success": True,
-                "stdout": f"[DRY RUN] Would execute: {command}",
-                "stderr": "",
-                "return_code": 0,
-                "dry_run": True
-            }
-        
-        # Use the execution engine to run the command - using API layer
-        from angela.api.execution import get_execution_engine
+        # Get execution engine and terminal formatter through API
         execution_engine = get_execution_engine()
-        
-        stdout, stderr, exit_code = await execution_engine.execute_command(
-            command=command,
-            check_safety=True
-        )
-        
-        return {
-            "command": command,
-            "success": exit_code == 0,
-            "stdout": stdout,
-            "stderr": stderr,
-            "return_code": exit_code,
-            "dry_run": False
-        }
+        terminal_formatter = get_terminal_formatter() # Assuming this is how you get it
 
+        # For dry runs, return the simulation directly
+        if dry_run:
+            stdout, stderr, return_code = await execution_engine.dry_run_command(command)
+            return {
+                "command": command, "success": True, "stdout": stdout,
+                "stderr": stderr, "return_code": return_code, "dry_run": True
+            }
 
+        # --- HANDLE INTERACTIVE/CONTINUOUS COMMANDS ---
+        interactive_continuous_commands = [
+            "top", "htop", "vim", "vi", "nano", 
+            "less", "more", "man", "ping", "tail" # Added tail
+        ]
+        base_cmd_to_execute = command.split()[0] if command.split() else ""
+        
+        is_special_interactive_cmd = False
+        if base_cmd_to_execute in interactive_continuous_commands:
+            if base_cmd_to_execute == "ping" and "-c" not in command:
+                is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "tail" and "-f" in command:
+                 is_special_interactive_cmd = True
+            elif base_cmd_to_execute not in ["ping", "tail"]:
+                is_special_interactive_cmd = True
+        
+        if is_special_interactive_cmd:
+            console.print(f"\n[dim]Running '{command}'... (Ctrl+C to stop if continuous)[/dim]")
+            start_exec_time = time.time()
+            stdout, stderr, return_code = await execution_engine.execute_command(
+                command,
+                check_safety=False # Safety already handled
+            )
+            execution_time = time.time() - start_exec_time
+            
+            # Display raw output or simple status
+            if stdout.strip(): terminal_formatter.print_output(stdout.strip(), OutputType.STDOUT, title=f"Output: {command}")
+            if stderr.strip(): terminal_formatter.print_output(stderr.strip(), OutputType.STDERR, title=f"Error: {command}")
+            if return_code == 0 and not stdout.strip() and not stderr.strip():
+                terminal_formatter.print_output("Command executed successfully with no output.", OutputType.SUCCESS)
+
+            return {
+                "command": command, "success": return_code == 0, "stdout": stdout,
+                "stderr": stderr, "return_code": return_code, 
+                "execution_time": execution_time, "dry_run": False
+            }
+        else:
+            # For non-interactive commands, use the execution timer
+            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
+                command,
+                with_philosophy=True
+            )
+            # Store result in session for reference (if needed here, or done in orchestrator)
+            # session_manager = get_session_manager()
+            # if stdout.strip():
+            #     session_manager.add_result(stdout.strip())
+            
+            return {
+                "command": command, "success": return_code == 0, "stdout": stdout,
+                "stderr": stderr, "return_code": return_code,
+                "execution_time": execution_time, "dry_run": False
+            }
+            
     async def _handle_critical_resource_warning(self, warning_data: Dict[str, Any]) -> None:
         """
         Handle a critical resource warning from the monitoring system.

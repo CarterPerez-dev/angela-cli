@@ -373,6 +373,92 @@ class ConfidenceScorer:
         
         return base
 
+    def _check_environment_relevance(
+        self, 
+        command_analysis: CommandAnalysis, 
+        current_state: ContextualState
+    ) -> float:
+        """
+        Check if command is relevant to the current environment variables and system context.
+        
+        Args:
+            command_analysis: Detailed command analysis
+            current_state: Current contextual state
+            
+        Returns:
+            Environment relevance score (0-1)
+        """
+        # Start with a moderate score
+        env_score = 0.7
+        
+        # Get reference to environment variables from current state
+        env_vars = current_state.environment_vars
+        
+        # Extract the base command
+        base_cmd = command_analysis.base_command
+        
+        # Check if command refers to environment variables directly
+        env_var_references = 0
+        for arg in command_analysis.args:
+            if arg.startswith('$') and arg[1:] in env_vars:
+                env_var_references += 1
+                env_score = min(1.0, env_score + 0.1)
+        
+        # Check for environment-specific commands
+        if base_cmd in ['env', 'printenv', 'export', 'set', 'echo']:
+            # Commands that directly interact with environment
+            for arg in command_analysis.args:
+                if '$' in arg or any(var in arg for var in env_vars):
+                    env_score = min(1.0, env_score + 0.1)
+        
+        # Check for shell-specific commands
+        shell = env_vars.get('SHELL', '')
+        if shell:
+            shell_name = shell.split('/')[-1]  # Extract basename
+            
+            # Check for shell-specific built-ins or behavior
+            if shell_name == 'bash' and base_cmd in ['source', '.', 'bash', 'alias', 'declare']:
+                env_score = min(1.0, env_score + 0.1)
+            elif shell_name == 'zsh' and base_cmd in ['source', '.', 'zsh', 'alias', 'setopt']:
+                env_score = min(1.0, env_score + 0.1)
+            elif shell_name == 'fish' and base_cmd in ['source', 'function', 'set']:
+                env_score = min(1.0, env_score + 0.1)
+        
+        # Check for terminal-specific commands
+        terminal = env_vars.get('TERM', '')
+        if terminal and base_cmd in ['clear', 'reset', 'tput', 'screen', 'tmux']:
+            env_score = min(1.0, env_score + 0.1)
+        
+        # Check for path-related commands with PATH variable
+        if base_cmd in ['which', 'whereis', 'type', 'command'] and 'PATH' in env_vars:
+            env_score = min(1.0, env_score + 0.1)
+        
+        # Check for user-related commands with USER variable
+        if base_cmd in ['id', 'whoami', 'su', 'sudo'] and 'USER' in env_vars:
+            env_score = min(1.0, env_score + 0.1)
+        
+        # Check for locale-related commands with LANG variable
+        if base_cmd in ['locale', 'iconv', 'date', 'cal'] and 'LANG' in env_vars:
+            env_score = min(1.0, env_score + 0.1)
+        
+        # Check for disk usage commands - specifically relevant to the example error
+        if base_cmd in ['df', 'du', 'ncdu', 'disk-usage']:
+            env_score = min(1.0, env_score + 0.15) # Higher boost for disk commands
+        
+        # Check for active processes relevance
+        for process in current_state.active_processes:
+            # If command is related to an active process
+            if (base_cmd in ['ps', 'top', 'htop', 'kill', 'pkill'] and 
+                process in command_analysis.args):
+                env_score = min(1.0, env_score + 0.1)
+        
+        # Ensure score is in valid range
+        return min(1.0, max(0.3, env_score))
+
+
+
+
+
     def _check_project_relevance(
         self, 
         command_analysis: CommandAnalysis, 
@@ -2688,12 +2774,43 @@ class ConfidenceScorer:
             preference_score = max(0.4, preference_score - 0.05)
         
         # Check active session entities
-        session_entities = session_manager.get_recent_entities(entity_type="file", limit=5)
-        for entity_id, entity_data in session_entities.items():
-            # Check if file is referenced in command
-            if entity_id in command:
-                preference_score = min(1.0, preference_score + 0.1)
-                break
+        session_data = session_manager.get_context() # Get the full session context dictionary
+        all_session_entities = session_data.get("entities", {}) # Get the entities dictionary
+        
+        # Filter for file entities and sort by creation time (most recent first)
+        file_entities_from_session = []
+        for entity_name, entity_details_dict in all_session_entities.items():
+            if isinstance(entity_details_dict, dict) and entity_details_dict.get("type") == "file":
+                try:
+                    # 'created' is an ISO format string, convert to datetime for sorting
+                    created_dt = datetime.fromisoformat(entity_details_dict.get("created", "1970-01-01T00:00:00"))
+                    file_entities_from_session.append(
+                        {
+                            "name": entity_name, # This is often like "file:filename.txt"
+                            "value": entity_details_dict.get("value"), # This is the actual path
+                            "created": created_dt
+                        }
+                    )
+                except ValueError:
+                    self._logger.warning(f"Could not parse 'created' timestamp for session entity: {entity_name}")
+        
+        # Sort by 'created' timestamp, descending (most recent first)
+        file_entities_from_session.sort(key=lambda x: x["created"], reverse=True)
+        
+        # Take the top 'limit' (e.g., 5)
+        limit = 5
+        recent_file_session_entities = file_entities_from_session[:limit]
+
+        for entity_info in recent_file_session_entities:
+            entity_path_str = entity_info.get("value") # The 'value' field holds the path
+            if entity_path_str:
+                # Check if the path string (or just its filename part) is in the command
+                entity_filename = Path(entity_path_str).name
+                if entity_path_str in command or entity_filename in command:
+                    preference_score = min(1.0, preference_score + 0.1)
+                    # Consider breaking if one match is enough, or continue to score multiple matches
+                    # For now, let's break after the first relevant match from recent session files.
+                    break 
         
         return preference_score
     

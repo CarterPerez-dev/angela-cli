@@ -136,8 +136,6 @@ class PreferencesManager:
         # Extract ONLY the base command (first word)
         base_command = command.split()[0] if command.split() else command
         
-        # Print debug info
-        print(f"DEBUG: Extracted base command '{base_command}' from full command")
         
         # Check if already in list to avoid duplicates
         if base_command not in self._prefs.trust.trusted_commands:
