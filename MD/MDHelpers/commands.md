@@ -1,160 +1,280 @@
+Okay, this is a great way to systematically test Angela CLI! I'll provide a list of commands progressing from basic to more complex, along with three key files involved in making each command work.
 
-**I. Basic Interaction & Context Awareness:**
+Please note:
+*   "Key files" are a simplification. Real execution paths can be more intricate. I'll focus on the command definition, primary processing, and core logic.
+*   `orchestrator.py` is central to many `angela request "..."` commands. I'll specify the main functions involved.
+*   For CLI subcommands (e.g., `angela files ls`), the flow often goes from the Typer app definition to an API layer or directly to the component.
 
-1.  **`Angela, what is the current directory?`**
-    *   *Tests:* Basic NLU, context awareness (PWD).
-2.  **`Angela, identify the project root.`**
-    *   *Tests:* Project root detection (.git, etc.).
-3.  **`Angela, what type of project is this?`**
-    *   *Tests:* Project type inference (Python, Node.js, etc.).
-4.  **`Angela, show me your version.`**
-    *   *Tests:* Basic command execution, version information retrieval.
-5.  **`Angela, explain the `grep` command.`**
-    *   *Tests:* NLU for meta-queries, potential knowledge base or help invocation.
+Here's a list of commands to test Angela CLI, working your way up:
 
-**II. File System Operations:**
+**Level 1: Basic CLI & Info**
 
-6.  **`Angela, create a new directory named 'docs/images'.`**
-    *   *Tests:* File system interaction (mkdir -p), path handling.
-7.  **`Angela, list all Python files in the 'src' folder.`**
-    *   *Tests:* File system interaction (find/ls), filtering, path handling.
-8.  **`Angela, create a file named 'config.yaml' in the project root with the content 'debug: true'.`**
-    *   *Tests:* File creation, content writing, project root context.
-9.  **`Angela, show me the content of 'README.md'.`**
-    *   *Tests:* File reading, console output.
-10. **`Angela, delete all files ending with '.tmp' in the current directory.`**
-    *   *Tests:* File deletion, pattern matching, confirmation (if implemented).
-11. **`Angela, rename 'old_feature.py' to 'new_feature.py' in the 'services' module.`**
-    *   *Tests:* File renaming, path resolution within project context.
+1.  `angela --version`
+    *   `__main__.py` (Entry point, calls `init_application`)
+    *   `components/cli/main.py` (Typer app definition, `version_callback`)
+    *   `__init__.py` (Contains `__version__`)
+2.  `angela --help`
+    *   `__main__.py` (Entry point)
+    *   `components/cli/main.py` (Typer app definition, Typer handles help)
+    *   `api/cli.py` (Registers sub-apps, contributing to help text)
+3.  `angela init`
+    *   `components/cli/main.py` (Typer app definition for `init`)
+    *   `orchestrator.py` (Likely a simple passthrough or direct call for `init`)
+    *   `config.py` (Handles configuration loading/saving)
+4.  `angela status`
+    *   `components/cli/main.py` (Typer app definition for `status`)
+    *   `orchestrator.py` (Likely a simple passthrough or direct call for `status`)
+    *   `components/context/manager.py` (Provides context for status)
 
-**III. Version Control (Git Integration):**
+**Level 2: Simple Natural Language Requests (Command Suggestion & Execution)**
 
-12. **`Angela, what is the current git status?`**
-    *   *Tests:* Git integration, command execution, output parsing.
-13. **`Angela, show me the differences in the last commit.`**
-    *   *Tests:* Git integration (`git show` or `git diff HEAD^ HEAD`).
-14. **`Angela, create a new git branch named 'feature/user-profile'.`**
-    *   *Tests:* Git branch creation.
-15. **`Angela, commit all staged changes with the message "Refactor: Improved logging utility".`**
-    *   *Tests:* Git commit, argument handling (commit message).
-16. **`Angela, switch to the 'develop' branch.`**
-    *   *Tests:* Git checkout.
+5.  `angela request "list files in current directory"`
+    *   `components/cli/main.py` (Defines `request` command)
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/ai/client.py` (Or `prompts.py` / `parser.py` for AI interaction)
+6.  `angela request "show disk usage"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/ai/prompts.py` (For building the prompt to the AI)
+7.  `angela request "what is my current directory"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/ai/parser.py` (For parsing the AI's response)
+8.  `angela request "create a new directory called my_project"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/execution/engine.py` (If executed, or `safety/confirmation.py` if confirmation needed)
+9.  `angela request "touch a file named example.txt"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/execution/adaptive_engine.py` (Handles confirmation and execution flow)
+10. `angela request "find all python files here" --suggest-only`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion` - `execute` flag will be false)
+    *   `components/shell/formatter.py` (For displaying the suggestion)
 
-**IV. Container Management (Docker Integration):**
+**Level 3: File Operations (CLI Subcommands)**
 
-17. **`Angela, list all running docker containers.`**
-    *   *Tests:* Docker integration (`docker ps`), output parsing.
-18. **`Angela, show the logs for the 'webserver' docker container.`**
-    *   *Tests:* Docker logs, container identification.
-19. **`Angela, restart the 'database' docker container.`**
-    *   *Tests:* Docker restart.
-20. **`Angela, build the docker image in the current directory and tag it as 'my-app:latest'.`**
-    *   *Tests:* Docker build, argument/option handling.
+11. `angela files ls`
+    *   `components/cli/files.py` (Typer app definition for `ls`)
+    *   `api/cli.py` (Registers `files_app` to main app)
+    *   `components/context/manager.py` (`get_directory_contents`)
+12. `angela files mkdir test_cli_dir`
+    *   `components/cli/files.py` (Typer app definition for `mkdir`)
+    *   `api/cli.py`
+    *   `components/execution/filesystem.py` (`create_directory` via `api/execution.py`)
+13. `angela files cat README.md` (assuming README.md exists)
+    *   `components/cli/files.py` (Typer app definition for `cat`)
+    *   `api/cli.py`
+    *   `components/execution/filesystem.py` (`read_file` via `api/execution.py`)
+14. `angela files write new_file.txt --content "Hello Angela"`
+    *   `components/cli/files.py` (Typer app definition for `write`)
+    *   `api/cli.py`
+    *   `components/execution/filesystem.py` (`write_file` via `api/execution.py`)
+15. `angela files rm new_file.txt --force` (use with caution)
+    *   `components/cli/files.py` (Typer app definition for `rm`)
+    *   `api/cli.py`
+    *   `components/execution/filesystem.py` (`delete_file` via `api/execution.py`)
+16. `angela files info .`
+    *   `components/cli/files.py` (Typer app definition for `info`)
+    *   `api/cli.py`
+    *   `components/context/manager.py` (`get_file_info`)
+17. `angela files find "*.py"`
+    *   `components/cli/files.py` (Typer app definition for `find`)
+    *   `api/cli.py`
+    *   `components/context/manager.py` (`find_files`)
 
-**V. Code Generation & Manipulation (Early Stages):**
+**Level 4: Context-Aware Requests** (Assumes you are in a Git Python project)
 
-21. **`Angela, generate a Python function in 'utils.py' that calculates the factorial of a number.`**
-    *   *Tests:* Basic code generation, file targeting, understanding of programming constructs.
-22. **`Angela, create a new Python file 'models.py' with a User class having 'id', 'username', and 'email' attributes.`**
-    *   *Tests:* File creation, class structure generation.
-23. **`Angela, in 'main.py', add a placeholder comment '# TODO: Implement error handling' before the main function.`**
-    *   *Tests:* Simple content manipulation, code structure awareness.
+18. `angela request "what is my current git branch"` (inside a git repo)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`, context passed to `build_prompt`)
+    *   `components/context/manager.py` (Provides CWD, project root/type)
+19. `angela request "show me python files modified recently"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `_get_ai_suggestion`)
+    *   `components/context/file_activity.py` (Accessed via `api/context.py` for recent files)
+20. `angela files resolve README.md --scope project` (inside a project)
+    *   `components/cli/files_extensions.py` (Defines `resolve` command)
+    *   `api/cli.py` (Registers the files app)
+    *   `components/context/file_resolver.py` (`resolve_reference` via `api/context.py`)
+21. `angela files recent`
+    *   `components/cli/files_extensions.py` (Defines `recent` command)
+    *   `api/cli.py`
+    *   `components/context/file_activity.py` (`get_recent_activities` via `api/context.py`)
 
-**VI. Multi-Step Intentions & Workflow (Early Stages):**
+**Level 5: Safety Features**
 
-24. **`Angela, create a new Python project named 'my_new_lib', initialize git, and create a 'setup.py' and a 'README.md'.`**
-    *   *Tests:* Multi-step task decomposition (directory creation, git init, file creation).
-25. **`Angela, create a feature branch 'docs-update', add a file 'CONTRIBUTING.md', and stage it.`**
-    *   *Tests:* Git operations + file operations sequence.
+22. `angela request "delete all .tmp files"` (will trigger confirmation)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `execute_command`)
+    *   `components/safety/adaptive_confirmation.py` (Via `api/safety.py` for `get_adaptive_confirmation`)
+23. `angela request "sudo rm -rf /" --force` (SHOULD BE BLOCKED BY VALIDATOR)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, then `adaptive_engine.execute_command`)
+    *   `components/safety/validator.py` (`validate_command_safety` via `api/safety.py`)
+24. `angela request "show me the contents of /etc/passwd"` (might trigger higher risk)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`)
+    *   `components/safety/classifier.py` (`classify` via `api/safety.py`)
+25. `angela request "run rm -rf test_cli_dir"` (after creating it, then trust it)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_command_request`, `adaptive_engine.execute_command`)
+    *   `components/safety/adaptive_confirmation.py` (`offer_command_learning` after successful execution and confirmation)
 
-**VII. Universal CLI Translation (Early Stages):**
+**Level 6: Multi-Step Operations**
 
-26. **`Angela, how do I list all files larger than 10MB in the current directory using the shell?`**
-    *   *Tests:* NLU to shell command translation (e.g., `find . -size +10M`).
-27. **`Angela, use the 'aws' tool to list my S3 buckets.`**
-    *   *Tests:* Specific tool invocation, parameter mapping (even if just `--help` based initially).
+26. `angela request "create a directory logs and then create a file app.log inside it"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `MULTI_STEP`, `_process_multi_step_request`)
+    *   `components/intent/planner.py` (`plan_task` via `api/intent.py`)
+27. `angela request "list python files and then count them"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `MULTI_STEP`, `_process_multi_step_request`)
+    *   `components/intent/enhanced_task_planner.py` (If complexity is high, via `api/intent.py`)
+28. `angela request "git add all files and then commit with message 'updates'"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `MULTI_STEP`, `_process_multi_step_request`)
+    *   `components/execution/rollback.py` (If `transaction_id` is created by orchestrator, via `api/execution.py`)
 
-**VIII. Contextual Dependency Management (Early Stages):**
+**Level 7: Workflow Management**
 
-28. **`Angela, add 'requests' to my Python project's dependencies.`**
-    *   *Tests:* Project type context, package manager interaction (`pip install requests`, update `requirements.txt`).
-29. **`Angela, install the 'lodash' package for this Node.js project.`**
-    *   *Tests:* Project type context, package manager interaction (`npm install lodash` or `yarn add lodash`, update `package.json`).
+29. `angela workflows create my_workflow --description "Lists files and counts them"` (then enter steps interactively)
+    *   `components/cli/workflows.py` (Typer app for `create`)
+    *   `api/cli.py`
+    *   `components/workflows/manager.py` (`define_workflow` via `api/workflows.py`)
+30. `angela workflows list`
+    *   `components/cli/workflows.py`
+    *   `api/cli.py`
+    *   `components/workflows/manager.py` (`list_workflows`)
+31. `angela workflows run my_workflow`
+    *   `components/cli/workflows.py`
+    *   `api/cli.py`
+    *   `components/workflows/manager.py` (`execute_workflow`)
+32. `angela workflows export my_workflow --output my_workflow_export.zip`
+    *   `components/cli/workflows.py`
+    *   `api/cli.py`
+    *   `components/workflows/sharing.py` (`export_workflow` via `api/workflows.py`)
+33. `angela workflows import my_workflow_export.zip --rename imported_workflow`
+    *   `components/cli/workflows.py`
+    *   `api/cli.py`
+    *   `components/workflows/sharing.py` (`import_workflow`)
+34. `angela workflows delete imported_workflow --force`
+    *   `components/cli/workflows.py`
+    *   `api/cli.py`
+    *   `components/workflows/manager.py` (`delete_workflow`)
 
-**IX. Testing Help and Error Handling:**
+**Level 8: Code Generation (Simple)**
 
-30. **`Angela, help me with the 'docker run' command.`**
-    *   *Tests:* Invoking help for a specific external tool.
-31. **`Angela, what went wrong with my last command?`** (Assuming some basic error logging/recall)
-    *   *Tests:* Error context recall, basic diagnostic capability.
+35. `angela request "generate a python script that prints hello world"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `CODE_GENERATION`, `_process_code_generation_request`)
+    *   `components/generation/engine.py` (`generate_project` or similar method via `api/generation.py`)
+36. `angela request "create a simple html file with a title 'My Page'"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_code_generation_request`)
+    *   `components/generation/planner.py` (If planning is involved via `api/generation.py`)
 
----
-Okay, here are 50 commands and natural language scenarios to test out Angela, designed to cover a wide range of its capabilities:
+**Level 9: Toolchain Integration**
 
-**Core `angela request` (Natural Language Focus):**
+37. `angela request "initialize a git repository here"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `TOOLCHAIN_OPERATION`, `_process_toolchain_operation`, `_process_git_operation`)
+    *   `components/toolchain/git.py` (`init_repository` via `api/toolchain.py`)
+38. `angela request "show me running docker containers"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_toolchain_operation`, `_process_docker_operation`)
+    *   `components/toolchain/docker.py` (`list_containers` via `api/toolchain.py`)
+39. `angela docker ps` (CLI subcommand for Docker)
+    *   `components/cli/docker.py` (Typer app for `ps`)
+    *   `api/cli.py`
+    *   `components/toolchain/docker.py` (`list_containers`)
+40. `angela docker generate-dockerfile .` (for a Python project)
+    *   `components/cli/docker.py`
+    *   `api/cli.py`
+    *   `components/toolchain/docker.py` (`generate_dockerfile`)
+41. `angela request "install flask using pip"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_toolchain_operation`, `_process_package_operation`)
+    *   `components/toolchain/package_managers.py` (`install_dependencies` via `api/toolchain.py`)
+42. `angela request "use git to show current branch"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `UNIVERSAL_CLI`, `_process_universal_cli_request`)
+    *   `components/toolchain/universal_cli.py` (`translate_request` via `api/toolchain.py`)
 
-1.  "angela list all files in the current directory, including hidden ones"
-2.  "angela what's the git status of this project? I want a summary."
-3.  "angela find all python files in `src/` modified in the last 2 days"
-4.  "angela create a new directory called 'temp_project' and then a file 'notes.txt' inside it with the content 'Initial notes.'"
-5.  "angela show me the disk usage for my home folder in a human-readable format"
-6.  "angela search for 'TODO: Refactor' in all `*.py` files within the 'lib' directory."
-7.  "angela suggest a command to compress the 'archive_data' folder into a tar.gz file named 'backup.tar.gz'"
-8.  "angela how do I check my current python version and where is it installed?"
-9.  "angela what are the main dependencies of this Node.js project?"
-10. "angela I want to delete all `.log` files in the `logs` directory, but show me what you'd do first."
-11. "angela explain the 'process_data' function in 'parser.py'"
-12. "angela what other functions call 'get_user_details' in my project?"
+**Level 10: Advanced Code Generation & Refinement**
 
-**File Operations (`angela files ...` and Natural Language Equivalents):**
+43. `angela generate create-project "a simple flask web app with a homepage"`
+    *   `components/cli/generation.py` (Typer app for `create-project`)
+    *   `api/cli.py`
+    *   `components/generation/engine.py` (`generate_project`)
+44. `angela generate add-feature "add a /about page to my flask app" --project-dir ./my_flask_app` (assuming `my_flask_app` exists)
+    *   `components/cli/generation.py` (Typer app for `add-feature`)
+    *   `api/cli.py`
+    *   `components/generation/engine.py` (`add_feature_to_project`)
+45. `angela generate refine-code "make this function more readable" ./my_flask_app/app.py --apply`
+    *   `components/cli/generation.py` (Typer app for `refine-code`)
+    *   `api/cli.py`
+    *   `components/review/feedback.py` (`process_feedback`, `apply_refinements` via `api/review.py`)
+46. `angela request "generate a django project for a blog"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_code_generation_request`)
+    *   `components/generation/frameworks.py` (`generate_framework_structure` or similar via `api/generation.py`)
+47. `angela generate create-framework-project django "a blog platform"`
+    *   `components/cli/generation.py`
+    *   `api/cli.py`
+    *   `components/generation/frameworks.py` (`generate_framework_structure`)
+48. `angela generate create-complex-project "a web app with user auth, posts, and comments using Python and Flask"`
+    *   `components/cli/generation.py`
+    *   `api/cli.py`
+    *   `components/generation/engine.py` (`generate_complex_project`)
 
-13. `angela files ls --all --long ./docs`
-14. "angela make a new folder structure 'data/raw/images' for me"
-15. `angela files rmdir old_project_files --recursive --force`
-16. "angela display the 'config.yaml' file with syntax highlighting"
-17. `angela files cp ./src/main.py ./backup/main_v2.py --force`
-18. "angela append 'new log entry' to 'application.log'"
-19. `angela files find "*.md" --path ./documentation --hidden`
-20. "angela give me detailed info about 'README.md' and show me the first 20 lines"
-21. `angela files resolve "the main configuration file for the API"`
-22. `angela files recent --limit 3 --type created`
-23. `angela files project`
+**Level 11: Complex Workflows & Pipelines**
 
-**Docker Operations (`angela docker ...` and Natural Language Equivalents):**
+49. `angela request "setup a CI/CD pipeline for my python project on GitHub Actions"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `CI_CD_PIPELINE`, `_process_ci_cd_pipeline_request`)
+    *   `components/toolchain/ci_cd.py` (`create_complete_pipeline` via `api/toolchain.py`)
+50. `angela request "create a workflow to build my docker image, tag it, and push to docker hub"`
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `COMPLEX_WORKFLOW`, `_process_complex_workflow_request`)
+    *   `components/toolchain/cross_tool_workflow_engine.py` (`create_workflow` via `api/toolchain.py`)
+51. `angela generate generate-ci github_actions .` (in a project directory)
+    *   `components/cli/generation.py`
+    *   `api/cli.py`
+    *   `components/toolchain/ci_cd.py` (`generate_ci_configuration`)
+52. `angela request "analyze the architecture of this project"` (in a project directory)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_determine_request_type` -> `CODE_ARCHITECTURE`, `_process_code_architecture_request`)
+    *   `components/generation/architecture.py` (`analyze_project_architecture` via `api/generation.py`)
 
-24. `angela docker status`
-25. "angela list all docker containers, even stopped ones, but just show their IDs"
-26. `angela docker logs my_api_container --follow --tail 50 --timestamps`
-27. "angela start the docker container named 'postgres_db_server'"
-28. `angela docker rmi old_app_image:v1.0 --force`
-29. "angela build a docker image from the current directory, tag it 'web-app:latest', and don't use cache"
-30. `angela docker run -p 3000:80 -v $(pwd)/public:/usr/share/nginx/html --name my-nginx-instance nginx:alpine --rm`
-31. "angela bring up my docker-compose setup in detached mode, rebuilding images if necessary"
-32. `angela docker generate-dockerfile . --output Dockerfile.prod --overwrite`
-33. `angela docker setup . --no-compose --build`
+**Level 12: Rollback & Monitoring** (Monitoring is harder to test with single commands)
 
-**Code Generation (`angela generate ...` and Natural Language Equivalents):**
+53. `angela files mkdir new_dir_for_rollback`
+    *   (Covered before)
+54. `angela files rmdir new_dir_for_rollback`
+    *   (Covered before)
+55. `angela rollback list`
+    *   `components/execution/rollback_commands.py` (Typer app for `list`)
+    *   `api/cli.py`
+    *   `components/execution/rollback.py` (`get_recent_operations` via `api/execution.py`)
+56. `angela rollback operation <ID_FROM_LIST>` (replace with an actual ID)
+    *   `components/execution/rollback_commands.py`
+    *   `api/cli.py`
+    *   `components/execution/rollback.py` (`rollback_operation`)
+57. `angela request "create a file temp.txt then delete it" --force` (to generate a transaction)
+    *   (Covered by multi-step, but with `--force` to ensure it runs)
+58. `angela rollback list --transactions`
+    *   `components/execution/rollback_commands.py`
+    *   `api/cli.py`
+    *   `components/execution/rollback.py` (`get_recent_transactions`)
+59. `angela rollback transaction <TX_ID_FROM_LIST>` (replace with an actual transaction ID)
+    *   `components/execution/rollback_commands.py`
+    *   `api/cli.py`
+    *   `components/execution/rollback.py` (`rollback_transaction`)
+60. `angela request "show me logs for container my_app"` (assuming `my_app` container exists)
+    *   `components/cli/main.py`
+    *   `orchestrator.py` (`process_request`, `_process_toolchain_operation`, `_process_docker_operation`)
+    *   `components/toolchain/docker.py` (`get_container_logs`)
 
-34. "angela create a new Python Flask project for a simple URL shortener, initialize git, and set up basic tests"
-35. `angela generate add-feature "implement user profile page with edit functionality" --project_dir ./my-webapp --branch feature/user-profile --generate_tests --auto_commit`
-36. "angela refine the 'data_processing.py' file. The 'parse_csv' function is too slow and lacks proper error handling. Apply the changes and create a backup."
-37. `angela generate generate-ci gitlab_ci --project_dir ./my-monorepo --project_type node`
-38. "angela create a complex project: a microservices-based e-commerce platform with a React frontend, Python (FastAPI) backend for orders, and a Go backend for inventory. Use detailed planning."
-39. `angela generate create-framework-project spring "A REST API for managing book inventory" --output_dir my_book_api --with_auth --install_deps`
-40. `angela generate generate-tests --project_dir ./my-rust-lib --test_framework cargo-test --focus "src/utils/*.rs"`
-
-**Rollback & Workflow Operations (`angela rollback ...`, `angela workflows ...`):**
-
-41. `angela rollback list --limit 5 --transactions`
-42. "angela undo the last file deletion I did"
-43. `angela workflows create backup_logs --description "Backup all .log files to archive folder"` (This will likely be interactive to define steps)
-44. "angela run the 'deploy_staging' workflow and set the version to 'v1.2.3'"
-45. `angela workflows export deploy_staging --output ./deploy_staging_workflow.zip`
-
-**Other Commands & Scenarios:**
-
-46. `angela init` (Test initialization, especially if config is missing/corrupt)
-47. `angela status` (Check overall system status and integrations)
-48. `angela shell` (Then type a few commands like `list files in /tmp` or `what is the current git branch?`)
-49. "angela I want to create a file named 'test.txt' and then another one called 'test.txt'. What happens?" (Tests error handling or overwrite logic for file creation)
-50. "angela I need to find a document about 'API rate limits' or maybe it was 'throttling', it's a markdown file in the 'docs' or 'wiki' folder." (Tests ambiguous file reference and content search)
+This list should give you a solid progression for testing. Remember to adapt file names and specific arguments to your actual test setup. Good luck!
