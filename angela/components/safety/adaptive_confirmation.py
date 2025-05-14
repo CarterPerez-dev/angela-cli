@@ -31,8 +31,8 @@ RISK_COLORS = {
 }
 
 async def get_adaptive_confirmation(
-    command: str, 
-    risk_level: int, 
+    command: str,
+    risk_level: int,
     risk_reason: str,
     impact: Dict[str, Any],
     preview: Optional[str] = None,
@@ -46,55 +46,64 @@ async def get_adaptive_confirmation(
 
     preferences_manager = get_preferences_manager()
     history_manager = get_history_manager()
-    
-    # Extract base command for consistent comparison
     base_command = command.split()[0] if command.split() else ""
-    
-    # CRITICAL FIX: Check trusted commands first thing
+
+
+    can_auto_proceed = False
     if base_command and base_command in preferences_manager.preferences.trust.trusted_commands:
-        logger.debug(f"Command '{base_command}' is in trusted list - auto-executing")
-        await _show_auto_execution_notice(command, risk_level, preview)
-        return True
-    
-    # Check if auto-execution is enabled for this risk level
-    if preferences_manager.should_auto_execute(risk_level, command):
-        # Only for frequently used commands with high success rate
+        can_auto_proceed = True
+        logger.debug(f"Command '{base_command}' is in trusted list.")
+        
+    elif preferences_manager.should_auto_execute(risk_level, command): 
         frequency = history_manager.get_command_frequency(base_command)
         success_rate = history_manager.get_command_success_rate(base_command)
         
         if frequency >= 5 and success_rate > 0.8:
-            logger.info(f"Auto-executing high trust command: {command}")
-            await _show_auto_execution_notice(command, risk_level, preview)
-            return True
-    
-    # Rest of the function remains the same...
-    # Skip confirmation for dry runs
+            can_auto_proceed = True
+            logger.info(f"Auto-proceeding with high trust command (history/success): {command}")
+
+    if can_auto_proceed:
+        await _show_auto_execution_notice(command, risk_level, preview, dry_run=dry_run)
+        return True
+
+
     if dry_run:
-        # (existing code)
-    
-    # For all other cases, get explicit confirmation
-        risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    
-    # For high-risk operations, use a more detailed confirmation dialog
+        from angela.api.shell import get_terminal_formatter 
+        terminal_formatter = get_terminal_formatter()
+
+        await terminal_formatter.display_pre_confirmation_info(
+            command=command, risk_level=risk_level, risk_reason=risk_reason,
+            impact=impact, explanation=explanation, preview=preview,
+            confidence_score=confidence_score
+        )
+        console.print(Panel(
+            "[bold blue]This is a dry run. No changes will be made.[/bold blue]\n"
+            "Angela will simulate the command execution.",
+            border_style="blue", expand=False
+        ))
+
+        return await terminal_formatter.display_inline_confirmation("Proceed with dry run simulation?")
+
+
     if risk_level >= RISK_LEVELS["HIGH"]:
         return await _get_detailed_confirmation(
             command, risk_level, risk_reason, impact, preview, explanation, confidence_score
         )
     
-    # For medium and lower risk operations, use a simpler confirmation
     return await _get_simple_confirmation(
         command, risk_level, risk_reason, preview, explanation, confidence_score
     )
 
+
 async def _show_auto_execution_notice(
-    command: str, 
+    command: str,
     risk_level: int,
-    preview: Optional[str]
+    preview: Optional[str],
+    dry_run: bool = False  
 ) -> None:
     """Show a notice for auto-execution."""
-    # Get terminal formatter from API to display the notice
     from angela.api.shell import display_auto_execution_notice
-    await display_auto_execution_notice(command, risk_level, preview)
+    await display_auto_execution_notice(command, risk_level, preview, dry_run=dry_run)
 
 async def _get_simple_confirmation(
     command: str, 

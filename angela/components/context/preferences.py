@@ -10,7 +10,7 @@ from angela.config import config_manager
 from angela.constants import RISK_LEVELS
 from angela.utils.logging import get_logger
 
-logger = get_logger(__name__)
+
 
 # Update in angela/components/context/preferences.py
 class TrustPreferences(BaseModel):
@@ -52,7 +52,9 @@ class PreferencesManager:
         """Initialize the preferences manager."""
         self._prefs = UserPreferences()
         self._prefs_file = config_manager.CONFIG_DIR / "preferences.json"
+        self._logger = get_logger(self.__class__.__name__)
         self._load_preferences()
+
     
     def _load_preferences(self) -> None:
         """Load preferences from file."""
@@ -61,21 +63,21 @@ class PreferencesManager:
                 with open(self._prefs_file, "r") as f:
                     data = json.load(f)
                     self._prefs = UserPreferences.parse_obj(data)
-                logger.debug(f"Loaded preferences from {self._prefs_file}")
+                self._logger.debug(f"Loaded preferences from {self._prefs_file}")
             else:
-                logger.debug("No preferences file found, using defaults")
+                self._logger.debug("No preferences file found, using defaults")
                 self._save_preferences()  # Create the file with defaults
         except Exception as e:
-            logger.error(f"Error loading preferences: {e}")
+            self._logger.error(f"Error loading preferences: {e}")
     
     def _save_preferences(self) -> None:
         """Save preferences to file."""
         try:
             with open(self._prefs_file, "w") as f:
                 json.dump(self._prefs.dict(), f, indent=2)
-            logger.debug(f"Saved preferences to {self._prefs_file}")
+            self._logger.debug(f"Saved preferences to {self._prefs_file}")
         except Exception as e:
-            logger.error(f"Error saving preferences: {e}")
+            self._logger.error(f"Error saving preferences: {e}")
     
     def update_preferences(self, **kwargs) -> None:
         """Update preferences with provided values."""

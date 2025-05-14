@@ -1085,7 +1085,8 @@ class TerminalFormatter:
         self,
         command: str, 
         risk_level: int,
-        preview: Optional[str]
+        preview: Optional[str],
+        dry_run: bool = False
     ) -> None:
         """
         Show a notice for auto-execution with enhanced styling.
@@ -1130,26 +1131,27 @@ class TerminalFormatter:
                 expand=False
             ))
         
-        # Create the loading task with your spinner styling
-        loading_task = asyncio.create_task(
-            self.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
-        )
-        
-        try:
-            # Wait a minimum amount of time for visual feedback
-            await asyncio.sleep(0.5)
-            
-            # Now we're ready to continue, cancel the loading task
-            loading_task.cancel()
+        if not dry_run: 
+            loading_task = asyncio.create_task(
+                self.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
+            )
+
             try:
-                await loading_task
-            except asyncio.CancelledError:
-                pass  # Expected
-        except Exception as e:
-            logger.error(f"Error managing loading display: {str(e)}")
-            # Ensure the task is cancelled
-            if not loading_task.done():
+                # Wait a minimum amount of time for visual feedback
+                await asyncio.sleep(0.5)
+
+                # Now we're ready to continue, cancel the loading task
                 loading_task.cancel()
+                try:
+                    await loading_task
+                except asyncio.CancelledError:
+                    pass  # Expected
+            except Exception as e:
+                logger.error(f"Error managing loading display: {str(e)}")
+                # Ensure the task is cancelled
+                if not loading_task.done():
+                    loading_task.cancel()
+        
     
     async def display_command_preview(
         self,
