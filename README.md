@@ -49,7 +49,7 @@
 -------------
 
 
-![Angela CLI Refactoring Flow ERD Style](./assets/flowchart.svg) 
+![Angela CLI Refactoring Flow ERD Style](https://github.com/CarterPerez-dev/angela-cli/blob/main/MD/assets/flow.svg) 
 
 
 
