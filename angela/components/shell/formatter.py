@@ -746,6 +746,18 @@ class TerminalFormatter:
         Returns:
             Tuple of (stdout, stderr, return_code, execution_time)
         """
+        from angela.utils.command_utils import is_interactive_command, display_command_recommendation
+        
+        is_interactive, base_cmd = is_interactive_command(command)
+        if is_interactive:
+            # Display recommendation for interactive commands
+            display_command_recommendation(command)
+            
+            # Return dummy result without execution
+            execution_time = 0.1
+            return ("", "", 0, execution_time)        
+        
+        
         import random
         import time
         import asyncio
@@ -761,6 +773,60 @@ class TerminalFormatter:
         if hasattr(self, '_current_spinner_choice'):
             delattr(self, '_current_spinner_choice')
         
+        # Check if this is an interactive command that should be recommended instead of executed
+        interactive_commands = [
+            "vim", "vi", "nano", "emacs", "pico", "less", "more", 
+            "top", "htop", "btop", "iotop", "iftop", "nmon", "glances", "atop",
+            "ping", "traceroute", "mtr", "tcpdump", "wireshark", "tshark", "ngrep",
+            "tail", "watch", "journalctl", "dmesg", "ssh", "telnet", "nc", "netcat",
+            "mysql", "psql", "sqlite3", "mongo", "redis-cli", "gdb", "lldb", "pdb",
+            "tmux", "screen"
+        ]
+        
+        base_cmd = command.split()[0] if command.split() else ""
+        should_recommend = base_cmd in interactive_commands
+        
+        # Special cases with flags
+        if not should_recommend:
+            if base_cmd == "ping" and "-c" not in command:
+                should_recommend = True
+            elif base_cmd == "tail" and "-f" in command:
+                should_recommend = True
+            elif base_cmd == "journalctl" and "-f" in command:
+                should_recommend = True
+        
+        if should_recommend:
+            # Provide a recommendation instead of execution for interactive commands
+            from rich.panel import Panel
+            
+            # Create a recommendation message
+            recommendation = f"""
+    [bold cyan]Interactive Command Detected:[/bold cyan]
+    
+    Angela cannot directly execute terminal-interactive commands like {base_cmd}.
+    You can run this command yourself by typing:
+    
+        [bold green]{command}[/bold green]
+    
+    This will launch {base_cmd} in your terminal.
+    """
+            
+            # Print the recommendation
+            self._console.print(Panel(
+                recommendation,
+                title="[bold cyan]Command Recommendation[/bold cyan]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                expand=False
+            ))
+            
+            # Return empty results as if the command was executed
+            execution_time = 0.1
+            return ("", "", 0, execution_time)
+        
+        # Normal execution for non-interactive commands (rest of the method)
+        
+        # Original implementation after this point...
         start_time = time.time()
         
         # Choose a random philosophy quote

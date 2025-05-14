@@ -41,22 +41,34 @@ class ExecutionEngine:
             return None
     
     async def execute_command(
-        self, 
+        self,
         command: str,
         check_safety: bool = True,
-        dry_run: bool = False
+        dry_run: bool = False,
+        working_dir: Optional[str] = None
     ) -> Tuple[str, str, int]:
         """
         Execute a shell command and return its output.
         
         Args:
-            command: The shell command to execute.
-            check_safety: Whether to perform safety checks before execution.
-            dry_run: Whether to simulate the command without actual execution.
+            command: The shell command to execute
+            check_safety: Whether to perform safety checks
+            dry_run: Whether to perform a dry run without execution
+            working_dir: Working directory for command execution
             
         Returns:
-            A tuple of (stdout, stderr, return_code).
+            Tuple of (stdout, stderr, exit_code)
         """
+        # Check for interactive commands first
+        from angela.utils.command_utils import is_interactive_command, display_command_recommendation
+        
+        is_interactive, base_cmd = is_interactive_command(command)
+        if is_interactive:
+            # Display recommendation for interactive commands
+            display_command_recommendation(command)
+            # Return dummy result without execution
+            return (f"Interactive command '{base_cmd}' not executed - please run manually", "", 0)
+            
         self._logger.info(f"Preparing to execute command: {command}")
         
         # If safety checks are requested, perform them

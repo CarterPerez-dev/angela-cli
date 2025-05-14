@@ -382,8 +382,6 @@ RISK_PATTERNS = {
         # Filesystem type
         (r"^(df|lsblk|blkid|findmnt)\b", "Filesystem information"),
         
-        # Basic shell built-ins
-        (r"^(alias|type|hash|true|false|test|[)\b", "Shell built-ins"),
         
         # Time-based commands
         (r"^time\s+", "Timing command execution"),

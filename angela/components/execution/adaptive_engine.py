@@ -41,6 +41,7 @@ class AdaptiveExecutionEngine:
             self._error_analyzer = get_error_analyzer()
         return self._error_analyzer
     
+    # In the execute_command method of AdaptiveExecutionEngine
     async def execute_command(
         self, 
         command: str,
@@ -60,6 +61,27 @@ class AdaptiveExecutionEngine:
         Returns:
             Dictionary with execution results
         """
+        # Add interactive command check near the beginning of the method
+        from angela.utils.command_utils import is_interactive_command, display_command_recommendation
+        
+        is_interactive, base_cmd = is_interactive_command(command)
+        if is_interactive and not dry_run:
+            # Display recommendation for interactive commands
+            display_command_recommendation(command)
+            
+            # Return result without execution
+            return {
+                "command": command,
+                "success": True,
+                "recommendation_only": True,
+                "stdout": f"Interactive command '{base_cmd}' not executed - please run manually",
+                "stderr": "",
+                "return_code": 0,
+                "execution_time": 0.1,
+                "dry_run": False
+            }
+        
+
         self._logger.info(f"Preparing to execute command: {command}")
         
         # Analyze command risk and impact
@@ -241,25 +263,8 @@ class AdaptiveExecutionEngine:
         self._logger.debug(f"Executing command '{command}' with interactive={is_special_interactive_cmd}")
         
         if is_special_interactive_cmd:
-            console.print(f"\n[dim]Running '{command}'... (Ctrl+C to stop if continuous)[/dim]")
-            start_exec_time = time.time()
-            
-            # Use terminal_formatter.display_execution_timer with interactive=True
-            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
-                command,
-                with_philosophy=True,
-                interactive=True  # Key change: Pass interactive=True
-            )
-            
-            return {
-                "command": command, 
-                "success": return_code == 0, 
-                "stdout": stdout,
-                "stderr": stderr, 
-                "return_code": return_code, 
-                "execution_time": execution_time, 
-                "dry_run": False
-            }
+            # NEW: Instead of executing, provide a recommendation for interactive commands
+            return await self._handle_interactive_command_recommendation(command)
         else:
             # Show execution spinner if enabled
             stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
@@ -281,6 +286,116 @@ class AdaptiveExecutionEngine:
                 "execution_time": execution_time, 
                 "dry_run": False
             }
+    
+    async def _handle_interactive_command_recommendation(
+        self, 
+        command: str, 
+        explanation: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Instead of executing interactive commands, provide recommendations to the user.
+        
+        Args:
+            command: The interactive command
+            explanation: Optional explanation of what the command does
+            
+        Returns:
+            Dictionary with recommendation results
+        """
+        base_cmd = command.split()[0] if command.split() else ""
+        
+        # Create a formatted recommendation
+        recommendation = f"""
+    [bold cyan]Interactive Command Detected:[/bold cyan]
+    
+    Angela doesn't directly execute terminal-interactive commands like {base_cmd}.
+    You can run this command yourself by typing:
+    
+        [bold green]{command}[/bold green]
+    
+    This will launch {base_cmd} in your terminal.
+    """
+    
+        if explanation:
+            recommendation += f"\n[italic]{explanation}[/italic]"
+        
+        # Print the recommendation
+        self._console.print(Panel(
+            recommendation,
+            title="[bold blue]Command Recommendation[/bold blue]",
+            border_style=COLOR_PALETTE["border"],
+            box=DEFAULT_BOX,
+            expand=False
+        ))
+        
+        # Return a success result but mark it as recommendation only
+        return {
+            "command": command,
+            "success": True,
+            "recommendation_only": True,
+            "stdout": f"Recommended command: {command}",
+            "stderr": "",
+            "return_code": 0
+        }
+
+    async def _handle_interactive_command_recommendation(
+        self, 
+        command: str, 
+        explanation: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Instead of executing interactive commands, provide recommendations to the user.
+        
+        Args:
+            command: The interactive command
+            explanation: Optional explanation of what the command does
+            
+        Returns:
+            Dictionary with recommendation results
+        """
+        # Get rich console
+        from rich.console import Console
+        from rich.panel import Panel
+        from angela.components.shell.formatter import COLOR_PALETTE, DEFAULT_BOX
+        console = Console()
+        
+        base_cmd = command.split()[0] if command.split() else ""
+        
+        # Create a formatted recommendation
+        recommendation = f"""
+    [bold cyan]Interactive Command Detected:[/bold cyan]
+    
+    Angela doesn't directly execute terminal-interactive commands like {base_cmd}.
+    You can run this command yourself by typing:
+    
+        [bold green]{command}[/bold green]
+    
+    This will launch {base_cmd} in your terminal.
+    """
+    
+        if explanation:
+            recommendation += f"\n[italic]{explanation}[/italic]"
+        
+        # Print the recommendation
+        console.print(Panel(
+            recommendation,
+            title="[bold blue]Command Recommendation[/bold blue]",
+            border_style=COLOR_PALETTE["border"],
+            box=DEFAULT_BOX,
+            expand=False
+        ))
+        
+        # Return a success result but mark it as recommendation only
+        return {
+            "command": command,
+            "success": True,
+            "recommendation_only": True,
+            "stdout": f"Recommended command: {command}",
+            "stderr": "",
+            "return_code": 0
+        }
+
+
 
 # Global adaptive execution engine instance
 adaptive_engine = AdaptiveExecutionEngine()

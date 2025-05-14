@@ -1899,7 +1899,7 @@ class Orchestrator:
                 
                 if is_special_interactive_cmd and not dry_run:
 
-                    console.print(f"\n[dim]Running '{suggestion.command}'... (Ctrl+C to stop if continuous)[/dim]")
+
                     start_exec_time = time.time()
                     stdout, stderr, return_code = await execution_engine.execute_command(
                         suggestion.command,
@@ -3972,6 +3972,7 @@ Include only the JSON object with no additional text.
         return result
     
 
+    # In Orchestrator class
     async def execute_command(
         self, 
         command: str,
@@ -3979,7 +3980,7 @@ Include only the JSON object with no additional text.
         explanation: Optional[str] = None,
         dry_run: bool = False
     ) -> Dict[str, Any]:
-        '''
+        """
         Execute a command with adaptive behavior based on user context.
         
         Args:
@@ -3990,7 +3991,28 @@ Include only the JSON object with no additional text.
             
         Returns:
             Dictionary with execution results
-        '''
+        """
+        # Add interactive command check near the beginning of the method
+        from angela.utils.command_utils import is_interactive_command, display_command_recommendation
+        
+        is_interactive, base_cmd = is_interactive_command(command)
+        if is_interactive and not dry_run:
+            # Display recommendation for interactive commands
+            display_command_recommendation(command)
+            
+            # Return result without execution
+            return {
+                "command": command,
+                "success": True,
+                "recommendation_only": True,
+                "stdout": f"Interactive command '{base_cmd}' not executed - please run manually",
+                "stderr": "",
+                "return_code": 0,
+                "execution_time": 0.1,
+                "dry_run": False
+            }
+        
+        # Rest of the original method...
         self._logger.info(f"Preparing to execute command: {command}")
         
         # Get current context for hooks
@@ -4372,6 +4394,7 @@ Include only the JSON object with no additional text.
         
         return confirmed
 
+    # In orchestrator.py, update the _execute_with_feedback method to add this check at the beginning
     async def _execute_with_feedback(self, command: str, dry_run: bool) -> Dict[str, Any]:
         """
         Execute a command with rich feedback, handling interactive commands.
@@ -4386,7 +4409,7 @@ Include only the JSON object with no additional text.
         # Get execution engine and terminal formatter through API
         execution_engine = get_execution_engine()
         terminal_formatter = get_terminal_formatter()
-    
+        
         # For dry runs, return the simulation directly
         if dry_run:
             stdout, stderr, return_code = await execution_engine.dry_run_command(command)
@@ -4394,80 +4417,69 @@ Include only the JSON object with no additional text.
                 "command": command, "success": True, "stdout": stdout,
                 "stderr": stderr, "return_code": return_code, "dry_run": True
             }
-    
-        # --- HANDLE INTERACTIVE/CONTINUOUS COMMANDS ---
-        interactive_continuous_commands = [
-            # Terminal-based editors and pagers
+        
+        # Check if this is an interactive command that should be recommended instead of executed
+        interactive_commands = [
             "vim", "vi", "nano", "emacs", "pico", "less", "more", 
-            # Interactive monitoring tools
             "top", "htop", "btop", "iotop", "iftop", "nmon", "glances", "atop",
-            # Networking tools with continuous output
             "ping", "traceroute", "mtr", "tcpdump", "wireshark", "tshark", "ngrep",
-            # File monitoring
-            "tail", "watch", 
-            # System logs
-            "journalctl", "dmesg",
-            # Remote sessions
-            "ssh", "telnet", "nc", "netcat",
-            # Database and interactive shells
-            "mysql", "psql", "sqlite3", "mongo", "redis-cli",
-            # Interactive debuggers
-            "gdb", "lldb", "pdb",
-            # Other interactive utilities
+            "tail", "watch", "journalctl", "dmesg", "ssh", "telnet", "nc", "netcat",
+            "mysql", "psql", "sqlite3", "mongo", "redis-cli", "gdb", "lldb", "pdb",
             "tmux", "screen"
         ]
         
-        base_cmd_to_execute = command.split()[0] if command.split() else ""
+        base_cmd = command.split()[0] if command.split() else ""
+        should_recommend = base_cmd in interactive_commands
         
-        # Enhanced detection for commands that should be interactive
-        is_special_interactive_cmd = False
-        if base_cmd_to_execute in interactive_continuous_commands:
-            # Standard interactive commands get automatic interactive mode
-            if base_cmd_to_execute in ["top", "htop", "btop", "vim", "vi", "nano", "emacs", 
-                                      "less", "more", "ssh", "mysql", "psql", "mongo",
-                                      "gdb", "lldb", "pdb", "tmux", "screen"]:
-                is_special_interactive_cmd = True
-            # Commands that are interactive only with certain flags
-            elif base_cmd_to_execute == "ping" and "-c" not in command:
-                is_special_interactive_cmd = True
-            elif base_cmd_to_execute == "tail" and "-f" in command:
-                is_special_interactive_cmd = True
-            elif base_cmd_to_execute == "journalctl" and "-f" in command:
-                is_special_interactive_cmd = True
-            elif base_cmd_to_execute == "watch":
-                is_special_interactive_cmd = True
+        # Special cases with flags
+        if not should_recommend:
+            if base_cmd == "ping" and "-c" not in command:
+                should_recommend = True
+            elif base_cmd == "tail" and "-f" in command:
+                should_recommend = True
+            elif base_cmd == "journalctl" and "-f" in command:
+                should_recommend = True
         
-        # Log the decision for debugging
-        self._logger.debug(f"Executing command '{command}' with interactive={is_special_interactive_cmd}")
-        
-        if is_special_interactive_cmd:
-            console.print(f"\n[dim]Running '{command}'... (Ctrl+C to stop if continuous)[/dim]")
-            start_exec_time = time.time()
+        if should_recommend:
+            # Provide a recommendation instead of execution for interactive commands
+            from rich.console import Console
+            from rich.panel import Panel
+            from angela.components.shell.formatter import COLOR_PALETTE, DEFAULT_BOX
+            console = Console()
             
-            # Use terminal_formatter.display_execution_timer with interactive=True
-            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
-                command,
-                with_philosophy=True,
-                interactive=True  # Key change: Pass interactive=True
-            )
+            # Create a recommendation message
+            recommendation = f"""
+    [bold cyan]Interactive Command Detected:[/bold cyan]
+    
+    Angela cannot directly execute terminal-interactive commands like {base_cmd}.
+    You can run this command yourself by typing:
+    
+        [bold green]{command}[/bold green]
+    
+    This will launch {base_cmd} in your terminal.
+    """
             
+            # Print the recommendation
+            console.print(Panel(
+                recommendation,
+                title="[bold cyan]Command Recommendation[/bold cyan]",
+                border_style=COLOR_PALETTE["border"],
+                box=DEFAULT_BOX,
+                expand=False
+            ))
+            
+            # Return success result with recommendation
             return {
-                "command": command, "success": return_code == 0, "stdout": stdout,
-                "stderr": stderr, "return_code": return_code, 
-                "execution_time": execution_time, "dry_run": False
+                "command": command,
+                "success": True,
+                "recommendation_only": True,
+                "stdout": f"Recommended command: {command}",
+                "stderr": "",
+                "return_code": 0,
+                "execution_time": 0.1,
+                "dry_run": False
             }
-        else:
-            # For non-interactive commands, use the execution timer normally
-            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
-                command,
-                with_philosophy=True
-            )
-            
-            return {
-                "command": command, "success": return_code == 0, "stdout": stdout,
-                "stderr": stderr, "return_code": return_code,
-                "execution_time": execution_time, "dry_run": False
-            }
+        
             
     async def _handle_critical_resource_warning(self, warning_data: Dict[str, Any]) -> None:
         """
