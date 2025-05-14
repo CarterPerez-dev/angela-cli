@@ -24,9 +24,7 @@
 ----
 
 [<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/UI.png" width="100" alt="Angela UI Example">](#angela-ui-example)
-[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/angela.webp" width="100" alt="Angela Logo/Mascot">](#angela-logo)
 [<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/confirmation.png" width="100" alt="Confirmation Prompt">](#confirmation-prompt)
-[<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/flow.svg" width="100" alt="Angela Workflow Diagram">](#angela-workflow-diagram)
 [<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/generate-help.png" width="100" alt="Generate Help Command">](#generate-help-command)
 [<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/help.png" width="100" alt="Angela Help Output">](#angela-help-output)
 [<img src="https://raw.githubusercontent.com/CarterPerez-dev/angela-cli/main/MD/assets/loading.png" width="100" alt="Loading Animation">](#loading-animation)
