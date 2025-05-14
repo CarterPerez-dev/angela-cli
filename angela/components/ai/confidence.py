@@ -1613,7 +1613,7 @@ class ConfidenceScorer:
                 potential_issues.append(f"Missing source or destination for {base_command}")
             
             # Estimate risk level for the command
-            risk_level = self._estimate_risk_level(base_command, flags, args, has_pipes, has_redirects)
+            risk_level = self._estimate_risk_level(command, base_command, flags, args, has_pipes, has_redirects)
             
             return CommandAnalysis(
                 base_command=base_command,
@@ -1651,6 +1651,7 @@ class ConfidenceScorer:
     
     def _estimate_risk_level(
         self, 
+        command: str,
         base_command: str, 
         flags: List[str], 
         args: List[str], 
