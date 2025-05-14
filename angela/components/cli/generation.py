@@ -852,8 +852,10 @@ def create_complex_project(
         logger.exception("Error generating complex project")
         console.print(f"[bold red]Error generating complex project:[/bold red] {str(e)}")
 
+# angela/components/cli/generation.py
+# ...
 @app.command("create-framework-project")
-def create_framework_project(
+async def create_framework_project( # <--- Change def to async def
     framework: str = typer.Argument(..., help="Framework to generate (e.g., react, django)"),
     description: str = typer.Argument(..., help="Description of the project to generate"),
     output_dir: str = typer.Option(".", help="Directory where the project should be generated"),
@@ -865,9 +867,6 @@ def create_framework_project(
     git_init: bool = typer.Option(True, help="Initialize Git repository"),
     dry_run: bool = typer.Option(False, help="Preview without creating files")
 ):
-    """
-    Generate a project for a specific framework with best practices.
-    """
     console.print(Panel(
         f"[bold green]Generating {framework} project:[/bold green]\n{description}",
         title="Framework Project Generation",
@@ -890,23 +889,24 @@ def create_framework_project(
         options = {k: v for k, v in options.items() if v is not None}
         
         # Generate framework project
-        from angela.generation.frameworks import framework_generator
+        from angela.api.generation import get_framework_generator
+        framework_generator = get_framework_generator()
         
         with console.status(f"[bold green]Generating {framework} project...[/bold green]"):
             if enhanced:
-                result = asyncio.run(framework_generator.generate_standard_project_structure(
+                result = await framework_generator.generate_standard_project_structure( # Now 'await' is valid
                     framework=framework,
                     description=description,
                     output_dir=output_dir,
                     options=options
-                ))
+                )
             else:
-                result = asyncio.run(framework_generator.generate_framework_structure(
+                result = await framework_generator.generate_framework_structure( # And here too
                     framework=framework,
                     description=description,
                     output_dir=output_dir,
                     options=options
-                ))
+                )
         
         if not result["success"]:
             console.print(f"[bold red]Error generating {framework} project:[/bold red] {result.get('error', 'Unknown error')}")
@@ -923,31 +923,32 @@ def create_framework_project(
         
         # Group files by directory
         grouped_files = {}
-        for file in result["files"]:
-            directory = Path(file.path).parent.as_posix()
+        for file_obj in result["files"]: # Changed 'file' to 'file_obj' to avoid conflict with built-in
+            directory = Path(file_obj.path).parent.as_posix()
             if directory == ".":
                 directory = "Root"
                 
             if directory not in grouped_files:
                 grouped_files[directory] = []
                 
-            grouped_files[directory].append(file)
+            grouped_files[directory].append(file_obj)
         
         # Display files by directory
-        for directory, files in grouped_files.items():
+        for directory, files_in_dir in grouped_files.items(): # Changed 'files' to 'files_in_dir'
             table = Table(title=f"Files in {directory}")
             table.add_column("Path", style="cyan")
             table.add_column("Purpose", style="green")
             
-            for file in files:
-                table.add_row(file.path, file.purpose)
+            for file_obj in files_in_dir: # Changed 'file' to 'file_obj'
+                table.add_row(file_obj.path, file_obj.purpose)
             
             console.print(table)
         
         # Create project if not dry run
         if not dry_run:
             # Create CodeProject object
-            from angela.generation.engine import CodeProject
+            from angela.api.generation import get_code_project_class # Use API
+            CodeProject = get_code_project_class()
             
             project = CodeProject(
                 name=f"{framework}_project",
@@ -962,9 +963,11 @@ def create_framework_project(
             # Create files
             console.print("\n[bold]Creating project files...[/bold]")
             
+            from angela.api.generation import get_code_generation_engine # Use API
+            code_generation_engine = get_code_generation_engine()
+            
             with console.status("[bold green]Creating files...[/bold green]"):
-                code_generation_engine = get_code_generation_engine()
-                creation_result = asyncio.run(code_generation_engine.create_project_files(project))
+                creation_result = await code_generation_engine.create_project_files(project) # Use await
             
             console.print(f"[green]Created {creation_result['file_count']} files[/green]")
             
@@ -972,13 +975,15 @@ def create_framework_project(
             if git_init:
                 console.print("\n[bold]Initializing Git repository...[/bold]")
                 
+                from angela.api.toolchain import get_git_integration # Use API
+                git_integration = get_git_integration()
+                
                 with console.status("[bold green]Initializing Git...[/bold green]"):
-                    git_integration = get_git_integration()
-                    git_result = asyncio.run(git_integration.init_repository(
+                    git_result = await git_integration.init_repository( # Use await
                         path=output_dir,
                         initial_branch="main",
                         gitignore_template=result["project_type"]
-                    ))
+                    )
                 
                 if git_result["success"]:
                     console.print("[green]Git repository initialized successfully[/green]")
@@ -989,15 +994,17 @@ def create_framework_project(
             if install_deps:
                 console.print("\n[bold]Installing dependencies...[/bold]")
                 
+                from angela.api.toolchain import get_package_manager_integration # Use API
+                package_manager_integration = get_package_manager_integration()
+                
                 with console.status("[bold green]Installing dependencies...[/bold green]"):
                     # Use package manager based on framework
                     project_type = result["project_type"]
                     
-                    package_manager_integration = get_package_manager_integration()
-                    deps_result = asyncio.run(package_manager_integration.install_dependencies(
+                    deps_result = await package_manager_integration.install_dependencies( # Use await
                         path=output_dir,
                         project_type=project_type
-                    ))
+                    )
                 
                 if deps_result["success"]:
                     console.print("[green]Dependencies installed successfully[/green]")

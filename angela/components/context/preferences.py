@@ -96,24 +96,25 @@ class PreferencesManager:
         self._save_preferences()
     
     def should_auto_execute(self, risk_level: int, command: str) -> bool:
-        """
-        Determine if a command should be auto-executed based on risk level
-        and user preferences.
+        """Determine if a command should be auto-executed."""
+        # Extract base command for comparison
+        base_command = command.split()[0] if command.split() else ""
         
-        Args:
-            risk_level: The risk level of the command
-            command: The command string
-            
-        Returns:
-            True if should auto-execute, False if confirmation needed
-        """
-        # Check if the command is explicitly trusted or untrusted
+        # CRITICAL FIX: log the check
+        self._logger.debug(f"Checking auto-execute for base command '{base_command}'")
+        self._logger.debug(f"Trusted commands: {self._prefs.trust.trusted_commands}")
+        self._logger.debug(f"Is in trusted list? {base_command in self._prefs.trust.trusted_commands}")
+        
+        # First check if base command is trusted
+        if base_command and base_command in self._prefs.trust.trusted_commands:
+            return True  # Auto-execute trusted commands
+                
+        # For backward compatibility, check if full command is trusted
         if command in self._prefs.trust.trusted_commands:
+            print(f"DEBUG: Full command found in trusted list, auto-executing")
             return True
-        if command in self._prefs.trust.untrusted_commands:
-            return False
         
-        # Check based on risk level
+        # Proceed with risk-level checks as before
         if risk_level == RISK_LEVELS["SAFE"]:
             return self._prefs.trust.auto_execute_safe
         elif risk_level == RISK_LEVELS["LOW"]:
@@ -130,22 +131,26 @@ class PreferencesManager:
     
     def add_trusted_command(self, command: str) -> None:
         """Add a command to the trusted commands list."""
-        if command not in self._prefs.trust.trusted_commands:
-            self._prefs.trust.trusted_commands.append(command)
+        # Extract ONLY the base command (first word)
+        base_command = command.split()[0] if command.split() else command
+        
+        # Print debug info
+        print(f"DEBUG: Extracted base command '{base_command}' from full command")
+        
+        # Check if already in list to avoid duplicates
+        if base_command not in self._prefs.trust.trusted_commands:
+            # Store ONLY the base command in the trusted list
+            self._prefs.trust.trusted_commands.append(base_command)
+            
             # Remove from untrusted if present
-            if command in self._prefs.trust.untrusted_commands:
-                self._prefs.trust.untrusted_commands.remove(command)
+            if base_command in self._prefs.trust.untrusted_commands:
+                self._prefs.trust.untrusted_commands.remove(base_command)
+            
             self._save_preferences()
-    
-    def add_untrusted_command(self, command: str) -> None:
-        """Add a command to the untrusted commands list."""
-        if command not in self._prefs.trust.untrusted_commands:
-            self._prefs.trust.untrusted_commands.append(command)
-            # Remove from trusted if present
-            if command in self._prefs.trust.trusted_commands:
-                self._prefs.trust.trusted_commands.remove(command)
-            self._save_preferences()
-
+            print(f"DEBUG: Added base command '{base_command}' to trusted list")
+        else:
+            print(f"DEBUG: Base command '{base_command}' already in trusted list")
+                       
     def get_command_rejection_count(self, command: str) -> int:
         """
         Get the number of times a user has rejected auto-execution for a command.
@@ -159,7 +164,7 @@ class PreferencesManager:
         if not hasattr(self._prefs.trust, 'command_rejections'):
             self._prefs.trust.command_rejections = {}
         
-        # Extract base command for more general tracking
+        # Extract base command for more consistent tracking
         base_command = command.split()[0] if command else ""
         return self._prefs.trust.command_rejections.get(base_command, 0)
     

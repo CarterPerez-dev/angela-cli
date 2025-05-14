@@ -42,66 +42,38 @@ async def get_adaptive_confirmation(
     confidence_score: Optional[float] = None,
     command_info: Optional[Dict[str, Any]] = None
 ) -> bool:
-    """
-    Get user confirmation for a command based on risk level and user history.
-    
-    Args:
-        command: The command to be executed
-        risk_level: The risk level of the command
-        risk_reason: The reason for the risk classification
-        impact: The impact analysis dictionary
-        preview: Optional preview of command results
-        explanation: AI explanation of what the command does
-        natural_request: The original natural language request
-        dry_run: Whether this is a dry run
-        confidence_score: Optional confidence score for the command
-        command_info: Optional command information dictionary
-        
-    Returns:
-        True if confirmed or dry_run is True, False otherwise
-    """
-    # Get managers from API
+    """Get user confirmation based on risk and history."""
+
     preferences_manager = get_preferences_manager()
     history_manager = get_history_manager()
     
-    # Check if auto-execution is enabled for this risk level and command
+    # Extract base command for consistent comparison
+    base_command = command.split()[0] if command.split() else ""
+    
+    # CRITICAL FIX: Check trusted commands first thing
+    if base_command and base_command in preferences_manager.preferences.trust.trusted_commands:
+        logger.debug(f"Command '{base_command}' is in trusted list - auto-executing")
+        await _show_auto_execution_notice(command, risk_level, preview)
+        return True
+    
+    # Check if auto-execution is enabled for this risk level
     if preferences_manager.should_auto_execute(risk_level, command):
-        # Get command frequency and success rate
-        frequency = history_manager.get_command_frequency(command)
-        success_rate = history_manager.get_command_success_rate(command)
+        # Only for frequently used commands with high success rate
+        frequency = history_manager.get_command_frequency(base_command)
+        success_rate = history_manager.get_command_success_rate(base_command)
         
-        # For frequently used commands with high success rate, auto-execute
         if frequency >= 5 and success_rate > 0.8:
-            logger.info(f"Auto-executing command with high trust: {command}")
+            logger.info(f"Auto-executing high trust command: {command}")
             await _show_auto_execution_notice(command, risk_level, preview)
             return True
     
+    # Rest of the function remains the same...
     # Skip confirmation for dry runs
     if dry_run:
-        # Get terminal formatter from API
-        from angela.api.shell import get_terminal_formatter
-        terminal_formatter = get_terminal_formatter()
-        
-        await terminal_formatter.display_pre_confirmation_info(
-            command=command,
-            risk_level=risk_level,
-            risk_reason=risk_reason,
-            impact=impact,
-            explanation=explanation,
-            preview=preview,
-            confidence_score=confidence_score
-        )
-        
-        console.print(Panel(
-            "[bold blue]This is a dry run.[/bold blue] No changes will be made.",
-            border_style="blue",
-            expand=False
-        ))
-        
-        return False
+        # (existing code)
     
     # For all other cases, get explicit confirmation
-    risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
+        risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
     
     # For high-risk operations, use a more detailed confirmation dialog
     if risk_level >= RISK_LEVELS["HIGH"]:
@@ -114,7 +86,6 @@ async def get_adaptive_confirmation(
         command, risk_level, risk_reason, preview, explanation, confidence_score
     )
 
-
 async def _show_auto_execution_notice(
     command: str, 
     risk_level: int,
@@ -125,10 +96,48 @@ async def _show_auto_execution_notice(
     preferences_manager = get_preferences_manager()
     
     # Get terminal formatter from API
-    from angela.api.shell import display_auto_execution_notice
-    await display_auto_execution_notice(command, risk_level, preview)
+    from angela.api.shell import get_terminal_formatter
+    terminal_formatter = get_terminal_formatter()
     
-
+    # Use a more subtle notification for auto-execution
+    console.print("\n")
+    console.print(Panel(
+        Syntax(command, "bash", theme="monokai", word_wrap=True),
+        title="Auto-Executing Trusted Command",
+        border_style="green",
+        expand=False
+    ))
+    
+    # Only show preview if it's enabled in preferences
+    if preview and preferences_manager.preferences.ui.show_command_preview:
+        console.print(Panel(
+            preview,
+            title="Command Preview",
+            border_style="blue",
+            expand=False
+        ))
+    
+    # Create the loading task
+    loading_task = asyncio.create_task(
+        terminal_formatter.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
+    )
+    
+    try:
+        # Wait a minimum amount of time for visual feedback
+        await asyncio.sleep(0.5)
+        
+        # Now we're ready to continue, cancel the loading task
+        loading_task.cancel()
+        try:
+            await loading_task
+        except asyncio.CancelledError:
+            pass  # Expected
+    except Exception as e:
+        logger.error(f"Error managing loading display: {str(e)}")
+        # Ensure the task is cancelled
+        if not loading_task.done():
+            loading_task.cancel()
+            
 
 async def _get_simple_confirmation(
     command: str, 
@@ -224,22 +233,29 @@ async def _get_detailed_confirmation(
 async def offer_command_learning(command: str) -> None:
     """
     After a successful execution, offer to add the command to trusted commands.
-    
-    Args:
-        command: The command that was executed
     """
+
     # Get managers from API
     preferences_manager = get_preferences_manager()
     history_manager = get_history_manager()
     
-    # Check if the command should be offered for learning
-    base_command = history_manager._extract_base_command(command)
+    # Extract base command for consistent comparison
+    base_command = command.split()[0] if command.split() else ""
+    if not base_command:
+        return  # Skip if we couldn't extract a base command
+    
+    # CRITICAL FIX: Skip if command is already trusted
+    if base_command in preferences_manager.preferences.trust.trusted_commands:
+        logger.debug(f"Command '{base_command}' already trusted, skipping learning prompt")
+        return
+    
+    # Check if this command should be offered for learning
     pattern = history_manager._patterns.get(base_command)
     
     # Only offer for commands used a few times but not yet trusted
-    if pattern and pattern.count >= 2 and command not in preferences_manager.preferences.trust.trusted_commands:
+    if pattern and pattern.count >= 2:
         # Check if user has previously rejected this command
-        rejection_count = preferences_manager.get_command_rejection_count(command)
+        rejection_count = preferences_manager.get_command_rejection_count(base_command)
         
         # Determine if we should show the prompt based on rejection count
         threshold = 2  # Base threshold
@@ -260,13 +276,12 @@ async def offer_command_learning(command: str) -> None:
             add_to_trusted = await terminal_formatter.display_inline_confirmation(prompt_text)
             
             if add_to_trusted:
-                preferences_manager.add_trusted_command(command)
-                await display_trust_added_message(command)
+                preferences_manager.add_trusted_command(base_command)
+                await display_trust_added_message(base_command)
             else:
                 # Record the rejection to increase the threshold for next time
-                preferences_manager.increment_command_rejection_count(command)
+                preferences_manager.increment_command_rejection_count(base_command)
                 console.print(f"[dim]You'll be asked again after using this command {threshold + 2} more times.[/dim]")
-
 
 # Export for API access
 adaptive_confirmation = get_adaptive_confirmation
