@@ -289,7 +289,7 @@ Thanks for helping make Angela smarter! ✨
 
 ---
 
-# ⚠️!!KEEP IN MIND-- ANGELA IS NOT COMPLETE YET, SHE'S IN ITS VERY BEGINING STAGES, SHE's STILL A MINOR!!⚠️
+# ⚠️!KEEP IN MIND-- ANGELA IS NOT COMPLETE YET!⚠️
 -----
 
 ## Screenshots & Examples
