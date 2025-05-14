@@ -732,7 +732,8 @@ class TerminalFormatter:
     async def display_execution_timer(
         self,
         command: str,
-        with_philosophy: bool = True
+        with_philosophy: bool = True,
+        interactive: bool = False  # New parameter for interactive commands
     ) -> Tuple[str, str, int, float]:
         """
         Display a command execution timer with philosophy quotes.
@@ -740,6 +741,7 @@ class TerminalFormatter:
         Args:
             command: The command being executed
             with_philosophy: Whether to display philosophy quotes
+            interactive: Whether this is an interactive command that needs direct terminal access
             
         Returns:
             Tuple of (stdout, stderr, return_code, execution_time)
@@ -800,127 +802,174 @@ class TerminalFormatter:
             
             return panel
         
-        # Use asyncio.create_subprocess_shell to execute the command
-        process = await asyncio.create_subprocess_shell(
-            command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        
-        # Collect output
-        stdout_chunks = []
-        stderr_chunks = []
-        
-        # Set up tasks to read output
-        async def read_stream(stream, is_stdout: bool):
-            while True:
-                line = await stream.readline()
-                if not line:
-                    break
+        if interactive:
+            # For interactive commands, don't capture stdout/stderr
+            # Just display loading initially, then let the command take over the terminal
+            try:
+                with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
+                    # Brief display of loading before handing over to interactive command
+                    await asyncio.sleep(0.5)
+                    live.stop()
                     
-                try:
-                    line_str = line.decode('utf-8', errors='replace')
+                    # Use create_subprocess_shell without redirecting stdout/stderr
+                    # This is the key change - allows direct terminal interaction
+                    process = await asyncio.create_subprocess_shell(
+                        command
+                        # No stdout/stderr redirection for interactive mode
+                    )
                     
-                    # Store the output
-                    if is_stdout:
-                        stdout_chunks.append(line_str)
-                    else:
-                        stderr_chunks.append(line_str)
+                    # Wait for the process to complete
+                    return_code = await process.wait()
+                    execution_time = time.time() - start_time
+                    
+                    # Create a completion panel - KEEPING the "Angela Initialized" title
+                    execution_time_text = Text()
+                    execution_time_text.append("Clocked in ", style=COLOR_PALETTE["text"])
+                    execution_time_text.append(f"{execution_time:.6f}", style="red")
+                    execution_time_text.append("s", style=COLOR_PALETTE["text"])
+                    execution_time_text.justify = "center"
+                    
+                    completed_panel = Panel(
+                        execution_time_text,
+                        title=f"[bold {COLOR_PALETTE['text']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['text']}]",
+                        border_style=COLOR_PALETTE["border"],
+                        box=DEFAULT_BOX,
+                        expand=False,
+                        padding=(1, 2)
+                    )
+                    
+                    # Create a new live display for completion message
+                    with Live(completed_panel, refresh_per_second=1, console=self._console) as completion_live:
+                        await asyncio.sleep(0.5)
+                    
+                    # Return empty stdout/stderr since they were directed to terminal
+                    return ("", "", return_code, execution_time)
+            except Exception as e:
+                self._logger.error(f"Error in interactive execution: {str(e)}")
+                return ("", f"Error: {str(e)}", -1, time.time() - start_time)
+        else:
+            # Original implementation for non-interactive commands
+            # Use asyncio.create_subprocess_shell to execute the command
+            process = await asyncio.create_subprocess_shell(
+                command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            
+            # Collect output
+            stdout_chunks = []
+            stderr_chunks = []
+            
+            # Set up tasks to read output
+            async def read_stream(stream, is_stdout: bool):
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
                         
-                except Exception as e:
-                    self._logger.error(f"Error processing output: {str(e)}")
-        
-        # Create tasks for stdout and stderr
-        stdout_task = asyncio.create_task(read_stream(process.stdout, True))
-        stderr_task = asyncio.create_task(read_stream(process.stderr, False))
-        
-        # Display the live progress with stunning visuals
-        try:
-            with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
-                # Wait for the command to complete while updating the display
-                return_code = await process.wait()
-                
-                # Wait for the streams to complete
-                await stdout_task
-                await stderr_task
-                
-                execution_time = time.time() - start_time
-                
-                # Create a visually stunning completion panel
-                execution_time_text = Text()
-                execution_time_text.append("Clocked in ", style=COLOR_PALETTE["text"])
-                execution_time_text.append(f"{execution_time:.6f}", style="red")  # Different color for numbers
-                execution_time_text.append("s", style=COLOR_PALETTE["text"])
-                
-                # Center the text
-                execution_time_text.justify = "center"
-                
-                completed_panel = Panel(
-                    execution_time_text,
-                    title=f"[bold {COLOR_PALETTE['text']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['text']}]",
-                    border_style=COLOR_PALETTE["border"],
-                    box=DEFAULT_BOX,
-                    expand=False,
-                    padding=(1, 2)
-                )
-                
-                live.update(completed_panel)
-                
-                # Brief pause to show completion
-                await asyncio.sleep(0.5)
-        except Exception as e:
-            self._logger.error(f"Error in execution timer: {str(e)}")
-            # Ensure we still wait for the process
-            if process.returncode is None: # Check if process might still be running
-                try:
-                    # Wait for process with a timeout to avoid hanging indefinitely
-                    await asyncio.wait_for(process.wait(), timeout=5.0) 
-                    return_code = process.returncode if process.returncode is not None else -1
-                except asyncio.TimeoutError:
-                    self._logger.error("Timeout waiting for process to complete after error.")
-                    if process.returncode is None: # if still none after timeout, try to kill
-                        try:
-                            process.kill()
-                            await process.wait() # ensure it's reaped
-                        except ProcessLookupError:
-                            pass # process might have already exited
-                        except Exception as kill_e:
-                            self._logger.error(f"Error trying to kill process: {kill_e}")
-                    return_code = -1 
-                except Exception as proc_e:
-                    self._logger.error(f"Further error waiting for process: {proc_e}")
+                    try:
+                        line_str = line.decode('utf-8', errors='replace')
+                        
+                        # Store the output
+                        if is_stdout:
+                            stdout_chunks.append(line_str)
+                        else:
+                            stderr_chunks.append(line_str)
+                            
+                    except Exception as e:
+                        self._logger.error(f"Error processing output: {str(e)}")
+            
+            # Create tasks for stdout and stderr
+            stdout_task = asyncio.create_task(read_stream(process.stdout, True))
+            stderr_task = asyncio.create_task(read_stream(process.stderr, False))
+            
+            # Display the live progress with stunning visuals
+            try:
+                with Live(get_layout(), refresh_per_second=20, console=self._console) as live:
+                    # Wait for the command to complete while updating the display
+                    return_code = await process.wait()
+                    
+                    # Wait for the streams to complete
+                    await stdout_task
+                    await stderr_task
+                    
+                    execution_time = time.time() - start_time
+                    
+                    # Create a visually stunning completion panel
+                    execution_time_text = Text()
+                    execution_time_text.append("Clocked in ", style=COLOR_PALETTE["text"])
+                    execution_time_text.append(f"{execution_time:.6f}", style="red")  # Different color for numbers
+                    execution_time_text.append("s", style=COLOR_PALETTE["text"])
+                    
+                    # Center the text
+                    execution_time_text.justify = "center"
+                    
+                    completed_panel = Panel(
+                        execution_time_text,
+                        title=f"[bold {COLOR_PALETTE['text']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['text']}]",
+                        border_style=COLOR_PALETTE["border"],
+                        box=DEFAULT_BOX,
+                        expand=False,
+                        padding=(1, 2)
+                    )
+                    
+                    live.update(completed_panel)
+                    
+                    # Brief pause to show completion
+                    await asyncio.sleep(0.5)
+            except Exception as e:
+                self._logger.error(f"Error in execution timer: {str(e)}")
+                # Ensure we still wait for the process
+                if process.returncode is None: # Check if process might still be running
+                    try:
+                        # Wait for process with a timeout to avoid hanging indefinitely
+                        await asyncio.wait_for(process.wait(), timeout=5.0) 
+                        return_code = process.returncode if process.returncode is not None else -1
+                    except asyncio.TimeoutError:
+                        self._logger.error("Timeout waiting for process to complete after error.")
+                        if process.returncode is None: # if still none after timeout, try to kill
+                            try:
+                                process.kill()
+                                await process.wait() # ensure it's reaped
+                            except ProcessLookupError:
+                                pass # process might have already exited
+                            except Exception as kill_e:
+                                self._logger.error(f"Error trying to kill process: {kill_e}")
+                        return_code = -1 
+                    except Exception as proc_e:
+                        self._logger.error(f"Further error waiting for process: {proc_e}")
+                        return_code = -1
+                elif process.returncode is not None: # Process already finished, just get its code
+                    return_code = process.returncode
+                else: # Fallback if process object is in an unexpected state
                     return_code = -1
-            elif process.returncode is not None: # Process already finished, just get its code
-                return_code = process.returncode
-            else: # Fallback if process object is in an unexpected state
-                return_code = -1
-
-            # Wait for the streams to complete, even in error cases
-            # Use try-except for each to ensure one doesn't prevent the other
-            try:
-                await asyncio.wait_for(stdout_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                self._logger.error("Timeout waiting for stdout_task to complete after error.")
-            except Exception as stream_e:
-                self._logger.error(f"Error waiting for stdout_task: {stream_e}")
+    
+                # Wait for the streams to complete, even in error cases
+                # Use try-except for each to ensure one doesn't prevent the other
+                try:
+                    await asyncio.wait_for(stdout_task, timeout=2.0)
+                except asyncio.TimeoutError:
+                    self._logger.error("Timeout waiting for stdout_task to complete after error.")
+                except Exception as stream_e:
+                    self._logger.error(f"Error waiting for stdout_task: {stream_e}")
+                
+                try:
+                    await asyncio.wait_for(stderr_task, timeout=2.0)
+                except asyncio.TimeoutError:
+                    self._logger.error("Timeout waiting for stderr_task to complete after error.")
+                except Exception as stream_e:
+                    self._logger.error(f"Error waiting for stderr_task: {stream_e}")
+                
+                # Recalculate execution_time up to the point of error handling completion
+                execution_time = time.time() - start_time
             
-            try:
-                await asyncio.wait_for(stderr_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                self._logger.error("Timeout waiting for stderr_task to complete after error.")
-            except Exception as stream_e:
-                self._logger.error(f"Error waiting for stderr_task: {stream_e}")
-            
-            # Recalculate execution_time up to the point of error handling completion
-            execution_time = time.time() - start_time
-        
-        # Return the results
-        return (
-            "".join(stdout_chunks),
-            "".join(stderr_chunks),
-            return_code if isinstance(return_code, int) else -1, # Ensure return_code is an int
-            execution_time
-        )
+            # Return the results
+            return (
+                "".join(stdout_chunks),
+                "".join(stderr_chunks),
+                return_code if isinstance(return_code, int) else -1, # Ensure return_code is an int
+                execution_time
+            )
 
 
     async def display_loading_timer(

@@ -4385,8 +4385,8 @@ Include only the JSON object with no additional text.
         """
         # Get execution engine and terminal formatter through API
         execution_engine = get_execution_engine()
-        terminal_formatter = get_terminal_formatter() # Assuming this is how you get it
-
+        terminal_formatter = get_terminal_formatter()
+    
         # For dry runs, return the simulation directly
         if dry_run:
             stdout, stderr, return_code = await execution_engine.dry_run_command(command)
@@ -4394,53 +4394,74 @@ Include only the JSON object with no additional text.
                 "command": command, "success": True, "stdout": stdout,
                 "stderr": stderr, "return_code": return_code, "dry_run": True
             }
-
+    
         # --- HANDLE INTERACTIVE/CONTINUOUS COMMANDS ---
         interactive_continuous_commands = [
-            "top", "htop", "vim", "vi", "nano", 
-            "less", "more", "man", "ping", "tail" # Added tail
+            # Terminal-based editors and pagers
+            "vim", "vi", "nano", "emacs", "pico", "less", "more", 
+            # Interactive monitoring tools
+            "top", "htop", "btop", "iotop", "iftop", "nmon", "glances", "atop",
+            # Networking tools with continuous output
+            "ping", "traceroute", "mtr", "tcpdump", "wireshark", "tshark", "ngrep",
+            # File monitoring
+            "tail", "watch", 
+            # System logs
+            "journalctl", "dmesg",
+            # Remote sessions
+            "ssh", "telnet", "nc", "netcat",
+            # Database and interactive shells
+            "mysql", "psql", "sqlite3", "mongo", "redis-cli",
+            # Interactive debuggers
+            "gdb", "lldb", "pdb",
+            # Other interactive utilities
+            "tmux", "screen"
         ]
+        
         base_cmd_to_execute = command.split()[0] if command.split() else ""
         
+        # Enhanced detection for commands that should be interactive
         is_special_interactive_cmd = False
         if base_cmd_to_execute in interactive_continuous_commands:
-            if base_cmd_to_execute == "ping" and "-c" not in command:
+            # Standard interactive commands get automatic interactive mode
+            if base_cmd_to_execute in ["top", "htop", "btop", "vim", "vi", "nano", "emacs", 
+                                      "less", "more", "ssh", "mysql", "psql", "mongo",
+                                      "gdb", "lldb", "pdb", "tmux", "screen"]:
+                is_special_interactive_cmd = True
+            # Commands that are interactive only with certain flags
+            elif base_cmd_to_execute == "ping" and "-c" not in command:
                 is_special_interactive_cmd = True
             elif base_cmd_to_execute == "tail" and "-f" in command:
-                 is_special_interactive_cmd = True
-            elif base_cmd_to_execute not in ["ping", "tail"]:
                 is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "journalctl" and "-f" in command:
+                is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "watch":
+                is_special_interactive_cmd = True
+        
+        # Log the decision for debugging
+        self._logger.debug(f"Executing command '{command}' with interactive={is_special_interactive_cmd}")
         
         if is_special_interactive_cmd:
             console.print(f"\n[dim]Running '{command}'... (Ctrl+C to stop if continuous)[/dim]")
             start_exec_time = time.time()
-            stdout, stderr, return_code = await execution_engine.execute_command(
-                command,
-                check_safety=False # Safety already handled
-            )
-            execution_time = time.time() - start_exec_time
             
-            # Display raw output or simple status
-            if stdout.strip(): terminal_formatter.print_output(stdout.strip(), OutputType.STDOUT, title=f"Output: {command}")
-            if stderr.strip(): terminal_formatter.print_output(stderr.strip(), OutputType.STDERR, title=f"Error: {command}")
-            if return_code == 0 and not stdout.strip() and not stderr.strip():
-                terminal_formatter.print_output("Command executed successfully with no output.", OutputType.SUCCESS)
-
+            # Use terminal_formatter.display_execution_timer with interactive=True
+            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
+                command,
+                with_philosophy=True,
+                interactive=True  # Key change: Pass interactive=True
+            )
+            
             return {
                 "command": command, "success": return_code == 0, "stdout": stdout,
                 "stderr": stderr, "return_code": return_code, 
                 "execution_time": execution_time, "dry_run": False
             }
         else:
-            # For non-interactive commands, use the execution timer
+            # For non-interactive commands, use the execution timer normally
             stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
                 command,
                 with_philosophy=True
             )
-            # Store result in session for reference (if needed here, or done in orchestrator)
-            # session_manager = get_session_manager()
-            # if stdout.strip():
-            #     session_manager.add_result(stdout.strip())
             
             return {
                 "command": command, "success": return_code == 0, "stdout": stdout,

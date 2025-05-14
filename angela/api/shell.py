@@ -154,7 +154,8 @@ async def display_inline_confirmation(
 
 async def display_execution_timer(
     command: str,
-    with_philosophy: bool = True
+    with_philosophy: bool = True,
+    interactive: bool = False 
 ) -> Tuple[str, str, int, float]:
     """
     Display a command execution timer with philosophy quotes.
@@ -162,12 +163,13 @@ async def display_execution_timer(
     Args:
         command: The command being executed
         with_philosophy: Whether to display philosophy quotes
+        interactive: Whether this is an interactive command that needs direct terminal access
         
     Returns:
         Tuple of (stdout, stderr, return_code, execution_time)
     """
     from angela.components.shell.formatter import terminal_formatter
-    return await terminal_formatter.display_execution_timer(command, with_philosophy)
+    return await terminal_formatter.display_execution_timer(command, with_philosophy, interactive)
 
 async def display_loading_timer(
     message: str,

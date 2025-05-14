@@ -16,6 +16,7 @@ from angela.api.safety import get_command_risk_classifier, get_adaptive_confirma
 from angela.api.execution import get_execution_engine
 from angela.api.context import get_history_manager, get_preferences_manager, get_session_manager
 from angela.utils.logging import get_logger
+from angela.api.shell import get_terminal_formatter
 
 logger = get_logger(__name__)
 console = Console()
@@ -162,7 +163,7 @@ class AdaptiveExecutionEngine:
     
     async def _execute_with_feedback(self, command: str, dry_run: bool) -> Dict[str, Any]:
         """
-        Execute a command with rich feedback.
+        Execute a command with rich feedback, handling interactive commands.
         
         Args:
             command: The command to execute
@@ -171,14 +172,17 @@ class AdaptiveExecutionEngine:
         Returns:
             Dictionary with execution results
         """
+        # Get preferences manager to check for UI preferences
         preferences_manager = get_preferences_manager()
         use_spinners = preferences_manager.preferences.ui.use_spinners
         
+        # Get execution engine through API
+        execution_engine = get_execution_engine()
+        # Get terminal formatter through API
+        terminal_formatter = get_terminal_formatter()
+        
         # For dry runs, return the preview directly
         if dry_run:
-            # Get execution engine through API
-            execution_engine = get_execution_engine()
-            
             # Execute in dry-run mode
             stdout, stderr, return_code = await execution_engine.dry_run_command(command)
             
@@ -191,29 +195,92 @@ class AdaptiveExecutionEngine:
                 "dry_run": True
             }
         
-        # Get execution engine through API
-        execution_engine = get_execution_engine()
+        # --- HANDLE INTERACTIVE/CONTINUOUS COMMANDS ---
+        interactive_continuous_commands = [
+            # Terminal-based editors and pagers
+            "vim", "vi", "nano", "emacs", "pico", "less", "more", 
+            # Interactive monitoring tools
+            "top", "htop", "btop", "iotop", "iftop", "nmon", "glances", "atop",
+            # Networking tools with continuous output
+            "ping", "traceroute", "mtr", "tcpdump", "wireshark", "tshark", "ngrep",
+            # File monitoring
+            "tail", "watch", 
+            # System logs
+            "journalctl", "dmesg",
+            # Remote sessions
+            "ssh", "telnet", "nc", "netcat",
+            # Database and interactive shells
+            "mysql", "psql", "sqlite3", "mongo", "redis-cli",
+            # Interactive debuggers
+            "gdb", "lldb", "pdb",
+            # Other interactive utilities
+            "tmux", "screen"
+        ]
         
-        # Show execution spinner if enabled
-        from angela.api.shell import display_execution_timer
-        stdout, stderr, return_code, execution_time = await display_execution_timer(
-            command,
-            with_philosophy=True
-        )
+        base_cmd_to_execute = command.split()[0] if command.split() else ""
         
-        # Store result in session for reference
-        session_manager = get_session_manager()
-        if stdout.strip():
-            session_manager.add_result(stdout.strip())
+        # Enhanced detection for commands that should be interactive
+        is_special_interactive_cmd = False
+        if base_cmd_to_execute in interactive_continuous_commands:
+            # Standard interactive commands get automatic interactive mode
+            if base_cmd_to_execute in ["top", "htop", "btop", "vim", "vi", "nano", "emacs", 
+                                      "less", "more", "ssh", "mysql", "psql", "mongo",
+                                      "gdb", "lldb", "pdb", "tmux", "screen"]:
+                is_special_interactive_cmd = True
+            # Commands that are interactive only with certain flags
+            elif base_cmd_to_execute == "ping" and "-c" not in command:
+                is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "tail" and "-f" in command:
+                is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "journalctl" and "-f" in command:
+                is_special_interactive_cmd = True
+            elif base_cmd_to_execute == "watch":
+                is_special_interactive_cmd = True
         
-        return {
-            "command": command,
-            "success": return_code == 0,
-            "stdout": stdout,
-            "stderr": stderr,
-            "return_code": return_code,
-            "dry_run": False
-        }
+        # Log the decision for debugging
+        self._logger.debug(f"Executing command '{command}' with interactive={is_special_interactive_cmd}")
+        
+        if is_special_interactive_cmd:
+            console.print(f"\n[dim]Running '{command}'... (Ctrl+C to stop if continuous)[/dim]")
+            start_exec_time = time.time()
+            
+            # Use terminal_formatter.display_execution_timer with interactive=True
+            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
+                command,
+                with_philosophy=True,
+                interactive=True  # Key change: Pass interactive=True
+            )
+            
+            return {
+                "command": command, 
+                "success": return_code == 0, 
+                "stdout": stdout,
+                "stderr": stderr, 
+                "return_code": return_code, 
+                "execution_time": execution_time, 
+                "dry_run": False
+            }
+        else:
+            # Show execution spinner if enabled
+            stdout, stderr, return_code, execution_time = await terminal_formatter.display_execution_timer(
+                command,
+                with_philosophy=True
+            )
+            
+            # Store result in session for reference
+            session_manager = get_session_manager()
+            if stdout.strip():
+                session_manager.add_result(stdout.strip())
+            
+            return {
+                "command": command, 
+                "success": return_code == 0, 
+                "stdout": stdout,
+                "stderr": stderr, 
+                "return_code": return_code,
+                "execution_time": execution_time, 
+                "dry_run": False
+            }
 
 # Global adaptive execution engine instance
 adaptive_engine = AdaptiveExecutionEngine()
