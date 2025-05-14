@@ -394,7 +394,7 @@ class TerminalFormatter:
         syntax = Syntax(
             command, 
             "bash", 
-            theme="monokai", 
+            theme="vim", 
             word_wrap=True,
             background_color="default"
         )
@@ -569,7 +569,7 @@ class TerminalFormatter:
         
         # 1. Command panel (top)
         command_panel = Panel(
-            Syntax(command, "bash", theme="monokai", word_wrap=True),
+            Syntax(command, "bash", theme="vim", word_wrap=True),
             title=f"[bold {risk_color}]{risk_icon} Execute [{risk_name} Risk][/bold {risk_color}]",
             border_style=COLOR_PALETTE["border"],
             box=DEFAULT_BOX,
@@ -847,10 +847,18 @@ class TerminalFormatter:
                 execution_time = time.time() - start_time
                 
                 # Create a visually stunning completion panel
+                execution_time_text = Text()
+                execution_time_text.append("Clocked in ", style=COLOR_PALETTE["text"])
+                execution_time_text.append(f"{execution_time:.6f}", style="red")  # Different color for numbers
+                execution_time_text.append("s", style=COLOR_PALETTE["text"])
+                
+                # Center the text
+                execution_time_text.justify = "center"
+                
                 completed_panel = Panel(
-                    Text(f"Execution completed in {execution_time:.6f}s", style=COLOR_PALETTE["success"], justify="center"),
-                    title=f"[bold {COLOR_PALETTE['success']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['success']}]",
-                    border_style=COLOR_PALETTE["success"],
+                    execution_time_text,
+                    title=f"[bold {COLOR_PALETTE['text']}]✓ Angela Initialized ✓[/bold {COLOR_PALETTE['text']}]",
+                    border_style=COLOR_PALETTE["border"],
                     box=DEFAULT_BOX,
                     expand=False,
                     padding=(1, 2)
@@ -975,8 +983,8 @@ class TerminalFormatter:
             
             panel = Panel(
                 content,
-                title="Angela Initializing...",
-                border_style=COLOR_PALETTE["border"],  # Consistent red border
+                title=f"[bold {COLOR_PALETTE['text']}]⯁ Angela Initializing ⯁[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],  # Consistent red border 
                 box=DEFAULT_BOX,
                 padding=(1, 2)
             )
@@ -1080,31 +1088,44 @@ class TerminalFormatter:
         preview: Optional[str]
     ) -> None:
         """
-        Show a notice for auto-execution with consistent styling.
+        Show a notice for auto-execution with enhanced styling.
         
         Args:
             command: The command being auto-executed
             risk_level: Risk level of the command
             preview: Optional preview of what the command will do
         """
-        from angela.api.context import get_preferences_manager
-        preferences_manager = get_preferences_manager()
+        # Risk styling
+        risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
+        risk_icon = RISK_ICONS.get(risk_level, "⚠")
+        risk_color = RISK_COLORS.get(risk_level, COLOR_PALETTE["warning"])
         
-        # Use a more subtle notification for auto-execution with your consistent styling
+        # Styled command with execution notice
+        command_display = Group(
+            Text(f"{risk_icon} Trusted Command ({risk_name} Risk)", style=COLOR_PALETTE["text"]),
+            Text(""),  # Spacing
+            Syntax(command, "bash", theme="vim", word_wrap=True)
+        )
+        
         self._console.print("\n")
         self._console.print(Panel(
-            Syntax(command, "bash", theme="monokai", word_wrap=True),
-            title="Auto-Executing Trusted Command",
-            border_style=COLOR_PALETTE["success"],  # Use success color from your palette
-            expand=False
+            command_display,
+            title=f"[bold {COLOR_PALETTE['text']}]◈ Auto-Executed Trusted Command ◈[/bold {COLOR_PALETTE['text']}]",
+            border_style=COLOR_PALETTE["border"],
+            box=DEFAULT_BOX,
+            expand=False,
+            padding=(1, 2)
         ))
         
         # Only show preview if it's enabled in preferences
+        from angela.api.context import get_preferences_manager
+        preferences_manager = get_preferences_manager()
+        
         if preview and preferences_manager.preferences.ui.show_command_preview:
             self._console.print(Panel(
-                preview,
-                title=f"[bold {COLOR_PALETTE['text']}]⚡ Command Preview ⚡[/bold {COLOR_PALETTE['text']}]",
-                border_style=COLOR_PALETTE["border"],  # Consistent red border
+                Text(preview, style=COLOR_PALETTE["text"]),
+                title=f"[bold {COLOR_PALETTE['text']}]❖ Command Preview ❖[/bold {COLOR_PALETTE['text']}]",
+                border_style=COLOR_PALETTE["border"],
                 box=DEFAULT_BOX,
                 expand=False
             ))

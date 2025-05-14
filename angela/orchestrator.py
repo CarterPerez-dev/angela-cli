@@ -30,7 +30,7 @@ from angela.api.shell import display_advanced_plan, display_execution_results
 from angela.api.monitoring import get_background_monitor, get_network_monitor
 from angela.api.safety import get_command_risk_classifier, get_adaptive_confirmation
 from angela.api.toolchain import get_docker_integration
-
+from angela.api.shell import display_command_preview
 # Get the core models and classes
 from angela.utils.logging import get_logger
 
@@ -4001,13 +4001,13 @@ Include only the JSON object with no additional text.
         session_manager.add_command(command)
         
         # Generate command preview if needed
-        from angela.api.safety import get_command_preview_generator
+        from angela.api.shell import display_command_preview
         from angela.api.context import get_preferences_manager
         
         command_preview_generator = get_command_preview_generator()
         preferences_manager = get_preferences_manager()
         
-        preview = await command_preview_generator.generate_preview(command) if preferences_manager.preferences.ui.show_command_preview else None
+        preview = await command_preview_generator.generate_preview(command) if     preferences_manager.preferences.ui.show_command_preview else None
         
         # Get adaptive confirmation based on risk level and user history
         confirmed = await get_adaptive_confirmation(

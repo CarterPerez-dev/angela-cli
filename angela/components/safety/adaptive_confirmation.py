@@ -92,52 +92,9 @@ async def _show_auto_execution_notice(
     preview: Optional[str]
 ) -> None:
     """Show a notice for auto-execution."""
-    risk_name = RISK_LEVEL_NAMES.get(risk_level, "UNKNOWN")
-    preferences_manager = get_preferences_manager()
-    
-    # Get terminal formatter from API
-    from angela.api.shell import get_terminal_formatter
-    terminal_formatter = get_terminal_formatter()
-    
-    # Use a more subtle notification for auto-execution
-    console.print("\n")
-    console.print(Panel(
-        Syntax(command, "bash", theme="monokai", word_wrap=True),
-        title="Auto-Executing Trusted Command",
-        border_style="green",
-        expand=False
-    ))
-    
-    # Only show preview if it's enabled in preferences
-    if preview and preferences_manager.preferences.ui.show_command_preview:
-        console.print(Panel(
-            preview,
-            title="Command Preview",
-            border_style="blue",
-            expand=False
-        ))
-    
-    # Create the loading task
-    loading_task = asyncio.create_task(
-        terminal_formatter.display_loading_timer("Auto-executing trusted command...", with_philosophy=True)
-    )
-    
-    try:
-        # Wait a minimum amount of time for visual feedback
-        await asyncio.sleep(0.5)
-        
-        # Now we're ready to continue, cancel the loading task
-        loading_task.cancel()
-        try:
-            await loading_task
-        except asyncio.CancelledError:
-            pass  # Expected
-    except Exception as e:
-        logger.error(f"Error managing loading display: {str(e)}")
-        # Ensure the task is cancelled
-        if not loading_task.done():
-            loading_task.cancel()
-            
+    # Get terminal formatter from API to display the notice
+    from angela.api.shell import display_auto_execution_notice
+    await display_auto_execution_notice(command, risk_level, preview)
 
 async def _get_simple_confirmation(
     command: str, 
