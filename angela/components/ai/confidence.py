@@ -236,22 +236,37 @@ class ContextualState:
         
         if session_manager:
             # Extract file and directory entities from session
-            for entity_id, entity_data in session_manager.get_session_memory().entities.items():
-                if entity_data.get('type') == 'file' and entity_data.get('last_use'):
-                    path = Path(entity_id)
-                    last_use = datetime.fromisoformat(entity_data['last_use'])
-                    recent_files.append((path, last_use))
-                elif entity_data.get('type') == 'directory' and entity_data.get('last_use'):
-                    path = Path(entity_id)
-                    last_use = datetime.fromisoformat(entity_data['last_use'])
-                    recent_dirs.append((path, last_use))
-        
+            session_data = session_manager.get_context() # Get the session data dictionary
+            for entity_name, entity_detail_dict in session_data.get("entities", {}).items(): # Access entities from the dict
+
+                # Ensure entity_detail_dict is a dictionary before using .get()
+                if isinstance(entity_detail_dict, dict):
+                    entity_type = entity_detail_dict.get('type')
+                    entity_created_iso = entity_detail_dict.get('created')
+                    entity_value = entity_detail_dict.get('value', entity_name) # Fallback to entity_name if value is missing
+
+                    if entity_created_iso: # Ensure 'created' timestamp exists
+                        try:
+                            path = Path(entity_value)
+                            created_dt = datetime.fromisoformat(entity_created_iso)
+
+                            if entity_type == 'file':
+                                recent_files.append((path, created_dt))
+                            elif entity_type == 'directory':
+                                recent_dirs.append((path, created_dt))
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"Could not parse entity data: {entity_detail_dict}, error: {e}")
+                else:
+                    logger.warning(f"Skipping non-dictionary entity_data in session: {entity_detail_dict}")
+
         # Get recent commands
         recent_commands = []
         history_manager = get_history_manager()
-        for cmd_record in history_manager.get_recent_commands(10):
-            timestamp = datetime.fromisoformat(cmd_record.get('timestamp', datetime.now().isoformat()))
-            recent_commands.append((cmd_record.get('command', ''), timestamp))
+        for cmd_record_obj in history_manager.get_recent_commands(10): # cmd_record_obj is a CommandRecord
+            # Access attributes directly from the CommandRecord object
+            timestamp = cmd_record_obj.timestamp
+            command_str = cmd_record_obj.command
+            recent_commands.append((command_str, timestamp))
         
         # Get active processes (simplified)
         active_processes = []
@@ -358,8 +373,190 @@ class ConfidenceScorer:
         
         return base
 
+    def _check_project_relevance(
+        self, 
+        command_analysis: CommandAnalysis, 
+        current_state: ContextualState
+    ) -> float:
+        """Check if command is relevant to current project type."""
+        # Start with a slightly below average score
+        project_score = 0.6
+        
+        # Get project type
+        project_type = current_state.project_type # Use current_state
+        project_root = current_state.project_root # Use current_state
+        
+        # If no project detected, this is less relevant
+        if not project_type or not project_root:
+            return project_score
+        
+        # Check for project-specific commands
+        # Define project_specific_commands or ensure it's accessible
+        # For example, you could define it as a class attribute or a local dictionary
+        _project_specific_commands_map = { # Using a local dict for this example
+            "python": (['python', 'pip', 'pytest', 'virtualenv', 'venv'], ['.py', '.pyc', 'requirements.txt']),
+            "node": (['node', 'npm', 'yarn', 'npx'], ['package.json', 'node_modules', '.js', '.ts']),
+            "go": (['go', 'gofmt', 'godoc'], ['.go', 'go.mod', 'go.sum']),
+            "ruby": (['ruby', 'rails', 'bundle', 'gem'], ['.rb', 'Gemfile']),
+            "java": (['java', 'javac', 'mvn', 'gradle'], ['.java', '.jar', 'pom.xml', 'build.gradle']),
+            # Add more project types and their common commands/file indicators
+        }
+
+        if project_type in _project_specific_commands_map:
+            cmds, file_indicators = _project_specific_commands_map[project_type]
+            if command_analysis.base_command in cmds:
+                project_score += 0.3
+            # Check if any argument in command_analysis.args contains any of the file_indicators
+            elif any(any(indicator in arg for indicator in file_indicators) for arg in command_analysis.args):
+                 project_score += 0.2
+        
+        # Git is relevant to all project types if a .git directory exists
+        if command_analysis.base_command == 'git' and (project_root / ".git").exists():
+            project_score += 0.1
+        
+        return min(1.0, max(0.3, project_score))
+
+    def _check_path_relevance(
+        self, 
+        command_analysis: CommandAnalysis, 
+        current_state: ContextualState
+    ) -> float:
+        """Check if paths in the command are relevant to current context."""
+        # Start with a moderate score
+        path_score = 0.7
+        
+        # Get the current working directory and project root
+        cwd = current_state.cwd
+        project_root = current_state.project_root
+        
+        # Count path entities in the command
+        path_entities = [
+            entity for entity in command_analysis.entities
+            if entity.type in (EntityType.FILE, EntityType.DIRECTORY)
+        ]
+        
+        if not path_entities:
+            # No paths to check, return default score
+            return path_score
+        
+        # Check if paths are valid in current context
+        valid_paths = 0
+        for entity in path_entities:
+            path_str = entity.text
+            
+            # Expand tilde and normalize path
+            if path_str.startswith('~'):
+                path_str = os.path.expanduser(path_str)
+            
+            # Handle absolute and relative paths
+            if os.path.isabs(path_str):
+                path = Path(path_str)
+            else:
+                path = cwd / path_str
+            
+            # Check if path exists
+            if path.exists():
+                valid_paths += 1
+                # Extra bonus for paths within project root
+                if project_root and str(project_root) in str(path): # Check if project_root is part of the path
+                    path_score = min(1.0, path_score + 0.1)
+            else:
+                # Path doesn't exist - check if it's a wildcard pattern
+                if '*' in path_str or '?' in path_str:
+                    # Wildcard pattern - try to match against existing paths
+                    try:
+                        # Use glob to find matching paths
+                        import glob # Make sure glob is imported
+                        matches = glob.glob(str(path))
+                        if matches:
+                            valid_paths += 0.8  # Slightly less than an exact match
+                    except Exception:
+                        # Ignore glob errors
+                        pass
+        
+        # Calculate score based on valid paths ratio
+        if path_entities: # Check if path_entities is not empty
+            path_validity_ratio = valid_paths / len(path_entities)
+            path_score = 0.5 + (path_validity_ratio * 0.5) # Adjusted base for validity
+        
+        # Check for recent file/directory usage overlap
+        recent_match_score = 0.0
+        # Ensure recent_files and recent_dirs are lists of Path objects or strings that can be converted
+        recent_files_paths = [p for p, _ in current_state.recent_files if isinstance(p, Path)]
+        recent_dirs_paths = [p for p, _ in current_state.recent_dirs if isinstance(p, Path)]
+
+        for entity in path_entities:
+            path_str = entity.text
+            # Ensure path object for comparison, handle potential errors if path_str is invalid
+            try:
+                path = Path(os.path.expanduser(path_str) if path_str.startswith('~') else path_str)
+                if not path.is_absolute(): # If still relative, make it absolute based on cwd
+                    path = cwd / path
+            except Exception:
+                continue # Skip if path is malformed
+
+            # Check if this path matches or is a child of recent files/dirs
+            for recent_p in recent_files_paths:
+                if path == recent_p or str(path).startswith(str(recent_p)):
+                    recent_match_score = min(1.0, recent_match_score + 0.2)
+                    break
+            
+            for recent_d in recent_dirs_paths:
+                if path == recent_d or str(path).startswith(str(recent_d)):
+                    recent_match_score = min(1.0, recent_match_score + 0.2)
+                    break
+        
+        # Combine path validity and recency scores
+        path_score = (path_score * 0.7) + (recent_match_score * 0.3)
+        
+        return min(1.0, max(0.3, path_score))
 
 
+
+    def _check_operation_relevance(
+        self, 
+        command_analysis: CommandAnalysis, 
+        current_state: ContextualState
+    ) -> float:
+
+        operation_score = 0.7
+        
+        # Get base command and category/subcategory
+        base_command = command_analysis.base_command
+        category = command_analysis.category
+        # subcategory = command_analysis.subcategory # Not used in this version of the logic
+        
+        # Check recent commands for continuity
+        recent_commands_tuples = current_state.recent_commands # This is List[Tuple[str, datetime]]
+        
+        if recent_commands_tuples:
+            last_cmd_str, _ = recent_commands_tuples[0] # Get the command string
+            last_base = self._extract_base_command(last_cmd_str) # Use helper to get base
+            
+            sequence_score = 0.0
+            
+            if (last_base in ['ls', 'find', 'du', 'df'] and 
+                base_command in ['cd', 'ls', 'mv', 'cp', 'rm']):
+                sequence_score += 0.2
+            elif (last_base == 'cd' and 
+                  base_command in ['ls', 'pwd', 'find', 'touch', 'mkdir']):
+                sequence_score += 0.2
+            # ... (add other sequence patterns as in the original snippet) ...
+            
+            operation_score = min(1.0, operation_score + sequence_score)
+        
+        if current_state.active_processes:
+            process_match_score = 0.0
+            for process_name_str in current_state.active_processes:
+                if isinstance(process_name_str, str): # Ensure it's a string
+                    if process_name_str.lower() in base_command.lower() or base_command.lower() in process_name_str.lower():
+                        process_match_score += 0.1
+                        break
+            if category == CommandCategory.PROCESS: # Ensure CommandCategory is accessible
+                process_match_score += 0.1
+            operation_score = min(1.0, operation_score + process_match_score)
+            
+        return min(1.0, max(0.3, operation_score))
 
     
     def _initialize_command_categories(self):
@@ -877,6 +1074,63 @@ class ConfidenceScorer:
         self._absolute_path_pattern = re.compile(r'/[^\s]*')
         self._relative_path_pattern = re.compile(r'\.{1,2}/[^\s]*|[^-/\s][^/\s]*/[^\s]*')
         self._home_path_pattern = re.compile(r'~(/[^\s]*)?')
+  
+  
+    def _check_contextual_relevance(
+        self,
+        request: str,
+        command: str,
+        command_analysis: CommandAnalysis,
+        context: Dict[str, Any] # Using the original context dict passed to score_command_confidence
+    ) -> float:
+        """
+        Check if the command is relevant to the current contextual state.
+        
+        Analyzes the command in relation to the current environment, project type,
+        recent files, directories, and other contextual factors.
+        
+        Args:
+            request: The original request
+            command: The suggested command
+            command_analysis: Detailed command analysis
+            context: Context information (the raw context dictionary)
+            
+        Returns:
+            Context relevance score (0-1)
+        """
+        # Get context manager and session manager from the API layer
+        context_manager = get_context_manager()
+        session_manager = get_session_manager()
+        
+        # Create the ContextualState object using the provided context
+        # This encapsulates the logic for fetching relevant parts of the context
+        current_state = ContextualState.from_context_manager(context_manager, session_manager)
+        
+        # Start with a neutral score
+        relevance_score = 0.7 # Default base score
+        
+        # Call the sub-check methods, passing the `current_state` object
+        path_relevance = self._check_path_relevance(command_analysis, current_state)
+        operation_relevance = self._check_operation_relevance(command_analysis, current_state)
+        project_relevance = self._check_project_relevance(command_analysis, current_state)
+        env_relevance = self._check_environment_relevance(command_analysis, current_state)
+        
+        # Combine scores with appropriate weighting
+        # Ensure these weights are defined or adjust as needed
+        # These weights are from the SCORING_WEIGHTS constant, but here we are combining sub-scores for context_relevance
+        relevance_score = (
+            0.4 * path_relevance +
+            0.3 * operation_relevance +
+            0.2 * project_relevance +
+            0.1 * env_relevance
+        )
+        
+        # Ensure score is in valid range (e.g., 0.3 to 1.0 for this sub-score)
+        relevance_score = min(1.0, max(0.3, relevance_score))
+        
+        return relevance_score  
+  
+  
     
     def score_command_confidence(
         self, 
